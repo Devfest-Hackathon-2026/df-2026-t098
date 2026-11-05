@@ -1,0 +1,84 @@
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand" aria-label="WhyLint"><span class="brand-mark" aria-hidden="true">w<span>_</span></span><span>whylint<span class="brand-dot">.</span></span></div>
+    <div class="header-actions"><span class="preview-label">{{ ui.preview }}</span><button class="language-toggle" type="button" (click)="toggleLanguage()" [attr.aria-label]="language() === 'ja' ? 'Switch to English' : '日本語に切り替え'" [attr.lang]="language() === 'ja' ? 'en' : 'ja'">{{ language() === 'ja' ? 'EN' : '日本語' }}</button><button class="theme-toggle" type="button" (click)="toggleTheme()" [attr.aria-label]="theme() === 'dark' ? ui.lightTheme : ui.darkTheme" [attr.title]="theme() === 'dark' ? ui.lightTheme : ui.darkTheme">@if (theme() === 'dark') {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>} @else {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z"/></svg>}</button></div>
+  </header>
+
+  @if (tab() === 'feed') {
+    @let currentCard = cards[activeCardIndex()];
+    @let currentText = language() === 'ja' ? currentCard.ja : currentCard;
+    <h1 class="sr-only">{{ ui.practice }}</h1>
+    <div class="feed-heading">
+      <div class="feed-heading-text"><div class="feed-concept"><span class="concept-dot"></span><span>{{ currentText.concept }}</span><span class="card-count">{{ activeCardIndex() + 1 }} / {{ cards.length }}</span></div><h2 class="feed-question" tabindex="-1">{{ currentText.question }}</h2></div>
+      <div class="feed-navigation">
+        @if (activeCardIndex() > 0) { <button type="button" (click)="goToCard(activeCardIndex() - 1, feed, $event)">{{ ui.previous }}</button> }
+        @if (activeCardIndex() < cards.length - 1) { <button type="button" (click)="goToCard(activeCardIndex() + 1, feed, $event)">{{ ui.next }} <span aria-hidden="true">↓</span></button> }
+      </div>
+    </div>
+  }
+
+  <main class="content" [class.feed-content]="tab() === 'feed'" id="main-content" #feed (scroll)="onFeedScroll(feed)">
+    @if (tab() === 'feed') {
+      @for (card of cards; track card.id; let cardIndex = $index) {
+        @let text = language() === 'ja' ? card.ja : card;
+        <section class="feed-slide" [id]="'card-' + cardIndex" [attr.aria-label]="ui.card(cardIndex + 1, cards.length)">
+          <h2 class="sr-only">{{ text.question }}</h2>
+          <article class="question-card">
+            <div class="code-window" [attr.aria-label]="ui.codeExample"><div class="code-head"><span>snippet.js · {{ card.language }}</span><span>{{ text.title }}</span></div><pre><code>@for (token of card.code | syntaxHighlight:card.language; track $index) {<span [class]="'syntax-' + token.kind">{{ token.text }}</span>}</code></pre></div>
+            @if (card.reviewOf) { <p class="review-label">{{ ui.reviewCard }}</p> }
+            @if (!states[cardIndex].revealed) {
+              <div class="answer-heading"><h3>{{ ui.yourAnswer }}</h3><button class="solution-button" type="button" (click)="reveal(cardIndex)">{{ ui.viewSolution }}</button></div>
+              <div class="answer-switch" role="group" [attr.aria-label]="ui.answerSection">
+                <button type="button" [class.current]="states[cardIndex].view === 'choice'" [attr.aria-pressed]="states[cardIndex].view === 'choice'" (click)="states[cardIndex].view = 'choice'">{{ ui.choose }} <span>{{ states[cardIndex].selected !== null ? '✓' : '' }}</span></button>
+                <button type="button" [class.current]="states[cardIndex].view === 'reason'" [attr.aria-pressed]="states[cardIndex].view === 'reason'" (click)="states[cardIndex].view = 'reason'">{{ ui.yourWhy }} <span>{{ states[cardIndex].reason.trim() ? '✓' : '' }}</span></button>
+              </div>
+              @if (states[cardIndex].view === 'choice') {
+                <fieldset class="answers"><legend>{{ ui.chooseExplanation }}</legend>
+                  @for (option of text.options; track $index; let i = $index) {
+                    <label class="answer" [class.selected]="states[cardIndex].selected === i"><input type="radio" [name]="'explanation-' + cardIndex" [value]="i" [checked]="states[cardIndex].selected === i" (change)="selectAnswer(cardIndex, i)"><span class="answer-letter">{{ ['A', 'B', 'C'][i] }}</span><span>{{ option }}</span><span class="radio-mark"></span></label>
+                  }
+                </fieldset>
+              } @else {
+                <label class="reason-label" [for]="'reason-' + cardIndex">{{ ui.reasonLabel }}</label>
+                <textarea [id]="'reason-' + cardIndex" [ngModel]="states[cardIndex].reason" (ngModelChange)="setReason(cardIndex, $event)" [placeholder]="ui.reasonPlaceholder" rows="4"></textarea>
+                <p class="reason-note">{{ ui.reasonNote }}</p>
+              }
+            } @else {
+              <section class="solution" aria-live="polite">
+                <div class="solution-heading"><h3>{{ ui.solution }}</h3><span>{{ states[cardIndex].peeked ? ui.peeked : ui.attempted }}</span></div>
+                @if (states[cardIndex].selected !== null) { <p class="answer-feedback">{{ states[cardIndex].selected === card.answer ? ui.correct : ui.incorrect }}</p><p class="chosen-answer">{{ text.options[states[cardIndex].selected!] }}</p> }
+                <p>{{ text.solution }}</p>
+                @if (states[cardIndex].reason.trim()) { <div class="your-reason"><h4>{{ ui.yourExplanation }}</h4><p>{{ states[cardIndex].reason }}</p></div> }
+                <p class="preview-note">{{ ui.previewNote }}</p>
+                <fieldset class="rating"><legend>{{ ui.rating }} <span>{{ ui.optional }}</span></legend>
+                  <div>
+                    <button type="button" [attr.aria-pressed]="states[cardIndex].rating === 'got-it'" (click)="setRating(cardIndex, 'got-it')">{{ ui.gotIt }}</button>
+                    <button type="button" [attr.aria-pressed]="states[cardIndex].rating === 'almost'" (click)="setRating(cardIndex, 'almost')">{{ ui.almost }}</button>
+                    <button type="button" [attr.aria-pressed]="states[cardIndex].rating === 'no'" (click)="setRating(cardIndex, 'no')">{{ ui.no }}</button>
+                  </div>
+                </fieldset>
+              </section>
+            }
+          </article>
+          <div class="slide-footer">
+            <span>{{ cardIndex < cards.length - 1 ? ui.continue : ui.end }}</span>
+            <div>
+              @if (cardIndex > 0) { <button type="button" (click)="goToCard(cardIndex - 1, feed, $event)">{{ ui.previous }}</button> }
+              @if (cardIndex < cards.length - 1) { <button type="button" (click)="goToCard(cardIndex + 1, feed, $event)">{{ ui.next }} <span aria-hidden="true">↓</span></button> }
+              @else { <button type="button" (click)="goToCard(0, feed, $event)">{{ ui.backToFirst }}</button> }
+            </div>
+          </div>
+        </section>
+      }
+    } @else if (tab() === 'news') {
+      <section class="empty-page"><h1>{{ ui.news }}</h1><p class="empty-intro">{{ ui.newsIntro }}</p><div class="empty-card"><h2>{{ ui.newsTitle }}</h2><p>{{ ui.newsBody }}</p><button type="button" (click)="openTab('feed', feed)">{{ ui.backToPractice }} →</button></div></section>
+    } @else {
+      <section class="empty-page"><h1>{{ ui.profile }}</h1><p class="empty-intro">{{ ui.profileIntro }}</p><div class="empty-card progress-card"><h2>{{ ui.progressTitle }}</h2><p>{{ progressStorageAvailable() ? ui.progressSaved : ui.progressSession }}</p><ul class="progress-list">@for (card of cards; track card.id; let i = $index) { @let text = language() === 'ja' ? card.ja : card; <li><div><span>{{ text.concept }}</span>@if (card.reviewOf) { <small>{{ ui.progressReview }}</small> }</div><span>{{ states[i].revealed ? (states[i].peeked ? ui.progressPeeked : ui.progressAttempted) : (states[i].selected !== null || states[i].reason.trim() ? ui.progressDraft : ui.progressPending) }}</span></li> }</ul><p>{{ ui.progressNote }}</p><div class="progress-actions"><button type="button" (click)="openTab('feed', feed)">{{ ui.backToPractice }} →</button>@if (!clearRequested()) { <button type="button" (click)="clearRequested.set(true)">{{ ui.clearProgress }}</button> } @else { <button type="button" (click)="clearProgress()">{{ ui.confirmClear }}</button><button type="button" (click)="clearRequested.set(false)">{{ ui.cancelClear }}</button> }</div>@if (clearError()) { <p role="alert">{{ ui.clearError }}</p> }</div></section>
+    }
+  </main>
+  <nav class="bottom-nav" [attr.aria-label]="ui.navigation">
+    <button type="button" (click)="openTab('feed', feed)" [attr.aria-current]="tab() === 'feed' ? 'page' : null" [class.active]="tab() === 'feed'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg><span>{{ ui.feed }}</span></button>
+    <button type="button" (click)="openTab('news', feed)" [attr.aria-current]="tab() === 'news' ? 'page' : null" [class.active]="tab() === 'news'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 12h8M8 15h5"/></svg><span>{{ ui.news }}</span></button>
+    <button type="button" (click)="openTab('profile', feed)" [attr.aria-current]="tab() === 'profile' ? 'page' : null" [class.active]="tab() === 'profile'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.5-3.1 2.6-5 6.5-5s6 1.9 6.5 5"/></svg><span>{{ ui.profile }}</span></button>
+  </nav>
+</div>
