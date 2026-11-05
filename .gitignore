@@ -32,3 +32,8 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.log
+.agents/
+.codex/
+.cursor/
+.impeccable/
+skills-lock.json
