@@ -34,6 +34,7 @@ const COPY = {
     profile: 'プロフィール', profileIntro: '理解を少しずつ積み重ねよう。', profileTitle: 'ここから始まります。',
     profileBody: '進捗管理が使えるようになると、概念ごとの習熟度や弱点がここに表示されます。',
     backToPractice: '学習に戻る', navigation: 'メインナビゲーション', feed: 'フィード',
+    save: '保存', saved: '保存済み', removeSaved: '保存を解除', savedTitle: '保存した問題', savedEmpty: '気になる問題を保存すると、ここからいつでも見返せます。', savedLocal: '保存した問題はこの端末にのみ保存されます。', savedSession: '保存できないため、この画面を開いている間のみ保持されます。', openSaved: '問題を開く',
   },
   en: {
     preview: 'Early preview', lightTheme: 'Switch to light theme', darkTheme: 'Switch to dark theme', practice: 'Practice', card: (n: number, total: number) => `Card ${n} of ${total}`,
@@ -51,6 +52,7 @@ const COPY = {
     profile: 'Profile', profileIntro: 'Make space for what you know.', profileTitle: 'Your map starts here.',
     profileBody: 'Your concept gaps and mastery will show up here once progress tracking is connected.',
     backToPractice: 'Back to practice', navigation: 'Main navigation', feed: 'Feed',
+    save: 'Save', saved: 'Saved', removeSaved: 'Remove saved question', savedTitle: 'Saved questions', savedEmpty: 'Save a question to find it here later.', savedLocal: 'Saved questions stay on this device.', savedSession: 'Storage is unavailable, so saved questions last only for this session.', openSaved: 'Open question',
   },
 } as const;
 
@@ -72,6 +74,9 @@ interface Card extends CardText {
 export class Homepage {
   private readonly document = inject(DOCUMENT);
   private readonly progressKey = 'whylint-preview-progress-v1';
+  private readonly savedKey = 'whylint-saved-cards-v1';
+  protected readonly savedIds = signal<string[]>([]);
+  protected readonly savedStorageAvailable = signal(true);
   protected readonly progressStorageAvailable = signal(true);
   protected readonly clearRequested = signal(false);
   protected readonly clearError = signal(false);
@@ -89,6 +94,7 @@ export class Homepage {
   constructor() {
     this.applyTheme(this.theme());
     this.restoreProgress();
+    this.restoreSaved();
     const onSystemThemeChange = (event: MediaQueryListEvent) => {
       if (!this.hasThemePreference) {
         const theme = event.matches ? 'light' : 'dark';
@@ -222,6 +228,55 @@ export class Homepage {
         solution: 'slice は浅いコピーを作るため、新しい配列への push は元の配列を変更しません。' },
     },
   };
+
+  protected get savedCards(): Card[] {
+    const available = [...this.cards.filter((card) => !card.reviewOf), ...Object.values(this.reviewCards)];
+    return this.savedIds().flatMap((id) => {
+      const card = available.find((item) => item.id === id);
+      return card ? [card] : [];
+    });
+  }
+
+  protected toggleSaved(id: string): void {
+    this.savedIds.update((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
+    try {
+      const storage = this.document.defaultView?.localStorage;
+      if (!storage) throw new Error('Storage unavailable');
+      storage.setItem(this.savedKey, JSON.stringify(this.savedIds()));
+      this.savedStorageAvailable.set(true);
+    } catch {
+      this.savedStorageAvailable.set(false);
+    }
+  }
+
+  private restoreSaved(): void {
+    try {
+      const storage = this.document.defaultView?.localStorage;
+      if (!storage) throw new Error('Storage unavailable');
+      const raw = storage.getItem(this.savedKey);
+      if (!raw) return;
+      const ids: unknown = JSON.parse(raw);
+      if (Array.isArray(ids)) {
+        const known = [...this.cards, ...Object.values(this.reviewCards)].map((card) => card.id);
+        this.savedIds.set([...new Set(ids.filter((id): id is string => typeof id === 'string' && known.includes(id)))]);
+      }
+    } catch {
+      this.savedStorageAvailable.set(false);
+    }
+  }
+
+  protected openSavedCard(card: Card, feed: HTMLElement): void {
+    if (card.reviewOf) this.addReview(card.reviewOf);
+    const index = this.cards.findIndex((item) => item.id === card.id);
+    if (index < 0) return;
+    this.tab.set('feed');
+    this.activeCardIndex.set(index);
+    afterNextRender(() => {
+      const target = feed.querySelector<HTMLElement>(`#card-${index}`);
+      if (target) feed.scrollTop += target.getBoundingClientRect().top - feed.getBoundingClientRect().top;
+      this.document.querySelector<HTMLElement>('.feed-question')?.focus({ preventScroll: true });
+    }, { injector: this.injector });
+  }
 
   // Preview progress is local to this device and never implies mastery.
   protected readonly states = this.cards.map(() => this.emptyState());
