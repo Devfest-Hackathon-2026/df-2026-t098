@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { afterNextRender, Component, DestroyRef, inject, Injector, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { SyntaxHighlightPipe } from './syntax-highlight.pipe';
 
 type Tab = 'feed' | 'news' | 'profile';
@@ -31,7 +32,7 @@ const COPY = {
     continue: 'スクロールして続ける', end: 'プレビューはここまで', previous: '前へ', next: '次へ', backToFirst: '最初へ戻る',
     news: 'ニュース', newsIntro: '気になる話題を、もっと深く。', newsTitle: '準備中です。',
     newsBody: '厳選した記事と出典をここに掲載する予定です。それまではフィードをお楽しみください。',
-    profile: 'プロフィール', profileIntro: '理解を少しずつ積み重ねよう。', profileTitle: 'ここから始まります。',
+    profile: 'プロフィール', changeLearning: '学習対象を変更', profileIntro: '理解を少しずつ積み重ねよう。', profileTitle: 'ここから始まります。',
     profileBody: '進捗管理が使えるようになると、概念ごとの習熟度や弱点がここに表示されます。',
     backToPractice: '学習に戻る', navigation: 'メインナビゲーション', feed: 'フィード',
   },
@@ -48,7 +49,7 @@ const COPY = {
     continue: 'Scroll to continue', end: 'End of preview', previous: 'Previous', next: 'Next', backToFirst: 'Back to first',
     news: 'News', newsIntro: 'Good ideas are worth looking into.', newsTitle: 'Coming into focus.',
     newsBody: 'Curated reads and their sources will live here. For now, there’s plenty to explore in the feed.',
-    profile: 'Profile', profileIntro: 'Make space for what you know.', profileTitle: 'Your map starts here.',
+    profile: 'Profile', changeLearning: 'Change learning target', profileIntro: 'Make space for what you know.', profileTitle: 'Your map starts here.',
     profileBody: 'Your concept gaps and mastery will show up here once progress tracking is connected.',
     backToPractice: 'Back to practice', navigation: 'Main navigation', feed: 'Feed',
   },
@@ -65,7 +66,7 @@ interface Card extends CardText {
 
 @Component({
   selector: 'app-homepage',
-  imports: [FormsModule, SyntaxHighlightPipe],
+  imports: [FormsModule, RouterLink, SyntaxHighlightPipe],
   templateUrl: './homepage.html',
   styleUrl: './homepage.css',
 })
@@ -83,11 +84,12 @@ export class Homepage {
   protected readonly theme = signal<Theme>(this.storedTheme ?? (this.systemTheme?.matches ? 'light' : 'dark'));
   protected readonly tab = signal<Tab>('feed');
   protected readonly activeCardIndex = signal(0);
-  protected readonly language = signal<Language>('ja');
+  protected readonly language = signal<Language>(this.readStoredLanguage());
   protected get ui() { return COPY[this.language()]; }
 
   constructor() {
     this.applyTheme(this.theme());
+    this.applyLanguage(this.language());
     this.restoreProgress();
     const onSystemThemeChange = (event: MediaQueryListEvent) => {
       if (!this.hasThemePreference) {
@@ -129,6 +131,15 @@ export class Homepage {
   protected toggleLanguage(): void {
     const next = this.language() === 'ja' ? 'en' : 'ja';
     this.language.set(next);
+    this.applyLanguage(next);
+    try { this.document.defaultView?.localStorage.setItem('whylint-language', next); } catch { /* Keep the session setting. */ }
+  }
+
+  private readStoredLanguage(): Language {
+    try { return this.document.defaultView?.localStorage.getItem('whylint-language') === 'en' ? 'en' : 'ja'; } catch { return 'ja'; }
+  }
+
+  private applyLanguage(next: Language): void {
     this.document.documentElement.lang = next;
     this.document.title = next === 'ja' ? 'WhyLint — コードの「なぜ」を学ぼう' : 'WhyLint — Understand what you ship';
   }

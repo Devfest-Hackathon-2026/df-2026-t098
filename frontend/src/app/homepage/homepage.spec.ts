@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Homepage } from './homepage';
 import { vi } from 'vitest';
+import { provideRouter } from '@angular/router';
 
 describe('Homepage feed', () => {
   let fixture: ComponentFixture<Homepage>;
@@ -8,7 +9,7 @@ describe('Homepage feed', () => {
   beforeEach(async () => {
     localStorage.removeItem('whylint-theme');
     localStorage.removeItem('whylint-preview-progress-v1');
-    await TestBed.configureTestingModule({ imports: [Homepage] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [Homepage], providers: [provideRouter([])] }).compileComponents();
     fixture = TestBed.createComponent(Homepage);
     await fixture.whenStable();
   });
