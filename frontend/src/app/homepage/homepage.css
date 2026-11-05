@@ -18,3 +18,19 @@ pre { margin: 0; padding: 12px; overflow-x: auto; color: var(--code-text); font:
 
 
 @media (min-width: 680px) { .feed-heading { padding-left: 44px; padding-right: 44px; } }
+
+.card-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+.save-button, .saved-remove { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; }
+.save-button svg, .saved-remove svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; fill: none; }
+.save-button.is-saved, .saved-remove { color: var(--accent); }
+.save-button.is-saved svg, .saved-remove svg { fill: currentColor; }
+.saved-section { margin-bottom: 16px; }
+.saved-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.saved-heading span { color: var(--muted); font: 13px 'DM Mono', monospace; }
+.saved-list { list-style: none; padding: 0; margin: 18px 0 0; border-top: 1px solid var(--border); }
+.saved-list li { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.empty-card .saved-card-link { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 0; text-align: left; }
+.saved-concept { color: var(--muted); font-size: 12px; }
+.saved-question { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.saved-open { color: var(--accent); font-size: 12px; }
+.empty-card .saved-remove { flex: 0 0 44px; padding: 0; }

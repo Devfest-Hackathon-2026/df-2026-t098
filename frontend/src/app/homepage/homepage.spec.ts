@@ -9,7 +9,8 @@ describe('Homepage feed', () => {
   beforeEach(async () => {
     localStorage.removeItem('whylint-theme');
     localStorage.removeItem('whylint-preview-progress-v1');
-    await TestBed.configureTestingModule({ imports: [Homepage], providers: [provideRouter([])] }).compileComponents();
+    localStorage.removeItem('whylint-saved-cards-v1');
+    await TestBed.configureTestingModule({ imports: [Homepage] }).compileComponents();
     fixture = TestBed.createComponent(Homepage);
     await fixture.whenStable();
   });
@@ -197,6 +198,55 @@ describe('Homepage feed', () => {
     } finally {
       blocked.mockRestore();
     }
+  });
+
+  it('saves a question, restores it in profile, opens it, and removes it', async () => {
+    let root = fixture.nativeElement as HTMLElement;
+    (root.querySelector('#card-1 .save-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('#card-1 .save-button')?.getAttribute('aria-pressed')).toBe('true');
+    fixture.destroy();
+    fixture = TestBed.createComponent(Homepage);
+    await fixture.whenStable();
+    root = fixture.nativeElement as HTMLElement;
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.saved-list')?.textContent).toContain('second');
+    (root.querySelector('.saved-card-link') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('second');
+    expect(root.querySelector('#card-1 .save-button')?.getAttribute('aria-pressed')).toBe('true');
+    (root.querySelector('#card-1 .save-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.saved-empty')).not.toBeNull();
+  });
+
+  it('keeps saved review cards when practice history is cleared', async () => {
+    let root = fixture.nativeElement as HTMLElement;
+    (root.querySelector('#card-0 .solution-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelector('#card-3 .save-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelector('.progress-actions button:nth-child(2)') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelector('.progress-actions button:nth-child(2)') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    fixture.destroy();
+    fixture = TestBed.createComponent(Homepage);
+    await fixture.whenStable();
+    root = fixture.nativeElement as HTMLElement;
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.saved-list')?.textContent).toContain('なぜ2回目');
+    (root.querySelector('.saved-card-link') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('なぜ2回目');
   });
 
 });
