@@ -248,4 +248,39 @@ describe('Homepage feed', () => {
     expect(root.querySelector('.feed-heading h2')?.textContent).toContain('なぜ2回目');
   });
 
+  it('filters the feed by a selected concept without losing the original answer state', () => {
+    const root = fixture.nativeElement as HTMLElement;
+    (root.querySelector('#card-1 input[type="radio"]') as HTMLInputElement).click();
+    fixture.detectChanges();
+    (root.querySelector('.menu-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelectorAll('.main-menu button')[1] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelectorAll('.concept-list button')[1] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelector('.apply-filters') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.feed-slide')).toHaveLength(1);
+    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('second');
+    expect((root.querySelector('#card-1 input[type="radio"]') as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('shows an empty state for unavailable filters and allows changing them', () => {
+    const root = fixture.nativeElement as HTMLElement;
+    (root.querySelector('.menu-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (root.querySelectorAll('.main-menu button')[1] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const python = Array.from(root.querySelectorAll('.filter-options button')).find((button) => button.textContent?.trim() === 'Python') as HTMLButtonElement;
+    python.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.concept-list')?.textContent).toContain('条件に合うトピックがありません');
+    (root.querySelector('.apply-filters') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.filter-empty')?.textContent).toContain('条件に合う問題がありません');
+    (root.querySelector('.filter-empty button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.discover-page')).not.toBeNull();
+  });
+
 });

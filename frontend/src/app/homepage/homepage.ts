@@ -3,7 +3,8 @@ import { afterNextRender, Component, DestroyRef, inject, Injector, signal } from
 import { FormsModule } from '@angular/forms';
 import { SyntaxHighlightPipe } from './syntax-highlight.pipe';
 
-type Tab = 'feed' | 'news' | 'profile';
+type Tab = 'feed' | 'news' | 'profile' | 'discover';
+type Difficulty = 'all' | 'beginner' | 'intermediate' | 'advanced';
 type AnswerView = 'choice' | 'reason';
 type SelfRating = 'got-it' | 'almost' | 'no';
 type Language = 'ja' | 'en';
@@ -35,6 +36,7 @@ const COPY = {
     profileBody: '進捗管理が使えるようになると、概念ごとの習熟度や弱点がここに表示されます。',
     backToPractice: '学習に戻る', navigation: 'メインナビゲーション', feed: 'フィード',
     save: '保存', saved: '保存済み', removeSaved: '保存を解除', savedTitle: '保存した問題', savedEmpty: '気になる問題を保存すると、ここからいつでも見返せます。', savedLocal: '保存した問題はこの端末にのみ保存されます。', savedSession: '保存できないため、この画面を開いている間のみ保持されます。', openSaved: '問題を開く',
+    menu: 'メニュー', discover: '学ぶトピックを探す', discoverIntro: '言語や概念で絞り込んで、学びたいトピックを見つけましょう。', search: '言語や概念を検索', languages: '言語', difficulty: '難易度', concepts: '概念', all: 'すべて', beginner: '初級', intermediate: '中級', advanced: '上級', learn: 'この条件で学ぶ', noConcepts: '条件に合うトピックがありません。', noCards: '条件に合う問題がありません。条件を変えてお試しください。', editFilters: '条件を変更', sampleLevel: '現在のサンプル問題は初級として表示しています。', count: (n: number) => `${n}問`,
   },
   en: {
     preview: 'Early preview', lightTheme: 'Switch to light theme', darkTheme: 'Switch to dark theme', practice: 'Practice', card: (n: number, total: number) => `Card ${n} of ${total}`,
@@ -53,6 +55,7 @@ const COPY = {
     profileBody: 'Your concept gaps and mastery will show up here once progress tracking is connected.',
     backToPractice: 'Back to practice', navigation: 'Main navigation', feed: 'Feed',
     save: 'Save', saved: 'Saved', removeSaved: 'Remove saved question', savedTitle: 'Saved questions', savedEmpty: 'Save a question to find it here later.', savedLocal: 'Saved questions stay on this device.', savedSession: 'Storage is unavailable, so saved questions last only for this session.', openSaved: 'Open question',
+    menu: 'Menu', discover: 'Explore topics', discoverIntro: 'Find something to learn by language or concept.', search: 'Search languages or concepts', languages: 'Language', difficulty: 'Difficulty', concepts: 'Concepts', all: 'All', beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', learn: 'Practice with these filters', noConcepts: 'No topics match these filters.', noCards: 'No questions match these filters. Try changing them.', editFilters: 'Change filters', sampleLevel: 'Current sample questions are shown as beginner level.', count: (n: number) => `${n} questions`,
   },
 } as const;
 
@@ -69,7 +72,7 @@ interface Card extends CardText {
   selector: 'app-homepage',
   imports: [FormsModule, SyntaxHighlightPipe],
   templateUrl: './homepage.html',
-  styleUrl: './homepage.css',
+  styleUrls: ['./homepage.css', './discover.css'],
 })
 export class Homepage {
   private readonly document = inject(DOCUMENT);
@@ -88,6 +91,14 @@ export class Homepage {
   protected readonly theme = signal<Theme>(this.storedTheme ?? (this.systemTheme?.matches ? 'light' : 'dark'));
   protected readonly tab = signal<Tab>('feed');
   protected readonly activeCardIndex = signal(0);
+  protected readonly menuOpen = signal(false);
+  protected readonly searchQuery = signal('');
+  protected readonly selectedLanguage = signal('all');
+  protected readonly selectedDifficulty = signal<Difficulty>('all');
+  protected readonly selectedConcept = signal<string | null>(null);
+  protected readonly appliedFilters = signal<{ language: string; difficulty: Difficulty; concept: string | null }>({ language: 'all', difficulty: 'all', concept: null });
+  protected readonly languages = ['all', 'JavaScript', 'Python', 'SQL'];
+  protected readonly difficulties: Difficulty[] = ['all', 'beginner', 'intermediate', 'advanced'];
   protected readonly language = signal<Language>('ja');
   protected get ui() { return COPY[this.language()]; }
 
@@ -229,6 +240,38 @@ export class Homepage {
     },
   };
 
+  protected get feedCards(): { card: Card; index: number }[] {
+    const filter = this.appliedFilters();
+    return this.cards.map((card, index) => ({ card, index })).filter(({ card }) =>
+      (filter.language === 'all' || card.language === filter.language) &&
+      (filter.difficulty === 'all' || filter.difficulty === 'beginner') &&
+      (!filter.concept || (card.reviewOf ?? card.id) === filter.concept));
+  }
+
+  protected get availableConcepts(): { card: Card; count: number }[] {
+    const query = this.searchQuery().trim().toLocaleLowerCase();
+    return this.cards.filter((card) => !card.reviewOf).filter((card) => {
+      const text = this.language() === 'ja' ? card.ja : card;
+      const matchesQuery = !query || [card.language, card.concept, card.ja.concept, text.title].some((value) => value.toLocaleLowerCase().includes(query));
+      return matchesQuery && (this.selectedLanguage() === 'all' || card.language === this.selectedLanguage()) && (this.selectedDifficulty() === 'all' || this.selectedDifficulty() === 'beginner');
+    }).map((card) => ({ card, count: this.cards.filter((item) => item.id === card.id || item.reviewOf === card.id).length }));
+  }
+
+  protected selectLanguage(value: string): void {
+    this.selectedLanguage.set(value);
+    this.selectedConcept.set(null);
+  }
+
+  protected selectDifficulty(value: Difficulty): void {
+    this.selectedDifficulty.set(value);
+    this.selectedConcept.set(null);
+  }
+
+  protected applyFilters(feed: HTMLElement): void {
+    this.appliedFilters.set({ language: this.selectedLanguage(), difficulty: this.selectedDifficulty(), concept: this.selectedConcept() });
+    this.openTab('feed', feed);
+  }
+
   protected get savedCards(): Card[] {
     const available = [...this.cards.filter((card) => !card.reviewOf), ...Object.values(this.reviewCards)];
     return this.savedIds().flatMap((id) => {
@@ -267,6 +310,7 @@ export class Homepage {
 
   protected openSavedCard(card: Card, feed: HTMLElement): void {
     if (card.reviewOf) this.addReview(card.reviewOf);
+    this.appliedFilters.set({ language: 'all', difficulty: 'all', concept: null });
     const index = this.cards.findIndex((item) => item.id === card.id);
     if (index < 0) return;
     this.tab.set('feed');
@@ -389,6 +433,7 @@ export class Homepage {
   }
 
   protected openTab(tab: Tab, feed: HTMLElement): void {
+    this.menuOpen.set(false);
     if (this.tab() === tab) return;
     feed.scrollTop = 0;
     this.tab.set(tab);
@@ -407,7 +452,7 @@ export class Homepage {
   }
 
   protected goToCard(index: number, feed: HTMLElement, event: MouseEvent): void {
-    const target = feed.querySelector<HTMLElement>(`#card-${index}`);
+    const target = feed.querySelectorAll<HTMLElement>('.feed-slide')[index];
     if (!target) return;
     const top = target.getBoundingClientRect().top - feed.getBoundingClientRect().top + feed.scrollTop;
     const reduceMotion = this.document.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
