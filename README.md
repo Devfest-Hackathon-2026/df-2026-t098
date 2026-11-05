@@ -4,6 +4,10 @@
 
 [日本語](#日本語) · [English](#english)
 
+> 提出用リポジトリには、現時点では README と運営の初期ファイルのみが含まれています。アプリのソースコードはまだ含まれていません。
+>
+> This submission repository currently contains the README and the organizers’ starter files. The application source code has not been added yet.
+
 ---
 
 ## 日本語
@@ -192,3 +196,7 @@ npm test -- --watch=false
 - [日本語 PRD](../whylint/whylint-prd-ja.md)
 
 These links assume `hackathon` and `whylint` are sibling directories on this machine. The five-question refill described in this README is the latest direction; the PRDs have not yet been updated to match it.
+
+## Submission guide / 提出ガイド
+
+- [運営が用意した提出ガイド / Original organizer guide](docs/organizer-guide.md)
