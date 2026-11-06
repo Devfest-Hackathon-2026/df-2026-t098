@@ -94,6 +94,40 @@
       <section class="empty-page"><h1>{{ ui.news }}</h1><p class="empty-intro">{{ ui.newsIntro }}</p><div class="empty-card"><h2>{{ ui.newsTitle }}</h2><p>{{ ui.newsBody }}</p><button type="button" (click)="openTab('feed', feed)">{{ ui.backToPractice }} →</button></div></section>
     } @else {
       <section class="empty-page"><h1>{{ ui.profile }}</h1><p class="empty-intro">{{ ui.profileIntro }}</p>
+        <section class="empty-card account-section" aria-labelledby="account-title">
+          <h2 id="account-title">{{ ui.account }}</h2>
+          @if (authSession.status() === 'loading') {
+            <p role="status">{{ ui.accountLoading }}</p>
+          } @else if (authSession.status() === 'authenticated') {
+            @if (authSession.user(); as account) {
+              <div class="account-details">
+                <span class="account-avatar" aria-hidden="true">
+                  @if (account.avatarUrl && failedAvatarUrl() !== account.avatarUrl) {
+                    <img [src]="account.avatarUrl" alt="" width="44" height="44" referrerpolicy="no-referrer" (error)="failedAvatarUrl.set(account.avatarUrl)">
+                  } @else {
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.5-3.1 2.6-5 6.5-5s6 1.9 6.5 5"/></svg>
+                  }
+                </span>
+                <div class="account-identity">
+                  <strong>{{ account.name || account.email }}</strong>
+                  @if (account.name) { <span>{{ account.email }}</span> }
+                  @if (account.username) { <span class="account-username">@{{ account.username }}</span> }
+                </div>
+              </div>
+            }
+          } @else if (authSession.status() === 'guest') {
+            <p>{{ ui.accountGuest }}</p>
+            <a class="account-sign-in" routerLink="/login">{{ ui.accountSignIn }} <span aria-hidden="true">→</span></a>
+          } @else {
+            <p role="alert">{{ ui.accountUnavailable }}</p>
+            <button class="account-retry" type="button" (click)="authSession.refresh()">{{ ui.accountRetry }}</button>
+          }
+          <app-username-setup [language]="language()" [showRecoveryActions]="false"/>
+          @if (authSession.status() === 'authenticated' && authSession.user()) {
+            <button class="account-sign-out" type="button" [disabled]="authSession.loggingOut()" [attr.aria-busy]="authSession.loggingOut()" (click)="signOut()">{{ authSession.loggingOut() ? ui.signingOut : ui.signOut }}</button>
+            @if (signOutFailed()) { <p class="account-error" role="alert">{{ ui.signOutError }}</p> }
+          }
+        </section>
         <section class="empty-card saved-section" aria-labelledby="saved-title"><div class="saved-heading"><h2 id="saved-title">{{ ui.savedTitle }}</h2><span>{{ savedCards.length }}</span></div><p>{{ savedStorageAvailable() ? ui.savedLocal : ui.savedSession }}</p>
           @if (savedCards.length === 0) { <p class="saved-empty">{{ ui.savedEmpty }}</p> }
           @else { <ul class="saved-list">@for (card of savedCards; track card.id) { @let text = language() === 'ja' ? card.ja : card; <li><button type="button" class="saved-card-link" (click)="openSavedCard(card, feed)"><span class="saved-concept">{{ text.concept }} · {{ card.language }}</span><span class="saved-question">{{ text.question }}</span><span class="saved-open">{{ ui.openSaved }} →</span></button><button type="button" class="saved-remove" [attr.aria-label]="ui.removeSaved + ': ' + text.question" (click)="toggleSaved(card.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v16.5L12 16l-6 4.25z"/></svg></button></li> }</ul> }

@@ -2,6 +2,8 @@ import { DOCUMENT } from '@angular/common';
 import { afterNextRender, Component, DestroyRef, inject, Injector, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SyntaxHighlightPipe } from './syntax-highlight.pipe';
+import { AuthSession } from '../auth/auth-session';
+import { UsernameSetup } from '../auth/username-setup';
 
 type Tab = 'feed' | 'news' | 'profile' | 'discover';
 type Difficulty = 'all' | 'beginner' | 'intermediate' | 'advanced';
@@ -33,6 +35,8 @@ const COPY = {
     news: 'ニュース', newsIntro: '気になる話題を、もっと深く。', newsTitle: '準備中です。',
     newsBody: '厳選した記事と出典をここに掲載する予定です。それまではフィードをお楽しみください。',
     profile: 'プロフィール', changeLearning: '学習対象を変更', profileIntro: '理解を少しずつ積み重ねよう。', profileTitle: 'ここから始まります。',
+    account: 'アカウント', accountLoading: 'アカウントを確認しています…', accountGuest: 'ログインすると、アカウント情報を確認できます。', accountSignIn: 'Googleでログイン', accountUnavailable: 'アカウント情報を取得できませんでした。', accountRetry: '再試行',
+    signOut: 'ログアウト', signingOut: 'ログアウト中…', signOutError: 'ログアウトできませんでした。もう一度お試しください。',
     profileBody: '進捗管理が使えるようになると、概念ごとの習熟度や弱点がここに表示されます。',
     backToPractice: '学習に戻る', navigation: 'メインナビゲーション', feed: 'フィード',
     save: '保存', saved: '保存済み', removeSaved: '保存を解除', savedTitle: '保存した問題', savedEmpty: '気になる問題を保存すると、ここからいつでも見返せます。', savedLocal: '保存した問題はこの端末にのみ保存されます。', savedSession: '保存できないため、この画面を開いている間のみ保持されます。', openSaved: '問題を開く',
@@ -52,6 +56,8 @@ const COPY = {
     news: 'News', newsIntro: 'Good ideas are worth looking into.', newsTitle: 'Coming into focus.',
     newsBody: 'Curated reads and their sources will live here. For now, there’s plenty to explore in the feed.',
     profile: 'Profile', changeLearning: 'Change learning target', profileIntro: 'Make space for what you know.', profileTitle: 'Your map starts here.',
+    account: 'Account', accountLoading: 'Checking your account…', accountGuest: 'Sign in to see your account details.', accountSignIn: 'Sign in with Google', accountUnavailable: 'Could not load your account.', accountRetry: 'Try again',
+    signOut: 'Sign out', signingOut: 'Signing out…', signOutError: 'Could not sign out. Please try again.',
     profileBody: 'Your concept gaps and mastery will show up here once progress tracking is connected.',
     backToPractice: 'Back to practice', navigation: 'Main navigation', feed: 'Feed',
     save: 'Save', saved: 'Saved', removeSaved: 'Remove saved question', savedTitle: 'Saved questions', savedEmpty: 'Save a question to find it here later.', savedLocal: 'Saved questions stay on this device.', savedSession: 'Storage is unavailable, so saved questions last only for this session.', openSaved: 'Open question',
@@ -70,12 +76,15 @@ interface Card extends CardText {
 
 @Component({
   selector: 'app-homepage',
-  imports: [FormsModule, SyntaxHighlightPipe],
+  imports: [FormsModule, RouterLink, SyntaxHighlightPipe, UsernameSetup],
   templateUrl: './homepage.html',
   styleUrls: ['./homepage.css', './discover.css', './desktop.css'],
 })
 export class Homepage {
   private readonly document = inject(DOCUMENT);
+  protected readonly authSession = inject(AuthSession);
+  protected readonly failedAvatarUrl = signal<string | null>(null);
+  protected readonly signOutFailed = signal(false);
   private readonly progressKey = 'whylint-preview-progress-v1';
   private readonly savedKey = 'whylint-saved-cards-v1';
   protected readonly savedIds = signal<string[]>([]);
@@ -116,6 +125,13 @@ export class Homepage {
     };
     this.systemTheme?.addEventListener?.('change', onSystemThemeChange);
     this.destroyRef.onDestroy(() => this.systemTheme?.removeEventListener?.('change', onSystemThemeChange));
+  }
+
+  protected async signOut(): Promise<void> {
+    if (this.authSession.loggingOut()) return;
+    this.signOutFailed.set(false);
+    if (!await this.authSession.logout()) this.signOutFailed.set(true);
+    else this.failedAvatarUrl.set(null);
   }
 
   protected toggleTheme(): void {
