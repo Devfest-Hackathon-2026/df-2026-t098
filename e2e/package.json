@@ -1,0 +1,23 @@
+{
+  "name": "whylint-integration-tests",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:mobile": "playwright test --project=mobile-chromium",
+    "test:desktop": "playwright test --project=desktop-chromium",
+    "test:backend": "node scripts/stack.mjs --backend-tests",
+    "typecheck": "tsc --noEmit",
+    "stack": "node scripts/stack.mjs",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "26.6.6",
+    "nock": "15.0.6",
+    "typescript": "7.0.2"
+  }
+}
