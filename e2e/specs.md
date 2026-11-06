@@ -24,13 +24,11 @@
 
 ## Goal and current state
 
-Create the first repeatable Playwright Test suite for the Angular Google-login
-checkout and the real NestJS backend. Keep both dirty branches and all existing
-application work intact. The backend checkout is `../backend` on `backend/auth`;
-the auth frontend currently lives in `../../hackathon-frontend-login/frontend`
-on `frontend/google-login`. The shared checkout's frontend does not contain that
-auth integration yet. Make the frontend source path configurable, and never copy
-or merge application code between the checkouts.
+Run the repeatable Playwright Test suite against the merged Angular frontend and
+real NestJS backend in this repository. Both auth branches and the desktop UI
+are now merged into `main`. Default to `../frontend` and `../backend`, while
+preserving `WHYLINT_FRONTEND_DIR` for explicitly testing another checkout.
+Removing the old frontend checkout must leave the default test command usable.
 
 Signup, password sign-in, username setup and logout now have real frontend
 controls and browser coverage. Some scenarios use API requests for account

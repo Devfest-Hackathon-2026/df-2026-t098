@@ -9,7 +9,7 @@ Chromium. No application `.env` file or development database is used.
 
 Use Node.js 24.15 or newer and PostgreSQL binaries (`initdb`, `pg_ctl`, `psql`) on
 `PATH`. Run as a regular user; PostgreSQL cannot initialize a cluster as root.
-Both application checkouts need their existing npm dependencies installed.
+Both applications need their existing npm dependencies installed.
 
 ```sh
 cd ~/code/hackathon/e2e
@@ -18,9 +18,7 @@ npx playwright install chromium
 npm test
 ```
 
-The default frontend is the auth checkout at
-`~/code/hackathon-frontend-login/frontend` when it exists. Otherwise the harness
-looks in `../frontend` and checks that the auth code is present. To choose a
+The default frontend is `../frontend` in this repository. To choose another
 checkout explicitly:
 
 ```sh
