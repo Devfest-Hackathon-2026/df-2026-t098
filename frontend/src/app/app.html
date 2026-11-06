@@ -1,3 +1,9 @@
 <main>
-    <router-outlet/>
+  <router-outlet #outlet="outlet"/>
+  @if (!outlet.isActivated && session.status() === 'loading') {
+    <div class="session-loading" role="status" [attr.lang]="sessionLanguage">
+      <span class="session-brand" aria-hidden="true">w<span>_</span> whylint.</span>
+      <p>{{ sessionLanguage === 'ja' ? 'アカウントを確認しています…' : 'Checking your account…' }}</p>
+    </div>
+  }
 </main>

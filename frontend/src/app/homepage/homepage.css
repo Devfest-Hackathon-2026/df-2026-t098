@@ -300,6 +300,87 @@ textarea::placeholder {
 .saved-section {
   margin-bottom: 16px;
 }
+.account-section {
+  margin-bottom: 16px;
+}
+.account-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--control-selected);
+  font-weight: 700;
+}
+.account-avatar svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+.account-avatar img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.account-identity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-identity strong,
+.account-identity span {
+  display: block;
+}
+.account-identity span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.account-sign-in,
+.account-retry,
+.account-sign-out {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--text);
+  font-weight: 700;
+}
+.account-sign-in {
+  text-decoration: none;
+}
+.account-sign-out {
+  margin-top: 16px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.account-sign-out:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+.account-error {
+  margin-top: 12px;
+  color: var(--text);
+}
+.account-sign-in:focus-visible,
+.account-sign-out:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .account-sign-in:hover {
+    text-decoration: underline;
+  }
+}
 .saved-heading {
   display: flex;
   align-items: baseline;

@@ -45,7 +45,8 @@
         } @empty { <p class="empty" role="status">{{ ui.empty }}</p> }
       </div>
       @if (storageError()) { <p class="error" role="alert">{{ ui.storage }}</p> }
-      <div class="actions"><button class="back" type="button" (click)="step.set(1)">← {{ ui.back }}</button><button class="primary" type="button" [disabled]="!stack()" (click)="complete()">{{ ui.start }} <span aria-hidden="true">→</span></button></div>
+      <app-username-setup [language]="language()" [showSaveButton]="false" inputId="onboarding-username"/>
+      <div class="actions"><button class="back" type="button" [disabled]="starting()" (click)="step.set(1)">← {{ ui.back }}</button><button class="primary" type="button" [disabled]="!stack() || starting()" [attr.aria-busy]="starting()" (click)="complete()">{{ starting() ? (language() === 'ja' ? '保存しています…' : 'Saving…') : ui.start }} <span aria-hidden="true">→</span></button></div>
     }
   </main>
 </div>

@@ -1,0 +1,18 @@
+:host { display: block; min-height: 100dvh; background: var(--canvas); }
+.auth-shell { min-height: 100dvh; max-width: 680px; margin: auto; padding: env(safe-area-inset-top, 0px) 20px calc(24px + env(safe-area-inset-bottom, 0px)); }
+.header { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: -.04em; text-decoration: none; }
+.brand-mark { color: var(--accent); font: 500 18px 'DM Mono', monospace; }.brand-mark span { color: var(--text); }.brand-dot { color: var(--accent); }
+.settings { display: flex; gap: 8px; }.settings button { display: grid; place-items: center; min-width: 44px; min-height: 44px; border: 1px solid var(--input-border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 13px; }.settings svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.6; }
+.content { width: min(100%, 440px); margin: 0 auto; padding: 40px 0 32px; }.back { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; color: var(--muted); text-decoration: none; font-size: 14px; }.back span { font-size: 18px; }
+h1 { margin: 32px 0 10px; font-size: 30px; line-height: 1.25; letter-spacing: -.035em; }.intro { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+.password-notice { margin: 28px 0 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.password-form { display: grid; gap: 8px; }.password-form label { margin-top: 8px; font-size: 14px; font-weight: 700; }.password-form input { width: 100%; min-height: 52px; padding: 0 14px; border: 1px solid var(--input-border); border-radius: 9px; background: var(--input-bg); color: var(--text); font: 16px 'DM Sans', sans-serif; }.password-form input[aria-invalid='true'] { border-color: var(--text); }.field-error, .password-status { margin: 0; color: var(--text); font-size: 13px; line-height: 1.55; }.password-status { margin-top: 4px; }
+.primary { min-height: 52px; border: 0; border-radius: 9px; font-weight: 700; }.password-button, .retry-button { width: 100%; margin-top: 16px; background: var(--accent); color: var(--canvas); }.divider { display: flex; align-items: center; gap: 12px; margin: 24px 0; color: var(--muted); font-size: 13px; }.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }.google-button { display: flex; width: 100%; justify-content: center; align-items: center; gap: 12px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f; }.google-button svg { width: 20px; height: 20px; }
+.status, .error { padding: 14px 16px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); line-height: 1.6; font-size: 14px; }.error { margin: 24px 0 0; }
+@media (hover: hover) and (pointer: fine) { .google-button:hover { background: #e9e9e9; }.back:hover { color: var(--text); } }
+@media (max-width: 360px) { .auth-shell { padding-inline: 16px; }.content { padding-top: 24px; }h1 { font-size: 27px; } }
+
+.auth-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; color: var(--text); font-size: 14px; text-underline-offset: 3px; }
+.password-form input:disabled, .primary:disabled { opacity: .6; cursor: wait; }
+.password-form input:focus-visible, .primary:focus-visible, .auth-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

@@ -1,18 +1,124 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { Homepage } from './homepage';
 import { vi } from 'vitest';
 import { provideRouter } from '@angular/router';
+import { AuthSession } from '../auth/auth-session';
+import type { AuthUser } from '../auth/auth-session';
 
 describe('Homepage feed', () => {
   let fixture: ComponentFixture<Homepage>;
+  let authStatus = signal<'loading' | 'authenticated' | 'guest' | 'unavailable'>('guest');
+  let authUser = signal<AuthUser | null>(null);
+  const refreshSession = vi.fn().mockResolvedValue(true);
+  const logoutSession = vi.fn().mockResolvedValue(true);
+  const loggingOut = signal(false);
 
   beforeEach(async () => {
     localStorage.removeItem('whylint-theme');
     localStorage.removeItem('whylint-preview-progress-v1');
     localStorage.removeItem('whylint-saved-cards-v1');
-    await TestBed.configureTestingModule({ imports: [Homepage] }).compileComponents();
+    authStatus = signal('guest');
+    authUser = signal<AuthUser | null>(null);
+    refreshSession.mockClear();
+    logoutSession.mockReset().mockResolvedValue(true);
+    loggingOut.set(false);
+    await TestBed.configureTestingModule({
+      imports: [Homepage],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSession, useValue: { status: authStatus.asReadonly(), user: authUser.asReadonly(), refresh: refreshSession, logout: logoutSession, loggingOut: loggingOut.asReadonly() } },
+      ],
+    }).compileComponents();
     fixture = TestBed.createComponent(Homepage);
     await fixture.whenStable();
+  });
+
+  it('offers guest sign-in without implying that local progress is synced', () => {
+    const root = fixture.nativeElement as HTMLElement;
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.account-sign-in')?.getAttribute('href')).toBe('/login');
+    expect(root.querySelector('.account-section')?.textContent).toContain('Googleでログイン');
+    expect(root.querySelector('.progress-card')?.textContent).toContain('この端末にのみ保存');
+  });
+
+  it('displays the authenticated user in the profile', () => {
+    authUser.set({ id: 'user-1', email: 'learner@example.com', name: 'Learner', avatarUrl: null, username: null });
+    authStatus.set('authenticated');
+    const root = fixture.nativeElement as HTMLElement;
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.account-identity')?.textContent).toContain('Learner');
+    expect(root.querySelector('.account-identity')?.textContent).toContain('learner@example.com');
+    expect(root.querySelector('.account-sign-in')).toBeNull();
+  });
+
+  it('separates a loading session and a connection error from a signed-out session', () => {
+    const root = fixture.nativeElement as HTMLElement;
+    authStatus.set('loading');
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.account-section [role="status"]')?.textContent).toContain('確認しています');
+    expect(root.querySelector('.account-sign-in')).toBeNull();
+
+    authStatus.set('unavailable');
+    fixture.detectChanges();
+    expect(root.querySelector('.account-section [role="alert"]')?.textContent).toContain('取得できませんでした');
+    (root.querySelector('.account-retry') as HTMLButtonElement).click();
+    expect(refreshSession).toHaveBeenCalledOnce();
+  });
+
+  it('renders a profile picture and falls back to the icon if the image fails', () => {
+    authUser.set({ id: 'user-1', email: 'learner@example.test', name: 'Learner', avatarUrl: 'https://example.test/avatar.png', username: null });
+    authStatus.set('authenticated');
+    const root = fixture.nativeElement as HTMLElement;
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const image = root.querySelector('.account-avatar img') as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe('https://example.test/avatar.png');
+    expect(image.getAttribute('referrerpolicy')).toBe('no-referrer');
+    image.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+    expect(root.querySelector('.account-avatar img')).toBeNull();
+    expect(root.querySelector('.account-avatar svg')).not.toBeNull();
+  });
+
+  it('keeps an unfinished username through a foreground session check', () => {
+    authUser.set({ id: 'user-1', email: 'learner@example.test', name: 'Learner', avatarUrl: null, username: null });
+    authStatus.set('authenticated');
+    const root = fixture.nativeElement as HTMLElement;
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click(); fixture.detectChanges();
+    const input = root.querySelector<HTMLInputElement>('#account-username')!;
+    input.value = 'unfinished_name'; input.dispatchEvent(new Event('input'));
+    authStatus.set('loading'); fixture.detectChanges();
+    authStatus.set('authenticated'); fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#account-username')?.value).toBe('unfinished_name');
+  });
+
+  it('shows logout progress, prevents repeat activation and offers retry on failure', async () => {
+    authUser.set({ id: 'user-1', email: 'learner@example.test', name: 'Learner', avatarUrl: null, username: null });
+    authStatus.set('authenticated');
+    const root = fixture.nativeElement as HTMLElement;
+    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const button = root.querySelector('.account-sign-out') as HTMLButtonElement;
+    loggingOut.set(true);
+    fixture.detectChanges();
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toContain('ログアウト中');
+    button.click();
+    expect(logoutSession).not.toHaveBeenCalled();
+    loggingOut.set(false);
+    logoutSession.mockResolvedValueOnce(false);
+    fixture.detectChanges();
+    button.click();
+    await fixture.whenStable();
+    expect(logoutSession).toHaveBeenCalledOnce();
+    expect(root.querySelector('.account-error')?.textContent).toContain('ログアウトできませんでした');
+    expect(root.querySelector('.account-identity')?.textContent).toContain('Learner');
   });
 
   it('keeps the choice and explanation when switching sections and shows both on reveal', async () => {
