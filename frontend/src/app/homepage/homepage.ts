@@ -1,7 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { afterNextRender, Component, DestroyRef, inject, Injector, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { SyntaxHighlightPipe } from './syntax-highlight.pipe';
 import { AuthSession } from '../auth/auth-session';
 import { UsernameSetup } from '../auth/username-setup';
@@ -79,7 +78,7 @@ interface Card extends CardText {
   selector: 'app-homepage',
   imports: [FormsModule, RouterLink, SyntaxHighlightPipe, UsernameSetup],
   templateUrl: './homepage.html',
-  styleUrls: ['./homepage.css', './discover.css'],
+  styleUrls: ['./homepage.css', './discover.css', './desktop.css'],
 })
 export class Homepage {
   private readonly document = inject(DOCUMENT);

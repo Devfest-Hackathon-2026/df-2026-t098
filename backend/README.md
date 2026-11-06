@@ -25,6 +25,35 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## WhyLint authentication
+
+Set `DB_URL`, `JWT_SECRET` (at least 32 characters), `FRONTEND_URL`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` in your local `.env`. The frontend URL must match the browser origin, for example `http://localhost:4200`. Never commit real credentials.
+
+Run the migrations with `npm run migration:run` before starting the server. The password/session migration preserves existing Google users and refuses to silently merge duplicate emails. Existing JWTs without a session ID must sign in again.
+
+All paths below use the `/api/v1` prefix:
+
+| Method | Path | JSON body | Result |
+| --- | --- | --- | --- |
+| POST | `/auth/login` | `{ "code": "..." }` | Existing Google authorization-code login |
+| POST | `/auth/signup` | `{ "email": "...", "username": "...", "password": "..." }` | Create an account and session |
+| POST | `/auth/password/login` | `{ "identifier": "...", "password": "..." }` | Sign in with email or username |
+| GET | `/auth/me` | — | Return the current user profile, including nullable `username` |
+| PATCH | `/auth/me/username` | `{ "username": "..." }` | Set the authenticated user's missing username |
+| POST | `/auth/logout` | — | Revoke the current session and clear its cookie |
+
+Login and signup set an HttpOnly `access_token` cookie; tokens and password hashes are not returned in JSON. Browser POST and PATCH requests must send the configured `Origin`; the login and signup bodies must be JSON. Usernames are 3–32 letters/numbers/`.`/`_`/`-` with no `@`. Passwords are 15–128 characters and are not trimmed. Login errors do not distinguish an unknown account from an incorrect password.
+
+Google users can skip username setup during onboarding and set it later in Profile. Username setup uses the authenticated subject, only fills a missing username, and shares signup validation and the normalized unique index. Retrying the same owned name is idempotent; unavailable or replacement names return 409. The public profile is `{id,email,name,avatarUrl,username}`. No migration is needed for this extension.
+
+Google display names and pictures are saved separately from the chosen username. Google login refreshes changed/missing profile metadata from the verified ID token, or uses the short-timeout UserInfo fallback when either field is omitted. UserInfo metadata is accepted only for the same verified Google subject. Missing optional fields preserve existing values. A fresh Google sign-in can backfill older NULL names; this does not change a chosen username.
+
+JWT verification and its guard live in `src/auth/jwt/`; the session entity and service live in `src/auth/sessions/`. `JwtService.verifyAsync` checks the signature and expiry, and the guard also checks the database session so logout can revoke a token immediately, before its seven-day expiry.
+
+Email ownership is not verified yet. Do not automatically link password and Google identities by email. Email verification and recovery, Google OAuth PKCE/state, distributed rate limiting, native app sign-in, and deployed cookie/CORS settings are not production-ready.
+
+The PostgreSQL integration test needs an empty local `whylint_auth_e2e_*` test database through `TEST_DATABASE_URL`; it skips when this variable is absent and refuses other database names or non-local hosts. Never point tests at your development database.
+
 ## Project setup
 
 ```bash
