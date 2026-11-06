@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { afterNextRender, Component, DestroyRef, inject, Injector, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { SyntaxHighlightPipe } from './syntax-highlight.pipe';
 import { AuthSession } from '../auth/auth-session';
 import { UsernameSetup } from '../auth/username-setup';

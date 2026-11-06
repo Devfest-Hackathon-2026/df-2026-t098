@@ -10,11 +10,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const directory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const backend = path.resolve(directory, '../backend');
-const separateFrontend = path.resolve(directory, '../../hackathon-frontend-login/frontend');
 const frontend = process.env.WHYLINT_FRONTEND_DIR
   ? path.resolve(process.env.WHYLINT_FRONTEND_DIR)
-  : existsSync(path.join(separateFrontend, 'src/app/auth/auth-session.ts'))
-    ? separateFrontend : path.resolve(directory, '../frontend');
+  : path.resolve(directory, '../frontend');
 const backendTests = process.argv.includes('--backend-tests');
 const backendPort = Number(process.env.WHYLINT_E2E_BACKEND_PORT ?? 3101);
 const children = [];
