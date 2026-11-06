@@ -1,7 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { afterNextRender, Component, DestroyRef, inject, Injector, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { SyntaxHighlightPipe } from './syntax-highlight.pipe';
 
 type Tab = 'feed' | 'news' | 'profile' | 'discover';
@@ -71,9 +70,9 @@ interface Card extends CardText {
 
 @Component({
   selector: 'app-homepage',
-  imports: [FormsModule, RouterLink, SyntaxHighlightPipe],
+  imports: [FormsModule, SyntaxHighlightPipe],
   templateUrl: './homepage.html',
-  styleUrls: ['./homepage.css', './discover.css'],
+  styleUrls: ['./homepage.css', './discover.css', './desktop.css'],
 })
 export class Homepage {
   private readonly document = inject(DOCUMENT);
@@ -100,7 +99,6 @@ export class Homepage {
   protected readonly appliedFilters = signal<{ language: string; difficulty: Difficulty; concept: string | null }>({ language: 'all', difficulty: 'all', concept: null });
   protected readonly languages = ['all', 'JavaScript', 'Python', 'SQL'];
   protected readonly difficulties: Difficulty[] = ['all', 'beginner', 'intermediate', 'advanced'];
-  protected readonly language = signal<Language>('ja');
   protected readonly language = signal<Language>(this.readStoredLanguage());
   protected get ui() { return COPY[this.language()]; }
 

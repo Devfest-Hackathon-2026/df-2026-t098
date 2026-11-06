@@ -66,12 +66,16 @@
   margin-right: auto;
 }
 .main-menu {
+  display: none;
   flex: 0 0 auto;
   max-height: 38vh;
   overflow-y: auto;
   padding: 8px 20px;
   border-bottom: 1px solid var(--border);
   background: transparent;
+}
+.main-menu.is-open {
+  display: block;
 }
 .main-menu button {
   display: flex;
