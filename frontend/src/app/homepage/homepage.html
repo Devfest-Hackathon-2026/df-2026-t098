@@ -1,17 +1,15 @@
-<div class="app-shell">
+<div class="app-shell" [class.has-feed]="tab() === 'feed' && feedCards.length > 0">
   <header class="topbar" (keydown.escape)="menuOpen.set(false)">
     <button class="menu-toggle" type="button" [attr.aria-label]="ui.menu" [attr.aria-expanded]="menuOpen()" aria-controls="main-menu" (click)="menuOpen.set(!menuOpen())"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path class="menu-line-top" d="M4 6h16"/><path class="menu-line-middle" d="M4 12h16"/><path class="menu-line-bottom" d="M4 18h16"/></svg></button>
     <div class="brand" aria-label="WhyLint"><span class="brand-mark" aria-hidden="true">w<span>_</span></span><span>whylint<span class="brand-dot">.</span></span></div>
     <div class="header-actions"><span class="preview-label">{{ ui.preview }}</span><button class="language-toggle" type="button" (click)="toggleLanguage()" [attr.aria-label]="language() === 'ja' ? 'Switch to English' : '日本語に切り替え'" [attr.lang]="language() === 'ja' ? 'en' : 'ja'">{{ language() === 'ja' ? 'EN' : '日本語' }}</button><button class="theme-toggle" type="button" (click)="toggleTheme()" [attr.aria-label]="theme() === 'dark' ? ui.lightTheme : ui.darkTheme" [attr.title]="theme() === 'dark' ? ui.lightTheme : ui.darkTheme">@if (theme() === 'dark') {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>} @else {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z"/></svg>}</button></div>
   </header>
-  @if (menuOpen()) {
-    <nav class="main-menu" id="main-menu" [attr.aria-label]="ui.navigation" (keydown.escape)="menuOpen.set(false)">
-      <button type="button" [class.active]="tab() === 'feed'" [attr.aria-current]="tab() === 'feed' ? 'page' : null" (click)="openTab('feed', feed)">{{ ui.feed }}</button>
+    <nav class="main-menu" id="main-menu" [class.is-open]="menuOpen()" [attr.aria-label]="ui.navigation" (keydown.escape)="menuOpen.set(false)">
+      <button type="button" [class.active]="tab() === 'feed'" [attr.aria-current]="tab() === 'feed' ? 'page' : null" (click)="openTab('feed', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>{{ ui.feed }}</button>
       <button type="button" [class.active]="tab() === 'discover'" [attr.aria-current]="tab() === 'discover' ? 'page' : null" (click)="openTab('discover', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>{{ ui.discover }}</button>
-      <button type="button" [class.active]="tab() === 'news'" [attr.aria-current]="tab() === 'news' ? 'page' : null" (click)="openTab('news', feed)">{{ ui.news }}</button>
-      <button type="button" [class.active]="tab() === 'profile'" [attr.aria-current]="tab() === 'profile' ? 'page' : null" (click)="openTab('profile', feed)">{{ ui.profile }}</button>
+      <button type="button" [class.active]="tab() === 'news'" [attr.aria-current]="tab() === 'news' ? 'page' : null" (click)="openTab('news', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 12h8M8 15h5"/></svg>{{ ui.news }}</button>
+      <button type="button" [class.active]="tab() === 'profile'" [attr.aria-current]="tab() === 'profile' ? 'page' : null" (click)="openTab('profile', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.5-3.1 2.6-5 6.5-5s6 1.9 6.5 5"/></svg>{{ ui.profile }}</button>
     </nav>
-  }
 
   @if (tab() === 'feed' && feedCards.length > 0) {
     @let currentCard = feedCards[activeCardIndex()].card;
@@ -103,6 +101,16 @@
         <div class="empty-card progress-card"><h2>{{ ui.progressTitle }}</h2><p>{{ progressStorageAvailable() ? ui.progressSaved : ui.progressSession }}</p><ul class="progress-list">@for (card of cards; track card.id; let i = $index) { @let text = language() === 'ja' ? card.ja : card; <li><div><span>{{ text.concept }}</span>@if (card.reviewOf) { <small>{{ ui.progressReview }}</small> }</div><span>{{ states[i].revealed ? (states[i].peeked ? ui.progressPeeked : ui.progressAttempted) : (states[i].selected !== null || states[i].reason.trim() ? ui.progressDraft : ui.progressPending) }}</span></li> }</ul><p>{{ ui.progressNote }}</p><div class="progress-actions"><button type="button" (click)="openTab('feed', feed)">{{ ui.backToPractice }} →</button>@if (!clearRequested()) { <button type="button" (click)="clearRequested.set(true)">{{ ui.clearProgress }}</button> } @else { <button type="button" (click)="clearProgress()">{{ ui.confirmClear }}</button><button type="button" (click)="clearRequested.set(false)">{{ ui.cancelClear }}</button> }</div>@if (clearError()) { <p role="alert">{{ ui.clearError }}</p> }</div></section>
     }
   </main>
+  @if (tab() === 'feed' && feedCards.length > 0) {
+    @let activeCard = feedCards[activeCardIndex()].card;
+    <aside class="desktop-feed-controls" [attr.aria-label]="ui.navigation">
+      <button type="button" class="desktop-save" [class.is-saved]="savedIds().includes(activeCard.id)" [attr.aria-pressed]="savedIds().includes(activeCard.id)" (click)="toggleSaved(activeCard.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v16.5L12 16l-6 4.25z"/></svg><span>{{ savedIds().includes(activeCard.id) ? ui.saved : ui.save }}</span></button>
+      <div class="desktop-step-controls">
+        <button type="button" [attr.aria-label]="ui.previous" [title]="ui.previous" [disabled]="activeCardIndex() === 0" (click)="goToCard(activeCardIndex() - 1, feed, $event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button>
+        <button type="button" [attr.aria-label]="ui.next" [title]="ui.next" [disabled]="activeCardIndex() === feedCards.length - 1" (click)="goToCard(activeCardIndex() + 1, feed, $event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 10 6 6 6-6"/></svg></button>
+      </div>
+    </aside>
+  }
   <nav class="bottom-nav" [attr.aria-label]="ui.navigation">
     <button type="button" (click)="openTab('feed', feed)" [attr.aria-current]="tab() === 'feed' ? 'page' : null" [class.active]="tab() === 'feed'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg><span>{{ ui.feed }}</span></button>
     <button type="button" (click)="openTab('news', feed)" [attr.aria-current]="tab() === 'news' ? 'page' : null" [class.active]="tab() === 'news'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 12h8M8 15h5"/></svg><span>{{ ui.news }}</span></button>

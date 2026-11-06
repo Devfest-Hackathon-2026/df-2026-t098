@@ -8,6 +8,7 @@ describe('Homepage feed', () => {
 
   beforeEach(async () => {
     localStorage.removeItem('whylint-theme');
+    localStorage.removeItem('whylint-language');
     localStorage.removeItem('whylint-preview-progress-v1');
     localStorage.removeItem('whylint-saved-cards-v1');
     await TestBed.configureTestingModule({ imports: [Homepage] }).compileComponents();
@@ -129,6 +130,26 @@ describe('Homepage feed', () => {
     expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'instant' }));
     expect(heading.textContent).toContain('second');
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it('keeps the desktop controls in sync with the feed and saved state', async () => {
+    const root = fixture.nativeElement as HTMLElement;
+    const feed = root.querySelector('.feed-content') as HTMLElement;
+    feed.scrollTo = vi.fn();
+    const buttons = root.querySelectorAll<HTMLButtonElement>('.desktop-step-controls button');
+    expect(buttons[0].disabled).toBe(true);
+    expect(buttons[1].disabled).toBe(false);
+
+    buttons[1].dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('second');
+    expect(buttons[0].disabled).toBe(false);
+
+    (root.querySelector('.desktop-save') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(root.querySelector('.desktop-save')?.getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('#card-1 .save-button')?.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('updates the fixed question bar when another card reaches the top', () => {
