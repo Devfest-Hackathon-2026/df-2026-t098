@@ -347,7 +347,7 @@ describe('AuthService', () => {
   });
 
   it('rejects a native Google ID token that fails verification', async () => {
-    verifyGoogle.mockRejectedValueOnce(new Error('invalid token'));
+    verifyGoogle.mockRejectedValueOnce(new Error('invalid token') as never);
     await expect(service.loginNative('invalid-id-token')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(users.findByGoogleId).not.toHaveBeenCalled();
     expect(sessions.create).not.toHaveBeenCalled();
