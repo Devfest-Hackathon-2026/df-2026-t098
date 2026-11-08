@@ -1,5 +1,21 @@
 # WhyLint browser and backend integration tests
 
+## Core learning regression extension
+
+- Exercise the new learning API and real Angular entry points on both existing
+  viewports. Preserve all auth scenarios and keep the real auth throttles enabled.
+- Add a Gemini HTTP fixture beside the Google OAuth fixture. Return exactly five
+  questions per generation, deterministic failing/passing understanding scores,
+  and reviewed community publication responses. No request reaches external AI.
+- Seed dedicated learning users/sessions only in the guarded disposable browser
+  database, with cookies held in memory by tests. This prepares core scenarios
+  without increasing the auth suite's signup/login calls beyond its real limits.
+- Verify third-card prefetch, fail/retry/pass, server-awarded XP idempotency, daily
+  completion and weekly ranking, community visibility to another user, likes,
+  bookmarks, comments and share URLs. Inject transient browser response failures
+  to prove answer preservation and recovery without turning errors into scores.
+- Keep live Gemini and actual mobile/Capacitor behavior separate from these results.
+
 ## Username and signup regression extension
 
 - Replace the old UI-only password assertions with form validation and real

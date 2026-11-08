@@ -1,0 +1,85 @@
+:host {
+  display: block;
+}
+.panel {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 0 40px;
+  overflow-wrap: anywhere;
+}
+h1 {
+  margin: 0 0 16px;
+  font-size: clamp(26px, 4vw, 36px);
+  letter-spacing: -0.03em;
+  line-height: 1.35;
+}
+h2 {
+  margin: 32px 0 16px;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+p {
+  line-height: 1.7;
+}
+.intro,
+.hint {
+  color: var(--muted);
+}
+.hint {
+  font-size: 13px;
+}
+.primary,
+.secondary {
+  min-height: 44px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.primary {
+  border: 0;
+  background: var(--button-bg);
+  color: var(--button-text);
+}
+.secondary {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 4px;
+}
+.question-list a {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  min-height: 60px;
+}
+.question-list a span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.question-list a strong {
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.question-list a small {
+  color: var(--accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .question-list a:hover strong {
+    color: var(--accent);
+  }
+  .secondary:hover {
+    background: var(--control);
+  }
+}

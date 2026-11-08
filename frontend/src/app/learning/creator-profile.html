@@ -1,0 +1,96 @@
+<main class="creator-page" [attr.lang]="settings.language()">
+  <header class="creator-navigation">
+    <a routerLink="/">{{ text('フィードに戻る', 'Back to the feed') }}</a>
+    <span class="creator-brand">whylint<span>.</span></span>
+  </header>
+  @if (loading()) {
+    <app-loading-skeleton
+      variant="profile"
+      [label]="text('公開プロフィールを読み込み中…', 'Loading public profile…')"
+    />
+  }
+  @if (profile(); as profile) {
+    <section class="creator-identity">
+      <span class="creator-avatar" aria-hidden="true">
+        @if (profile.creator.avatarUrl && !failedAvatar()) {
+          <img
+            [src]="profile.creator.avatarUrl"
+            alt=""
+            width="64"
+            height="64"
+            referrerpolicy="no-referrer"
+            (error)="failedAvatar.set(true)"
+          />
+        } @else {
+          <app-icon name="profile" />
+        }
+      </span>
+      <div>
+        <h1>{{ profile.creator.displayName }}</h1>
+        <p>
+          {{
+            text(
+              'みんなに共有した質問と説明',
+              'Questions and explanations shared with the community'
+            )
+          }}
+        </p>
+      </div>
+    </section>
+    <dl class="creator-counts">
+      <div>
+        <dt>{{ text('投稿した質問', 'Published questions') }}</dt>
+        <dd>{{ profile.counts.questions }}</dd>
+      </div>
+      <div>
+        <dt>{{ text('公開した説明', 'Shared explanations') }}</dt>
+        <dd>{{ profile.counts.explanations }}</dd>
+      </div>
+      <div>
+        <dt>{{ text('参考になった', 'Helpful votes') }}</dt>
+        <dd>{{ profile.counts.helpful }}</dd>
+      </div>
+    </dl>
+    <section class="creator-contributions" aria-labelledby="creator-explanations">
+      <h2 id="creator-explanations">{{ text('公開した説明', 'Shared explanations') }}</h2>
+      <ul>
+        @for (explanation of profile.explanations; track explanation.id) {
+          <li>
+            <a [routerLink]="['/questions', explanation.questionId]">{{
+              explanation.questionTitle
+            }}</a>
+            <p class="explanation-text">{{ explanation.text }}</p>
+            <span class="contribution-helpful"
+              >{{ text('参考になった', 'Helpful') }} {{ explanation.helpfulCount ?? 0 }}</span
+            >
+          </li>
+        } @empty {
+          <li class="empty-contributions">
+            {{ text('公開した説明はまだありません。', 'No explanations shared yet.') }}
+          </li>
+        }
+      </ul>
+    </section>
+    <section class="creator-contributions" aria-labelledby="creator-questions">
+      <h2 id="creator-questions">{{ text('投稿した質問', 'Published questions') }}</h2>
+      <ul>
+        @for (question of profile.questions; track question.id) {
+          <li>
+            <a [routerLink]="['/questions', question.id]">{{ question.title }}</a>
+            <p>{{ question.prompt }}</p>
+          </li>
+        } @empty {
+          <li class="empty-contributions">
+            {{ text('投稿した質問はまだありません。', 'No questions published yet.') }}
+          </li>
+        }
+      </ul>
+    </section>
+  }
+  @if (error()) {
+    <p class="creator-error" role="alert">{{ error() }}</p>
+    <button type="button" class="creator-retry" (click)="load()">
+      {{ text('再試行', 'Try again') }}
+    </button>
+  }
+</main>

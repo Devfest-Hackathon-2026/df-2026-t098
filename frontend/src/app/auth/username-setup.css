@@ -1,13 +1,74 @@
-:host { display: block; }
-.username-setup { margin-top: 24px; }
-label { font-size: 14px; font-weight: 700; }
-.hint, .feedback { margin: 8px 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
-.feedback { color: var(--text); }
-.username-controls { display: flex; align-items: stretch; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-input { flex: 1 1 160px; min-width: 0; width: 100%; min-height: 48px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--text); background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px; }
-button { min-height: 48px; padding: 10px 14px; border: 1px solid var(--input-border); border-radius: 8px; color: var(--text); background: var(--input-bg); font: inherit; font-size: 13px; font-weight: 700; }
-input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-input[aria-invalid='true'] { border-color: var(--text); }
-:disabled { opacity: .6; cursor: wait; }
-.recovery { display: inline-flex; align-items: center; min-height: 48px; color: var(--text); text-underline-offset: 3px; }
-.recovery:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+:host {
+  display: block;
+}
+.username-setup {
+  margin-top: 24px;
+}
+label {
+  font-size: 14px;
+  font-weight: 700;
+}
+.hint,
+.feedback {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.feedback {
+  color: var(--text);
+}
+.username-controls {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+input {
+  flex: 1 1 160px;
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+}
+button {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--input-bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+input[aria-invalid='true'] {
+  border-color: var(--text);
+}
+:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.recovery {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--text);
+  text-underline-offset: 3px;
+}
+.recovery:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

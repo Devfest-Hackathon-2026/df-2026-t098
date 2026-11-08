@@ -42,13 +42,28 @@ describe('Password authentication DTOs', () => {
   });
 
   it('shares trimmed Unicode username validation with the authenticated profile action', async () => {
-    await expect(pipe.transform({ username: '  学習者_1  ' }, { type: 'body', metatype: UsernameDto }))
-      .resolves.toMatchObject({ username: '学習者_1' });
-    for (const value of [undefined, null, '', 'ab', 'a'.repeat(33), 'name@example.test', 'two names']) {
-      await expect(pipe.transform({ username: value }, { type: 'body', metatype: UsernameDto })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      pipe.transform({ username: '  学習者_1  ' }, { type: 'body', metatype: UsernameDto }),
+    ).resolves.toMatchObject({ username: '学習者_1' });
+    for (const value of [
+      undefined,
+      null,
+      '',
+      'ab',
+      'a'.repeat(33),
+      'name@example.test',
+      'two names',
+    ]) {
+      await expect(
+        pipe.transform({ username: value }, { type: 'body', metatype: UsernameDto }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     }
-    await expect(pipe.transform({ username: 'learner', id: 'another-user' }, { type: 'body', metatype: UsernameDto }))
-      .rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      pipe.transform(
+        { username: 'learner', id: 'another-user' },
+        { type: 'body', metatype: UsernameDto },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it.each([

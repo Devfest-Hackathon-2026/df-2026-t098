@@ -1,0 +1,91 @@
+.question-credit a,
+.question-references a {
+  color: var(--accent);
+  text-underline-offset: 4px;
+}
+.question-credit a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding-block: 8px;
+  margin-block: -8px;
+}
+.explanation-share {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.explanation-share label,
+.question-report label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.question-references {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.question-references h3 {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+}
+.question-references ul {
+  padding-left: 20px;
+  margin: 0;
+}
+.question-references a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.question-report {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.question-report summary {
+  display: list-item;
+  width: fit-content;
+  padding-block: 12px;
+  min-height: 48px;
+  cursor: pointer;
+}
+.question-report form {
+  color: var(--text);
+  padding-top: 12px;
+}
+.question-report select {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+.question-report textarea {
+  min-height: 80px;
+  margin-bottom: 16px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .question-credit a:hover,
+  .question-references a:hover,
+  .question-report summary:hover {
+    color: var(--accent);
+  }
+}

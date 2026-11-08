@@ -1,4 +1,10 @@
-import { BadGatewayException, ConflictException, Injectable, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  ConflictException,
+  Injectable,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import * as argon2 from 'argon2';
@@ -25,13 +31,16 @@ export class AuthService implements OnModuleInit {
     private readonly usersService: UsersService,
     private readonly sessionsService: SessionsService,
     private readonly dataSource: DataSource,
-  ){}
+  ) {}
 
   private readonly googleClient = new OAuth2Client();
   private dummyPasswordHash!: string;
 
   async onModuleInit(): Promise<void> {
-    this.dummyPasswordHash = await argon2.hash('whylint-dummy-password-for-verification', PASSWORD_OPTIONS);
+    this.dummyPasswordHash = await argon2.hash(
+      'whylint-dummy-password-for-verification',
+      PASSWORD_OPTIONS,
+    );
   }
 
   async login(code: string) {
@@ -61,7 +70,10 @@ export class AuthService implements OnModuleInit {
       accessToken = tokenRes.data.access_token;
     } catch (err) {
       if (err instanceof BadGatewayException) throw err;
-      if (axios.isAxiosError(err) && (err.response?.status === 400 || err.response?.status === 401)) {
+      if (
+        axios.isAxiosError(err) &&
+        (err.response?.status === 400 || err.response?.status === 401)
+      ) {
         throw new UnauthorizedException('Unable to sign in with Google');
       }
       throw new BadGatewayException('Google sign-in is unavailable');
@@ -72,7 +84,10 @@ export class AuthService implements OnModuleInit {
       const ticket = await this.googleClient.verifyIdToken({ idToken, audience: clientId });
       data = ticket.getPayload();
     } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Failed to retrieve verification certificates:')) {
+      if (
+        err instanceof Error &&
+        err.message.startsWith('Failed to retrieve verification certificates:')
+      ) {
         throw new BadGatewayException('Google sign-in is unavailable');
       }
       throw new UnauthorizedException('Unable to verify Google sign-in');
@@ -91,10 +106,13 @@ export class AuthService implements OnModuleInit {
           { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 3000 },
         );
         if (profile.data.sub === data.sub) {
-          if (!name && typeof profile.data.name === 'string' && profile.data.name.trim()) name = profile.data.name.trim();
+          if (!name && typeof profile.data.name === 'string' && profile.data.name.trim())
+            name = profile.data.name.trim();
           if (!picture && typeof profile.data.picture === 'string') picture = profile.data.picture;
         }
-      } catch { /* Missing optional profile data must not prevent sign-in. */ }
+      } catch {
+        /* Missing optional profile data must not prevent sign-in. */
+      }
     }
 
     let user = await this.usersService.findByGoogleId(data.sub);

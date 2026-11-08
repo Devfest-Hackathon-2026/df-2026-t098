@@ -1,20 +1,31 @@
 import { randomUUID } from 'node:crypto';
 import { test as base, expect, type Page, type Route } from '@playwright/test';
 
-export const origin = 'http://localhost:4200';
+export const origin = `http://localhost:${process.env.WHYLINT_E2E_FRONTEND_PORT ?? 4200}`;
 export const stateKey = 'whylint-google-auth-state';
 export const avatarUrl = 'https://lh3.googleusercontent.com/whylint-fixture-avatar.svg';
 
 export const test = base.extend<{ isolateBrowser: void }>({
-  isolateBrowser: [async ({ context, page }, use) => {
-    const pageErrors: string[] = [];
-    page.on('pageerror', (error) => pageErrors.push(error.name));
-    // Later, specific Google authorization routes can replace this deny rule.
-    await context.route('**/*', (route) => new URL(route.request().url()).origin === origin
-      ? route.continue() : route.abort('blockedbyclient'));
-    await use();
-    expect(pageErrors, 'The app should not throw unhandled browser errors').toEqual([]);
-  }, { auto: true }],
+  extraHTTPHeaders: async ({ extraHTTPHeaders }, use) => {
+    // Additional contexts inherit these test options unless they explicitly override them.
+    // All requests within one test share the actor and therefore retain its rate limits.
+    await use({ ...extraHTTPHeaders, 'X-WhyLint-TestActor': randomUUID() });
+  },
+  isolateBrowser: [
+    async ({ context, page }, use) => {
+      const pageErrors: string[] = [];
+      page.on('pageerror', (error) => pageErrors.push(error.name));
+      // Later, specific Google authorization routes can replace this deny rule.
+      await context.route('**/*', (route) =>
+        new URL(route.request().url()).origin === origin
+          ? route.continue()
+          : route.abort('blockedbyclient'),
+      );
+      await use();
+      expect(pageErrors, 'The app should not throw unhandled browser errors').toEqual([]);
+    },
+    { auto: true },
+  ],
 });
 
 export { expect };
@@ -29,23 +40,28 @@ export function learner() {
 }
 
 export async function browserRequest(page: Page, pathname: string, method = 'GET', data?: unknown) {
-  return page.evaluate(async ({ pathname, method, data }) => {
-    const response = await fetch(pathname, {
-      method,
-      credentials: 'same-origin',
-      cache: 'no-store',
-      ...(data === undefined ? {} : {
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      }),
-    });
-    const text = await response.text();
-    return {
-      status: response.status,
-      body: text ? JSON.parse(text) : null,
-      cacheControl: response.headers.get('cache-control'),
-    };
-  }, { pathname, method, data });
+  return page.evaluate(
+    async ({ pathname, method, data }) => {
+      const response = await fetch(pathname, {
+        method,
+        credentials: 'same-origin',
+        cache: 'no-store',
+        ...(data === undefined
+          ? {}
+          : {
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            }),
+      });
+      const text = await response.text();
+      return {
+        status: response.status,
+        body: text ? JSON.parse(text) : null,
+        cacheControl: response.headers.get('cache-control'),
+      };
+    },
+    { pathname, method, data },
+  );
 }
 
 export async function openGuestLogin(page: Page) {
@@ -54,9 +70,16 @@ export async function openGuestLogin(page: Page) {
 }
 
 export async function completeOnboarding(page: Page) {
-  await page.addInitScript(() => localStorage.setItem('whylint-onboarding-v1', JSON.stringify({
-    domain: 'frontend', stack: 'javascript', onboardingCompleted: true,
-  })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'whylint-onboarding-v1',
+      JSON.stringify({
+        domain: 'frontend',
+        stack: 'javascript',
+        onboardingCompleted: true,
+      }),
+    ),
+  );
 }
 
 export async function openProfile(page: Page) {
@@ -64,26 +87,43 @@ export async function openProfile(page: Page) {
   await expect(page.getByRole('heading', { name: 'アカウント', exact: true })).toBeVisible();
 }
 
-export async function mockGoogleAuthorization(page: Page, outcome: 'success' | 'invalid-state' | 'rejected' = 'success') {
-  await page.context().route(avatarUrl, (route) => route.fulfill({
-    contentType: 'image/svg+xml',
-    body: '<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><rect width="44" height="44" fill="#c3df72"/><circle cx="22" cy="16" r="8" fill="#203314"/><path d="M8 44v-5a14 14 0 0 1 28 0v5" fill="#203314"/></svg>',
-  }));
-  const code = outcome === 'rejected' ? 'whylint-fixture-rejected' : `whylint-fixture-${randomUUID().replaceAll('-', '')}`;
+export async function mockGoogleAuthorization(
+  page: Page,
+  outcome: 'success' | 'invalid-state' | 'rejected' = 'success',
+) {
+  await page.context().route(avatarUrl, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><rect width="44" height="44" fill="#c3df72"/><circle cx="22" cy="16" r="8" fill="#203314"/><path d="M8 44v-5a14 14 0 0 1 28 0v5" fill="#203314"/></svg>',
+    }),
+  );
+  const code =
+    outcome === 'rejected'
+      ? 'whylint-fixture-rejected'
+      : `whylint-fixture-${randomUUID().replaceAll('-', '')}`;
   let visits = 0;
-  await page.context().route('https://accounts.google.com/o/oauth2/v2/auth**', async (route: Route) => {
-    visits++;
-    const query = new URL(route.request().url()).searchParams;
-    const state = query.get('state');
-    expect(typeof state === 'string' && /^[a-f0-9]{64}$/.test(state)).toBe(true);
-    expect(query.get('redirect_uri')).toBe(`${origin}/auth/google/callback`);
-    expect(query.get('response_type')).toBe('code');
-    expect(query.get('scope')).toBe('openid email profile');
-    const callback = new URL('/auth/google/callback', origin);
-    callback.searchParams.set('state', outcome === 'invalid-state' ? 'fixture-mismatched-state' : state!);
-    callback.searchParams.set('code', code);
-    // The authorization page is entirely local; no request is sent to Google.
-    await route.fulfill({ status: 302, headers: { location: callback.toString(), 'cache-control': 'no-store' }, body: '' });
-  });
+  await page
+    .context()
+    .route('https://accounts.google.com/o/oauth2/v2/auth**', async (route: Route) => {
+      visits++;
+      const query = new URL(route.request().url()).searchParams;
+      const state = query.get('state');
+      expect(typeof state === 'string' && /^[a-f0-9]{64}$/.test(state)).toBe(true);
+      expect(query.get('redirect_uri')).toBe(`${origin}/auth/google/callback`);
+      expect(query.get('response_type')).toBe('code');
+      expect(query.get('scope')).toBe('openid email profile');
+      const callback = new URL('/auth/google/callback', origin);
+      callback.searchParams.set(
+        'state',
+        outcome === 'invalid-state' ? 'fixture-mismatched-state' : state!,
+      );
+      callback.searchParams.set('code', code);
+      // The authorization page is entirely local; no request is sent to Google.
+      await route.fulfill({
+        status: 302,
+        headers: { location: callback.toString(), 'cache-control': 'no-store' },
+        body: '',
+      });
+    });
   return { visits: () => visits };
 }

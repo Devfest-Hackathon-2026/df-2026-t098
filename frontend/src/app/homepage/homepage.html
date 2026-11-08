@@ -1,153 +1,225 @@
-<div class="app-shell" [class.has-feed]="tab() === 'feed' && feedCards.length > 0">
-  <header class="topbar" (keydown.escape)="menuOpen.set(false)">
-    <button class="menu-toggle" type="button" [attr.aria-label]="ui.menu" [attr.aria-expanded]="menuOpen()" aria-controls="main-menu" (click)="menuOpen.set(!menuOpen())"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path class="menu-line-top" d="M4 6h16"/><path class="menu-line-middle" d="M4 12h16"/><path class="menu-line-bottom" d="M4 18h16"/></svg></button>
-    <div class="brand" aria-label="WhyLint"><span class="brand-mark" aria-hidden="true">w<span>_</span></span><span>whylint<span class="brand-dot">.</span></span></div>
-    <div class="header-actions"><span class="preview-label">{{ ui.preview }}</span><button class="language-toggle" type="button" (click)="toggleLanguage()" [attr.aria-label]="language() === 'ja' ? 'Switch to English' : '日本語に切り替え'" [attr.lang]="language() === 'ja' ? 'en' : 'ja'">{{ language() === 'ja' ? 'EN' : '日本語' }}</button><button class="theme-toggle" type="button" (click)="toggleTheme()" [attr.aria-label]="theme() === 'dark' ? ui.lightTheme : ui.darkTheme" [attr.title]="theme() === 'dark' ? ui.lightTheme : ui.darkTheme">@if (theme() === 'dark') {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>} @else {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z"/></svg>}</button></div>
-  </header>
-    <nav class="main-menu" id="main-menu" [class.is-open]="menuOpen()" [attr.aria-label]="ui.navigation" (keydown.escape)="menuOpen.set(false)">
-      <button type="button" [class.active]="tab() === 'feed'" [attr.aria-current]="tab() === 'feed' ? 'page' : null" (click)="openTab('feed', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>{{ ui.feed }}</button>
-      <button type="button" [class.active]="tab() === 'discover'" [attr.aria-current]="tab() === 'discover' ? 'page' : null" (click)="openTab('discover', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>{{ ui.discover }}</button>
-      <button type="button" [class.active]="tab() === 'news'" [attr.aria-current]="tab() === 'news' ? 'page' : null" (click)="openTab('news', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 12h8M8 15h5"/></svg>{{ ui.news }}</button>
-      <button type="button" [class.active]="tab() === 'profile'" [attr.aria-current]="tab() === 'profile' ? 'page' : null" (click)="openTab('profile', feed)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.5-3.1 2.6-5 6.5-5s6 1.9 6.5 5"/></svg>{{ ui.profile }}</button>
-    </nav>
-
-  @if (tab() === 'feed' && feedCards.length > 0) {
-    @let currentCard = feedCards[activeCardIndex()].card;
-    @let currentText = language() === 'ja' ? currentCard.ja : currentCard;
-    <h1 class="sr-only">{{ ui.practice }}</h1>
-    <div class="feed-heading" (click)="menuOpen.set(false)">
-      <div class="feed-heading-text"><div class="feed-concept"><span class="concept-dot"></span><span>{{ currentText.concept }}</span><span class="card-count">{{ activeCardIndex() + 1 }} / {{ feedCards.length }}</span></div><h2 class="feed-question" tabindex="-1">{{ currentText.question }}</h2></div>
-      <div class="feed-navigation">
-        @if (activeCardIndex() > 0) { <button type="button" (click)="goToCard(activeCardIndex() - 1, feed, $event)">{{ ui.previous }}</button> }
-        @if (activeCardIndex() < feedCards.length - 1) { <button type="button" (click)="goToCard(activeCardIndex() + 1, feed, $event)">{{ ui.next }} <span aria-hidden="true">↓</span></button> }
-      </div>
+<div class="app-shell" [class.has-discussion]="discussionQuestion() !== null">
+  <header class="topbar">
+    <a class="brand" routerLink="/" aria-label="WhyLint"
+      ><span aria-hidden="true">w<span>_</span></span
+      ><span class="brand-name"> whylint<span class="brand-dot">.</span></span></a
+    >
+    <app-learning-hud [language]="settings.language()" />
+    <div class="header-actions">
+      <button
+        type="button"
+        (click)="settings.toggleTheme()"
+        [attr.aria-label]="
+          settings.theme() === 'dark'
+            ? text('ライトテーマに切り替え', 'Switch to light theme')
+            : text('ダークテーマに切り替え', 'Switch to dark theme')
+        "
+      >
+        <app-icon [name]="settings.theme() === 'dark' ? 'sun' : 'moon'" />
+      </button>
     </div>
-  }
-
-  <main class="content" [class.feed-content]="tab() === 'feed'" id="main-content" #feed (scroll)="onFeedScroll(feed)" (click)="menuOpen.set(false)">
+  </header>
+  <nav class="main-nav" [attr.aria-label]="text('メインナビゲーション', 'Main navigation')">
+    @for (item of tabs; track item) {
+      <button
+        type="button"
+        [class.active]="tab() === item"
+        [attr.aria-current]="tab() === item ? 'page' : null"
+        (click)="openTab(item, content)"
+      >
+        <app-icon [name]="item" /><span>{{ label(item) }}</span>
+      </button>
+    }
+  </nav>
+  <main
+    #content
+    class="content"
+    [class.feed-content]="tab() === 'feed'"
+    [attr.tabindex]="tab() === 'feed' ? 0 : null"
+    [attr.aria-label]="tab() === 'feed' ? text('問題フィード', 'Question feed') : null"
+    (scroll)="onScroll(content)"
+  >
+    @if (authSession.status() === 'unavailable') {
+      <div class="session-error" role="alert">
+        <p>{{ text('アカウントを確認できませんでした。', 'Could not check your account.') }}</p>
+        <button type="button" (click)="authSession.refresh()">
+          {{ text('再試行', 'Try again') }}
+        </button>
+      </div>
+    }
     @if (tab() === 'feed') {
-      @for (entry of feedCards; track entry.card.id; let position = $index) {
-        @let card = entry.card;
-        @let cardIndex = entry.index;
-        @let text = language() === 'ja' ? card.ja : card;
-        <section class="feed-slide" [id]="'card-' + cardIndex" [attr.aria-label]="ui.card(position + 1, feedCards.length)">
-          <h2 class="sr-only">{{ text.question }}</h2>
-          <article class="question-card">
-            <div class="code-window" [attr.aria-label]="ui.codeExample"><div class="code-head"><span>snippet.js · {{ card.language }}</span><span>{{ text.title }}</span></div><pre><code>@for (token of card.code | syntaxHighlight:card.language; track $index) {<span [class]="'syntax-' + token.kind">{{ token.text }}</span>}</code></pre></div>
-            <div class="card-actions"><button class="save-button" type="button" [class.is-saved]="savedIds().includes(card.id)" [attr.aria-pressed]="savedIds().includes(card.id)" (click)="toggleSaved(card.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v16.5L12 16l-6 4.25z"/></svg><span>{{ savedIds().includes(card.id) ? ui.saved : ui.save }}</span></button></div>
-            @if (card.reviewOf) { <p class="review-label">{{ ui.reviewCard }}</p> }
-            @if (!states[cardIndex].revealed) {
-              <div class="answer-heading"><h3>{{ ui.yourAnswer }}</h3><button class="solution-button" type="button" (click)="reveal(cardIndex)">{{ ui.viewSolution }}</button></div>
-              <div class="answer-switch" role="group" [attr.aria-label]="ui.answerSection">
-                <button type="button" [class.current]="states[cardIndex].view === 'choice'" [attr.aria-pressed]="states[cardIndex].view === 'choice'" (click)="states[cardIndex].view = 'choice'">{{ ui.choose }} <span>{{ states[cardIndex].selected !== null ? '✓' : '' }}</span></button>
-                <button type="button" [class.current]="states[cardIndex].view === 'reason'" [attr.aria-pressed]="states[cardIndex].view === 'reason'" (click)="states[cardIndex].view = 'reason'">{{ ui.yourWhy }} <span>{{ states[cardIndex].reason.trim() ? '✓' : '' }}</span></button>
+      @if (feed.notice() === 'fallback' || feed.generating()) {
+        <div class="feed-status" role="status">
+          @if (feed.notice() === 'fallback') {
+            <span>{{
+              text(
+                'Geminiが混み合っています。厳選問題で続けましょう。',
+                'Gemini is busy, so here are hand-picked questions.'
+              )
+            }}</span>
+            <button type="button" (click)="feed.retry()">{{ text('再試行', 'Retry') }}</button>
+          } @else {
+            <app-icon class="sparkle" name="sparkle" aria-hidden="true" />
+            <span>{{
+              text('Geminiがあなた向けの問題を作成中…', 'Gemini is writing your next questions…')
+            }}</span>
+          }
+        </div>
+      }
+      @for (item of feed.items(); track item.key; let index = $index) {
+        <section class="feed-slide" [attr.data-feed-index]="index">
+          @if (item.kind === 'question') {
+            @if (item.daily && feed.daily(); as daily) {
+              <div class="daily-banner">
+                <strong
+                  ><app-icon name="bug" aria-hidden="true" />
+                  {{ text('今日のバグ', 'Bug of the Day') }}</strong
+                >
+                <span>{{
+                  text(
+                    daily.solved + '人が解決 · 全員に同じ問題',
+                    daily.solved + ' solved · same question for everyone'
+                  )
+                }}</span>
+                @if (daily.you; as you) {
+                  <span class="daily-rank">{{
+                    you.correct
+                      ? text(you.rank + '番目に解決！', 'You were #' + you.rank + ' to solve it!')
+                      : text('明日また挑戦しよう', 'Try again tomorrow')
+                  }}</span>
+                }
               </div>
-              @if (states[cardIndex].view === 'choice') {
-                <fieldset class="answers"><legend>{{ ui.chooseExplanation }}</legend>
-                  @for (option of text.options; track $index; let i = $index) {
-                    <label class="answer" [class.selected]="states[cardIndex].selected === i"><input type="radio" [name]="'explanation-' + cardIndex" [value]="i" [checked]="states[cardIndex].selected === i" (change)="selectAnswer(cardIndex, i)"><span class="answer-letter">{{ ['A', 'B', 'C'][i] }}</span><span>{{ option }}</span><span class="radio-mark"></span></label>
-                  }
-                </fieldset>
-              } @else {
-                <label class="reason-label" [for]="'reason-' + cardIndex">{{ ui.reasonLabel }}</label>
-                <textarea [id]="'reason-' + cardIndex" [ngModel]="states[cardIndex].reason" (ngModelChange)="setReason(cardIndex, $event)" [placeholder]="ui.reasonPlaceholder" rows="4"></textarea>
-                <p class="reason-note">{{ ui.reasonNote }}</p>
-              }
-            } @else {
-              <section class="solution" aria-live="polite">
-                <div class="solution-heading"><h3>{{ ui.solution }}</h3><span>{{ states[cardIndex].peeked ? ui.peeked : ui.attempted }}</span></div>
-                @if (states[cardIndex].selected !== null) { <p class="answer-feedback">{{ states[cardIndex].selected === card.answer ? ui.correct : ui.incorrect }}</p><p class="chosen-answer">{{ text.options[states[cardIndex].selected!] }}</p> }
-                <p>{{ text.solution }}</p>
-                @if (states[cardIndex].reason.trim()) { <div class="your-reason"><h4>{{ ui.yourExplanation }}</h4><p>{{ states[cardIndex].reason }}</p></div> }
-                <p class="preview-note">{{ ui.previewNote }}</p>
-                <fieldset class="rating"><legend>{{ ui.rating }} <span>{{ ui.optional }}</span></legend>
-                  <div>
-                    <button type="button" [attr.aria-pressed]="states[cardIndex].rating === 'got-it'" (click)="setRating(cardIndex, 'got-it')">{{ ui.gotIt }}</button>
-                    <button type="button" [attr.aria-pressed]="states[cardIndex].rating === 'almost'" (click)="setRating(cardIndex, 'almost')">{{ ui.almost }}</button>
-                    <button type="button" [attr.aria-pressed]="states[cardIndex].rating === 'no'" (click)="setRating(cardIndex, 'no')">{{ ui.no }}</button>
-                  </div>
-                </fieldset>
-              </section>
             }
-          </article>
-          <div class="slide-footer">
-            <span>{{ position < feedCards.length - 1 ? ui.continue : ui.end }}</span>
-            <div>
-              @if (position > 0) { <button type="button" (click)="goToCard(position - 1, feed, $event)">{{ ui.previous }}</button> }
-              @if (position < feedCards.length - 1) { <button type="button" (click)="goToCard(position + 1, feed, $event)">{{ ui.next }} <span aria-hidden="true">↓</span></button> }
-              @else { <button type="button" (click)="goToCard(0, feed, $event)">{{ ui.backToFirst }}</button> }
+            <app-question-card
+              [question]="item.question"
+              [viewId]="item.key"
+              [cachedTap]="item.tap ?? null"
+              [language]="settings.language()"
+              [relearn]="item.relearn ?? false"
+              [daily]="item.daily ?? false"
+              [nextable]="true"
+              (next)="next(index)"
+              [discussion]="discussionQuestion() === item.key"
+              (discussionChange)="setDiscussion(item.key, $event)"
+              (tapped)="onTapped(item, $event)"
+            />
+            @if (index === 0 && !feed.hasScrolled()) {
+              <p class="swipe-hint" aria-hidden="true">
+                <span class="hint-arrow">↑</span>
+                <span class="hint-touch">{{
+                  text('スワイプで次の問題', 'Swipe up for the next question')
+                }}</span>
+                <span class="hint-pointer">{{
+                  text('スクロールか ↓ キーで次の問題', 'Scroll or press ↓ for the next question')
+                }}</span>
+              </p>
+            }
+          } @else {
+            <div class="signin-card">
+              <app-icon class="signin-icon" name="flame" [filled]="true" aria-hidden="true" />
+              <h2>{{ text('いい調子！', 'You’re on a roll!') }}</h2>
+              <p>
+                {{
+                  text(
+                    'ログインすると、連続記録・XP・あなた専用のAI問題・弱点の復習が使えます。',
+                    'Sign in to keep your streak, earn XP, get AI questions made for you, and review what you miss.'
+                  )
+                }}
+              </p>
+              <a class="primary" routerLink="/login">{{
+                text('ログインして続ける', 'Sign in to keep going')
+              }}</a>
+              <button type="button" class="link-button" (click)="next(index)">
+                {{ text('あとで', 'Maybe later') }}
+              </button>
             </div>
-          </div>
+          }
         </section>
       }
-      @if (feedCards.length === 0) { <section class="filter-empty"><p>{{ ui.noCards }}</p><button type="button" (click)="openTab('discover', feed)">{{ ui.editFilters }} →</button></section> }
-    } @else if (tab() === 'discover') {
-      <section class="discover-page">
-        <h1>{{ ui.discover }}</h1><p class="discover-intro">{{ ui.discoverIntro }}</p>
-        <label class="search-field"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><span class="sr-only">{{ ui.search }}</span><input type="search" [placeholder]="ui.search" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)"></label>
-        <fieldset class="filter-section"><legend>{{ ui.languages }}</legend><div class="filter-options">@for (item of languages; track item) { <button type="button" [class.selected]="selectedLanguage() === item" [attr.aria-pressed]="selectedLanguage() === item" (click)="selectLanguage(item)">{{ item === 'all' ? ui.all : item }}</button> }</div></fieldset>
-        <fieldset class="filter-section"><legend>{{ ui.difficulty }}</legend><div class="filter-options">@for (item of difficulties; track item) { <button type="button" [class.selected]="selectedDifficulty() === item" [attr.aria-pressed]="selectedDifficulty() === item" (click)="selectDifficulty(item)">{{ ui[item] }}</button> }</div><p class="filter-note">{{ ui.sampleLevel }}</p></fieldset>
-        <section class="filter-section concept-section"><h2>{{ ui.concepts }}</h2><div class="concept-list">@for (item of availableConcepts; track item.card.id) { @let text = language() === 'ja' ? item.card.ja : item.card; <button type="button" [class.selected]="selectedConcept() === item.card.id" [attr.aria-pressed]="selectedConcept() === item.card.id" (click)="selectedConcept.set(selectedConcept() === item.card.id ? null : item.card.id)"><span>{{ text.concept }}</span><span>{{ ui.count(item.count) }} <span aria-hidden="true">›</span></span></button> } @empty { <p class="filter-note">{{ ui.noConcepts }}</p> }</div></section>
-        <button class="apply-filters" type="button" (click)="applyFilters(feed)">{{ ui.learn }}</button>
-      </section>
-    } @else if (tab() === 'news') {
-      <section class="empty-page"><h1>{{ ui.news }}</h1><p class="empty-intro">{{ ui.newsIntro }}</p><div class="empty-card"><h2>{{ ui.newsTitle }}</h2><p>{{ ui.newsBody }}</p><button type="button" (click)="openTab('feed', feed)">{{ ui.backToPractice }} →</button></div></section>
-    } @else {
-      <section class="empty-page"><h1>{{ ui.profile }}</h1><p class="empty-intro">{{ ui.profileIntro }}</p>
-        <section class="empty-card account-section" aria-labelledby="account-title">
-          <h2 id="account-title">{{ ui.account }}</h2>
-          @if (authSession.status() === 'loading') {
-            <p role="status">{{ ui.accountLoading }}</p>
-          } @else if (authSession.status() === 'authenticated') {
-            @if (authSession.user(); as account) {
-              <div class="account-details">
-                <span class="account-avatar" aria-hidden="true">
-                  @if (account.avatarUrl && failedAvatarUrl() !== account.avatarUrl) {
-                    <img [src]="account.avatarUrl" alt="" width="44" height="44" referrerpolicy="no-referrer" (error)="failedAvatarUrl.set(account.avatarUrl)">
-                  } @else {
-                    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.5-3.1 2.6-5 6.5-5s6 1.9 6.5 5"/></svg>
-                  }
-                </span>
-                <div class="account-identity">
-                  <strong>{{ account.name || account.email }}</strong>
-                  @if (account.name) { <span>{{ account.email }}</span> }
-                  @if (account.username) { <span class="account-username">@{{ account.username }}</span> }
-                </div>
-              </div>
+      @if ((feed.loading() || feed.booting()) && !feed.items().length) {
+        <div class="feed-slide feed-loading">
+          <app-loading-skeleton
+            variant="question"
+            [label]="text('問題を読み込み中…', 'Loading questions…')"
+          />
+        </div>
+      }
+      @if (feed.error()) {
+        <div class="feed-state">
+          <p role="alert">{{ feed.error() }}</p>
+          <button class="primary" type="button" (click)="feed.retry()">
+            {{ text('再試行', 'Try again') }}
+          </button>
+        </div>
+      }
+      @if (!feed.loading() && !feed.generating() && !feed.error() && feed.items().length) {
+        <div class="feed-end">
+          <p>
+            {{
+              authSession.user()
+                ? text('次の問題を準備しています…', 'Preparing more questions…')
+                : text(
+                    'ログインすると、あなた専用の問題が無限に続きます。',
+                    'Sign in for an endless feed made for you.'
+                  )
+            }}
+          </p>
+          <a routerLink="/onboarding" [queryParams]="{ edit: '1' }">{{
+            text('興味を変更', 'Edit interests')
+          }}</a>
+        </div>
+      }
+    } @else if (tab() === 'review') {
+      <section class="collection">
+        <h1>{{ text('理解するまで、もう一度。', 'Come back with a fresh perspective.') }}</h1>
+        <p>
+          {{
+            text(
+              '間違えた問題はここに保存され、正解するまで毎朝9時（日本時間）にフィードへ戻ってきます。今すぐ解き直すこともできます。',
+              'Missed questions are kept here and return to your feed every morning at 9:00 (Japan time) until you get them right. You can also solve them now.'
+            )
+          }}
+        </p>
+        @if (authSession.status() !== 'authenticated') {
+          <a routerLink="/login">{{ text('ログインして復習', 'Sign in to practice') }}</a>
+        } @else {
+          @if (reviewsLoading()) {
+            <app-loading-skeleton
+              [label]="text('復習する問題を読み込み中…', 'Loading practice questions…')"
+            />
+          }
+          <div class="question-list">
+            @for (question of reviews(); track question.id) {
+              <a [routerLink]="['/questions', question.id]"
+                ><span>{{ topics(question) }}</span>
+                <strong>{{ question.prompt }}</strong>
+                <small>{{ text('もう一度解く', 'Try again') }}</small></a
+              >
+            } @empty {
+              @if (!reviewsLoading() && !reviewsError()) {
+                <p>
+                  {{
+                    text(
+                      '復習する問題はありません。フィードで次の問いに挑戦しましょう。',
+                      'You’re caught up. Find your next question in the feed.'
+                    )
+                  }}
+                </p>
+              }
             }
-          } @else if (authSession.status() === 'guest') {
-            <p>{{ ui.accountGuest }}</p>
-            <a class="account-sign-in" routerLink="/login">{{ ui.accountSignIn }} <span aria-hidden="true">→</span></a>
-          } @else {
-            <p role="alert">{{ ui.accountUnavailable }}</p>
-            <button class="account-retry" type="button" (click)="authSession.refresh()">{{ ui.accountRetry }}</button>
+          </div>
+          @if (reviewsError()) {
+            <p role="alert">{{ reviewsError() }}</p>
+            <button type="button" (click)="loadReviews()">{{ text('再試行', 'Try again') }}</button>
           }
-          <app-username-setup [language]="language()" [showRecoveryActions]="false"/>
-          @if (authSession.status() === 'authenticated' && authSession.user()) {
-            <button class="account-sign-out" type="button" [disabled]="authSession.loggingOut()" [attr.aria-busy]="authSession.loggingOut()" (click)="signOut()">{{ authSession.loggingOut() ? ui.signingOut : ui.signOut }}</button>
-            @if (signOutFailed()) { <p class="account-error" role="alert">{{ ui.signOutError }}</p> }
-          }
-        </section>
-        <section class="empty-card saved-section" aria-labelledby="saved-title"><div class="saved-heading"><h2 id="saved-title">{{ ui.savedTitle }}</h2><span>{{ savedCards.length }}</span></div><p>{{ savedStorageAvailable() ? ui.savedLocal : ui.savedSession }}</p>
-          @if (savedCards.length === 0) { <p class="saved-empty">{{ ui.savedEmpty }}</p> }
-          @else { <ul class="saved-list">@for (card of savedCards; track card.id) { @let text = language() === 'ja' ? card.ja : card; <li><button type="button" class="saved-card-link" (click)="openSavedCard(card, feed)"><span class="saved-concept">{{ text.concept }} · {{ card.language }}</span><span class="saved-question">{{ text.question }}</span><span class="saved-open">{{ ui.openSaved }} →</span></button><button type="button" class="saved-remove" [attr.aria-label]="ui.removeSaved + ': ' + text.question" (click)="toggleSaved(card.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v16.5L12 16l-6 4.25z"/></svg></button></li> }</ul> }
-        </section>
-        <div class="empty-card progress-card"><h2>{{ ui.progressTitle }}</h2><p>{{ progressStorageAvailable() ? ui.progressSaved : ui.progressSession }}</p><ul class="progress-list">@for (card of cards; track card.id; let i = $index) { @let text = language() === 'ja' ? card.ja : card; <li><div><span>{{ text.concept }}</span>@if (card.reviewOf) { <small>{{ ui.progressReview }}</small> }</div><span>{{ states[i].revealed ? (states[i].peeked ? ui.progressPeeked : ui.progressAttempted) : (states[i].selected !== null || states[i].reason.trim() ? ui.progressDraft : ui.progressPending) }}</span></li> }</ul><p>{{ ui.progressNote }}</p><div class="progress-actions"><button type="button" (click)="openTab('feed', feed)">{{ ui.backToPractice }} →</button>@if (!clearRequested()) { <button type="button" (click)="clearRequested.set(true)">{{ ui.clearProgress }}</button> } @else { <button type="button" (click)="clearProgress()">{{ ui.confirmClear }}</button><button type="button" (click)="clearRequested.set(false)">{{ ui.cancelClear }}</button> }</div>@if (clearError()) { <p role="alert">{{ ui.clearError }}</p> }</div></section>
+        }
+      </section>
+    } @else if (tab() === 'rank') {
+      <app-leaderboard-panel [language]="settings.language()" />
+    } @else if (tab() === 'publish') {
+      <app-publish-question [language]="settings.language()" />
+    } @else {
+      <app-profile-panel [language]="settings.language()" />
     }
   </main>
-  @if (tab() === 'feed' && feedCards.length > 0) {
-    @let activeCard = feedCards[activeCardIndex()].card;
-    <aside class="desktop-feed-controls" [attr.aria-label]="ui.navigation">
-      <button type="button" class="desktop-save" [class.is-saved]="savedIds().includes(activeCard.id)" [attr.aria-pressed]="savedIds().includes(activeCard.id)" (click)="toggleSaved(activeCard.id)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v16.5L12 16l-6 4.25z"/></svg><span>{{ savedIds().includes(activeCard.id) ? ui.saved : ui.save }}</span></button>
-      <div class="desktop-step-controls">
-        <button type="button" [attr.aria-label]="ui.previous" [title]="ui.previous" [disabled]="activeCardIndex() === 0" (click)="goToCard(activeCardIndex() - 1, feed, $event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button>
-        <button type="button" [attr.aria-label]="ui.next" [title]="ui.next" [disabled]="activeCardIndex() === feedCards.length - 1" (click)="goToCard(activeCardIndex() + 1, feed, $event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 10 6 6 6-6"/></svg></button>
-      </div>
-    </aside>
-  }
-  <nav class="bottom-nav" [attr.aria-label]="ui.navigation">
-    <button type="button" (click)="openTab('feed', feed)" [attr.aria-current]="tab() === 'feed' ? 'page' : null" [class.active]="tab() === 'feed'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg><span>{{ ui.feed }}</span></button>
-    <button type="button" (click)="openTab('news', feed)" [attr.aria-current]="tab() === 'news' ? 'page' : null" [class.active]="tab() === 'news'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 12h8M8 15h5"/></svg><span>{{ ui.news }}</span></button>
-    <button type="button" (click)="openTab('profile', feed)" [attr.aria-current]="tab() === 'profile' ? 'page' : null" [class.active]="tab() === 'profile'"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.5-3.1 2.6-5 6.5-5s6 1.9 6.5 5"/></svg><span>{{ ui.profile }}</span></button>
-  </nav>
 </div>

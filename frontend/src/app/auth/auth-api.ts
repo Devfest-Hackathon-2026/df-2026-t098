@@ -32,8 +32,13 @@ export class AuthApi {
     try {
       const response = await Promise.race([
         this.request(path, {
-          method, credentials: 'same-origin', cache: 'no-store', referrerPolicy: 'no-referrer',
-          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: controller.signal,
+          method,
+          credentials: 'same-origin',
+          cache: 'no-store',
+          referrerPolicy: 'no-referrer',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          signal: controller.signal,
         }),
         cancelled,
       ]);
@@ -42,14 +47,20 @@ export class AuthApi {
         // Finish the response before session restoration can replace the form.
         await Promise.race([response.text(), cancelled]);
         if (controller.signal.aborted) return { ok: false, reason: 'unavailable' };
-        return await this.session.refresh() ? { ok: true } : { ok: false, reason: 'unavailable' };
+        return (await this.session.refresh()) ? { ok: true } : { ok: false, reason: 'unavailable' };
       }
       if (response.status === 401) {
         if (method === 'PATCH') await this.session.refresh();
         return { ok: false, reason: 'unauthorized' };
       }
-      const reason: AuthFailure = response.status === 400 ? 'invalid'
-        : response.status === 409 ? 'conflict' : response.status === 429 ? 'rateLimit' : 'unavailable';
+      const reason: AuthFailure =
+        response.status === 400
+          ? 'invalid'
+          : response.status === 409
+            ? 'conflict'
+            : response.status === 429
+              ? 'rateLimit'
+              : 'unavailable';
       return { ok: false, reason };
     } catch {
       return { ok: false, reason: 'unavailable' };

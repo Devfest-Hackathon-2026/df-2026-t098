@@ -29,19 +29,31 @@ function idToken(suffix) {
   return `${content}.${sign('RSA-SHA256', Buffer.from(content), privateKey).toString('base64url')}`;
 }
 
-nock('https://oauth2.googleapis.com').persist().post('/token').reply(async (request) => {
-  const data = new URLSearchParams(await request.text());
-  const code = data.get('code') ?? '';
-  if (data.get('client_id') !== 'whylint-fixture-client' ||
+nock('https://oauth2.googleapis.com')
+  .persist()
+  .post('/token')
+  .reply(async (request) => {
+    const data = new URLSearchParams(await request.text());
+    const code = data.get('code') ?? '';
+    if (
+      data.get('client_id') !== 'whylint-fixture-client' ||
       data.get('client_secret') !== 'whylint-fixture-secret' ||
-      data.get('redirect_uri') !== 'http://localhost:4200/auth/google/callback' ||
+      data.get('redirect_uri') !== `${process.env.FRONTEND_URL}/auth/google/callback` ||
       data.get('grant_type') !== 'authorization_code' ||
-      !/^whylint-fixture-[a-f0-9]{32}$/.test(code)) {
-    return [400, { error: 'invalid_grant' }];
-  }
-  return [200, { id_token: idToken(code.slice('whylint-fixture-'.length)) }];
-});
+      !/^whylint-fixture-[a-f0-9]{32}$/.test(code)
+    ) {
+      return [400, { error: 'invalid_grant' }];
+    }
+    return [200, { id_token: idToken(code.slice('whylint-fixture-'.length)) }];
+  });
 
-nock('https://www.googleapis.com').persist().get('/oauth2/v1/certs').reply(200, {
-  [keyId]: publicKey.export({ type: 'spki', format: 'pem' }),
-}, { 'Cache-Control': 'public, max-age=3600' });
+nock('https://www.googleapis.com')
+  .persist()
+  .get('/oauth2/v1/certs')
+  .reply(
+    200,
+    {
+      [keyId]: publicKey.export({ type: 'spki', format: 'pem' }),
+    },
+    { 'Cache-Control': 'public, max-age=3600' },
+  );

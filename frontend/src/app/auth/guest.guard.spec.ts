@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { convertToParamMap, Router } from '@angular/router';
 import type { ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { AuthSession } from './auth-session';
 import type { SessionStatus } from './auth-session';
@@ -11,49 +11,83 @@ describe('guestOnlyGuard', () => {
   let refresh: ReturnType<typeof vi.fn>;
   let redirect: UrlTree;
   let createUrlTree: ReturnType<typeof vi.fn>;
+  let parseUrl: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     status = signal<SessionStatus>('loading');
     refresh = vi.fn();
     redirect = {} as UrlTree;
     createUrlTree = vi.fn().mockReturnValue(redirect);
+    parseUrl = vi.fn().mockReturnValue(redirect);
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthSession, useValue: { status: status.asReadonly(), refresh } },
-        { provide: Router, useValue: { createUrlTree } },
+        { provide: Router, useValue: { createUrlTree, parseUrl } },
       ],
     });
   });
 
-  function runGuard(): Promise<boolean | UrlTree> {
-    return TestBed.runInInjectionContext(() => guestOnlyGuard(
-      {} as ActivatedRouteSnapshot,
-      {} as RouterStateSnapshot,
-    )) as Promise<boolean | UrlTree>;
+  function runGuard(returnTo?: string): Promise<boolean | UrlTree> {
+    return TestBed.runInInjectionContext(() =>
+      guestOnlyGuard(
+        {
+          queryParamMap: convertToParamMap(returnTo ? { returnTo } : {}),
+        } as ActivatedRouteSnapshot,
+        {} as RouterStateSnapshot,
+      ),
+    ) as Promise<boolean | UrlTree>;
   }
 
   it('redirects an authenticated user after checking the server', async () => {
-    refresh.mockImplementation(async () => { status.set('authenticated'); return true; });
+    refresh.mockImplementation(async () => {
+      status.set('authenticated');
+      return true;
+    });
     await expect(runGuard()).resolves.toBe(redirect);
     expect(refresh).toHaveBeenCalledOnce();
     expect(createUrlTree).toHaveBeenCalledWith(['/']);
   });
 
+  it('returns an authenticated learner to the requested public question', async () => {
+    status.set('authenticated');
+    const target = '/questions/894a7456-75cf-43c8-bb51-02f6b84a6cc3?explain=1';
+    await expect(runGuard(target)).resolves.toBe(redirect);
+    expect(parseUrl).toHaveBeenCalledWith(target);
+    expect(createUrlTree).not.toHaveBeenCalled();
+  });
+
+  it('falls back to practice for an external return target', async () => {
+    status.set('authenticated');
+    await expect(runGuard('https://evil.test')).resolves.toBe(redirect);
+    expect(parseUrl).not.toHaveBeenCalled();
+    expect(createUrlTree).toHaveBeenCalledWith(['/']);
+  });
+
   it('allows a confirmed guest', async () => {
-    refresh.mockImplementation(async () => { status.set('guest'); return false; });
+    refresh.mockImplementation(async () => {
+      status.set('guest');
+      return false;
+    });
     await expect(runGuard()).resolves.toBe(true);
     expect(createUrlTree).not.toHaveBeenCalled();
   });
 
   it('allows the page to present a retryable unavailable state', async () => {
-    refresh.mockImplementation(async () => { status.set('unavailable'); return false; });
+    refresh.mockImplementation(async () => {
+      status.set('unavailable');
+      return false;
+    });
     await expect(runGuard()).resolves.toBe(true);
     expect(createUrlTree).not.toHaveBeenCalled();
   });
 
   it('waits for the initial check instead of redirecting while loading', async () => {
     let resolve!: (value: boolean) => void;
-    refresh.mockReturnValue(new Promise<boolean>((done) => { resolve = done; }));
+    refresh.mockReturnValue(
+      new Promise<boolean>((done) => {
+        resolve = done;
+      }),
+    );
     const navigation = runGuard();
     expect(status()).toBe('loading');
     expect(createUrlTree).not.toHaveBeenCalled();
@@ -65,7 +99,10 @@ describe('guestOnlyGuard', () => {
 
   it('revalidates rather than trusting an expired in-memory session', async () => {
     status.set('authenticated');
-    refresh.mockImplementation(async () => { status.set('guest'); return false; });
+    refresh.mockImplementation(async () => {
+      status.set('guest');
+      return false;
+    });
     await expect(runGuard()).resolves.toBe(true);
     expect(refresh).toHaveBeenCalledOnce();
     expect(createUrlTree).not.toHaveBeenCalled();
@@ -73,7 +110,11 @@ describe('guestOnlyGuard', () => {
 
   it('uses the newest status when an in-flight check is superseded', async () => {
     let resolve!: (value: boolean) => void;
-    refresh.mockReturnValue(new Promise<boolean>((done) => { resolve = done; }));
+    refresh.mockReturnValue(
+      new Promise<boolean>((done) => {
+        resolve = done;
+      }),
+    );
     const navigation = runGuard();
 
     status.set('authenticated');

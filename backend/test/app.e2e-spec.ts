@@ -24,9 +24,7 @@ describe('Application routes (e2e)', () => {
   });
 
   it('returns 404 for an unregistered API route', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/api/v1/not-registered')
-      .expect(404);
+    const response = await request(app.getHttpServer()).get('/api/v1/not-registered').expect(404);
     expect(response.body.message).toBe('Cannot GET /api/v1/not-registered');
   });
 });

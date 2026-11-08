@@ -1,0 +1,276 @@
+<section class="panel profile-panel">
+  <h1>{{ text('プロフィール', 'Profile') }}</h1>
+  <section class="account-section" aria-labelledby="account-title">
+    <h2 id="account-title">{{ text('アカウント', 'Account') }}</h2>
+    @if (session.status() === 'loading') {
+      <app-loading-skeleton
+        variant="account"
+        [label]="text('アカウントを確認しています…', 'Checking your account…')"
+      />
+    } @else if (session.status() === 'authenticated') {
+      @if (session.user(); as account) {
+        <div class="account-details">
+          <span class="account-avatar" aria-hidden="true">
+            @if (account.avatarUrl && failedAvatarUrl() !== account.avatarUrl) {
+              <img
+                [src]="account.avatarUrl"
+                alt=""
+                width="48"
+                height="48"
+                referrerpolicy="no-referrer"
+                (error)="failedAvatarUrl.set(account.avatarUrl)"
+              />
+            } @else {
+              <app-icon name="profile" />
+            }
+          </span>
+          <div class="account-identity">
+            <strong>{{ account.name || account.email }}</strong>
+            @if (account.name) {
+              <span>{{ account.email }}</span>
+            }
+            @if (account.username) {
+              <span class="account-username">@{{ account.username }}</span>
+            }
+          </div>
+        </div>
+        <a class="public-profile-link" [routerLink]="['/creators', account.id]">{{
+          text('公開プロフィールを見る', 'View public profile')
+        }}</a>
+      }
+    } @else if (session.status() === 'guest') {
+      <p>
+        {{
+          text(
+            'ログインすると学習の進み具合を保存できます。',
+            'Sign in to keep your progress across devices.'
+          )
+        }}
+      </p>
+      <a class="account-sign-in" routerLink="/login">{{
+        text('Googleでログイン', 'Sign in with Google')
+      }}</a>
+    } @else {
+      <p role="alert">
+        {{ text('アカウント情報を取得できませんでした。', 'Could not load your account.') }}
+      </p>
+      <button class="secondary account-retry" type="button" (click)="session.refresh()">
+        {{ text('再試行', 'Try again') }}
+      </button>
+    }
+    <app-username-setup [language]="language()" [showRecoveryActions]="false" />
+    @if (session.status() === 'authenticated') {
+      <button
+        class="secondary account-sign-out"
+        type="button"
+        [disabled]="session.loggingOut()"
+        [attr.aria-busy]="session.loggingOut()"
+        (click)="signOut()"
+      >
+        {{
+          session.loggingOut()
+            ? text('ログアウト中…', 'Signing out…')
+            : text('ログアウト', 'Sign out')
+        }}
+      </button>
+      @if (signOutFailed()) {
+        <p class="account-error" role="alert">
+          {{
+            text(
+              'ログアウトできませんでした。もう一度お試しください。',
+              'Could not sign out. Please try again.'
+            )
+          }}
+        </p>
+      }
+    }
+  </section>
+  <section class="profile-settings" aria-labelledby="profile-settings-title">
+    <h2 id="profile-settings-title">{{ text('設定', 'Settings') }}</h2>
+    <fieldset class="reading-size" aria-describedby="reading-size-description">
+      <legend>{{ text('文字の大きさ', 'Text size') }}</legend>
+      <p id="reading-size-description">
+        {{
+          text(
+            '読みやすい大きさを選べます。この端末に保存されます。',
+            'Choose a comfortable reading size. Saved on this device.'
+          )
+        }}
+      </p>
+      <div class="reading-size-options">
+        @for (size of readingSizes; track size.value) {
+          <label [class.is-selected]="settings.readingSize() === size.value">
+            <input
+              type="radio"
+              name="reading-size"
+              [value]="size.value"
+              [checked]="settings.readingSize() === size.value"
+              (change)="settings.setReadingSize(size.value)"
+            />
+            <span>{{ text(size.ja, size.en) }}</span>
+          </label>
+        }
+      </div>
+    </fieldset>
+    @if (session.status() === 'authenticated') {
+      <app-language-picker
+        [language]="language()"
+        [selected]="selectedLanguage()"
+        [disabled]="savingLanguage()"
+        [attr.aria-busy]="savingLanguage()"
+        (changed)="changeLanguage($event)"
+      />
+      @if (savingLanguage()) {
+        <span class="sr-only" role="status">{{ text('言語を保存中…', 'Saving language…') }}</span>
+      }
+      @if (languageError()) {
+        <p role="alert">{{ languageError() }}</p>
+      }
+    }
+  </section>
+  @if (session.status() === 'authenticated') {
+    @if (loading() && !progress()) {
+      <app-loading-skeleton
+        variant="profile"
+        [label]="text('学習の記録を読み込み中…', 'Loading your progress…')"
+      />
+    }
+    @if (progress(); as stats) {
+      <section class="progress-summary">
+        <h2>{{ text('今日の目標', 'Today’s goal') }}</h2>
+        <div class="goal-heading">
+          <p>{{ text('問題に取り組む', 'Work through questions') }}</p>
+          <strong>{{ stats.dailyCompleted }} / {{ stats.dailyGoal }}</strong>
+        </div>
+        <progress
+          [value]="stats.dailyCompleted"
+          [max]="stats.dailyGoal"
+          [attr.aria-label]="text('今日の目標', 'Today’s goal')"
+        ></progress>
+        <p class="hint">
+          {{ text('日本時間で毎日更新されます。', 'A new day starts at midnight in Japan.') }}
+        </p>
+        <dl class="stats">
+          <div>
+            <dt>{{ text('レベル', 'Level') }}</dt>
+            <dd>{{ stats.level }}</dd>
+          </div>
+          <div>
+            <dt>{{ text('累計XP', 'Total XP') }}</dt>
+            <dd>{{ stats.totalXp }}</dd>
+          </div>
+          <div>
+            <dt>{{ text('連続日数', 'Day streak') }}</dt>
+            <dd>
+              <app-icon class="stat-flame" name="flame" [filled]="true" aria-hidden="true" />
+              {{ stats.streak }}
+            </dd>
+          </div>
+          <div>
+            <dt>{{ text('最高コンボ', 'Best combo') }}</dt>
+            <dd>×{{ stats.bestCombo }}</dd>
+          </div>
+          <div>
+            <dt>{{ text('正解した問題', 'Correct answers') }}</dt>
+            <dd>
+              {{ stats.correctTaps }}<small> / {{ stats.answeredTaps }}</small>
+            </dd>
+          </div>
+          <div>
+            <dt>{{ text('説明で合格', 'Explained') }}</dt>
+            <dd>{{ stats.passedQuestions }}</dd>
+          </div>
+        </dl>
+        @if (stats.weeklyHighlight; as highlight) {
+          <p class="highlight">
+            <app-icon name="trend-up" aria-hidden="true" />
+            {{
+              text(
+                '今週は「' +
+                  topic(highlight.topic) +
+                  '」で' +
+                  highlight.correct +
+                  '問正解。成長しています！',
+                'This week you got ' +
+                  highlight.correct +
+                  ' right in ' +
+                  topic(highlight.topic) +
+                  '. You’re improving!'
+              )
+            }}
+          </p>
+        }
+      </section>
+      <section class="mastery">
+        <h2>{{ text('分野ごとの理解度', 'Mastery by area') }}</h2>
+        <app-mastery-radar [interests]="stats.interests ?? []" [language]="language()" />
+        @if (stats.topics?.length) {
+          <div class="topic-bars">
+            @for (item of stats.topics; track item.topic) {
+              <div class="topic-bar">
+                <span>{{ topic(item.topic) }}</span>
+                <span class="meter" aria-hidden="true"
+                  ><span [style.transform]="'scaleX(' + item.mastery + ')'"></span
+                ></span>
+                <small>{{ item.correct }}/{{ item.answered }}</small>
+              </div>
+            }
+          </div>
+        }
+      </section>
+      <section class="achievements">
+        <h2>
+          {{ text('実績', 'Achievements') }}
+          <small>{{ earnedCount(stats) }} / {{ stats.achievements.length }}</small>
+        </h2>
+        <ul>
+          @for (badge of stats.achievements; track badge.id) {
+            <li [class.earned]="badge.earned">
+              <span class="badge-icon" aria-hidden="true"
+                ><app-icon [name]="badgeIcon(badge.id)" /></span
+              ><span>{{ badgeName(badge.id) }}</span>
+              <small>{{
+                badge.earned ? text('獲得済み', 'Earned') : text('挑戦中', 'In progress')
+              }}</small>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+    <section class="saved-section">
+      <h2>{{ text('保存した問題', 'Saved questions') }}</h2>
+      @if (loading() && !saved().length) {
+        <app-loading-skeleton
+          [label]="text('保存した問題を読み込み中…', 'Loading saved questions…')"
+        />
+      } @else {
+        <div class="question-list">
+          @for (question of saved(); track question.id) {
+            <a [routerLink]="['/questions', question.id]"
+              ><span>{{ question.topics.join(' · ') }}</span>
+              <strong>{{ question.prompt }}</strong></a
+            >
+          } @empty {
+            <p class="hint">
+              {{
+                text(
+                  'また読みたい問題をブックマークしましょう。',
+                  'Bookmark a question you’d like to return to.'
+                )
+              }}
+            </p>
+          }
+        </div>
+      }
+    </section>
+    @if (error()) {
+      <p role="alert">{{ error() }}</p>
+      <button class="secondary" type="button" (click)="load()">
+        {{ text('再試行', 'Try again') }}
+      </button>
+    }
+  }
+  <a class="preferences-link" routerLink="/onboarding" [queryParams]="{ edit: '1' }">{{
+    text('学習対象を変更', 'Change learning interests')
+  }}</a>
+</section>

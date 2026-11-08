@@ -13,7 +13,8 @@ export function createAuthorizationUrl(clientId: string, origin: string, state: 
   return url.toString();
 }
 
-export type CallbackResult = { kind: 'code'; code: string } | { kind: 'cancelled' } | { kind: 'invalid' };
+export type CallbackResult =
+  { kind: 'code'; code: string } | { kind: 'cancelled' } | { kind: 'invalid' };
 
 export function readCallback(search: string, expectedState: string | null): CallbackResult {
   const query = new URLSearchParams(search);

@@ -1,40 +1,137 @@
 <div class="auth-shell">
   <header class="header">
-    <a class="brand" routerLink="/" aria-label="WhyLint"><span class="brand-mark" aria-hidden="true">w<span>_</span></span><span>whylint<span class="brand-dot">.</span></span></a>
+    <a class="brand" routerLink="/" aria-label="WhyLint"
+      ><span class="brand-mark" aria-hidden="true">w<span>_</span></span>
+      <span>whylint<span class="brand-dot">.</span></span></a
+    >
     <div class="settings">
-      <button type="button" (click)="toggleLanguage()" [attr.aria-label]="language() === 'ja' ? 'Switch to English' : '日本語に切り替え'">{{ language() === 'ja' ? 'EN' : '日本語' }}</button>
-      <button type="button" (click)="toggleTheme()" [attr.aria-label]="theme() === 'dark' ? ui.light : ui.dark">
-        @if (theme() === 'dark') { <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg> }
-        @else { <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z"/></svg> }
+      <button
+        type="button"
+        (click)="toggleTheme()"
+        [attr.aria-label]="theme() === 'dark' ? ui.light : ui.dark"
+      >
+        @if (theme() === 'dark') {
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"
+            />
+          </svg>
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z" />
+          </svg>
+        }
       </button>
     </div>
   </header>
   <main class="content">
     <a routerLink="/" class="back"><span aria-hidden="true">←</span>{{ ui.back }}</a>
-    <h1>{{ ui.title }}</h1><p class="intro">{{ ui.intro }}</p>
+    <h1>{{ ui.title }}</h1>
+    <p class="intro">{{ ui.intro }}</p>
     @if (navigationFailed() && session.status() === 'authenticated') {
-      <p class="error" role="alert">{{ ui.navigation }}</p><button class="primary retry-button" type="button" (click)="goToPractice()">{{ ui.retry }}</button>
+      <p class="error" role="alert">{{ ui.navigation }}</p>
+      <button class="primary retry-button" type="button" (click)="goToPractice()">
+        {{ ui.retry }}
+      </button>
     } @else if (session.status() === 'loading' || session.status() === 'authenticated') {
-      <p class="status" role="status">{{ ui.checking }}</p>
+      <app-loading-skeleton variant="form" [label]="ui.checking" />
     } @else if (session.status() === 'unavailable') {
-      <p class="error" role="alert">{{ ui.connection }}</p><button class="primary retry-button" type="button" (click)="retrySession()">{{ ui.retry }}</button>
+      <p class="error" role="alert">{{ ui.connection }}</p>
+      <button class="primary retry-button" type="button" (click)="retrySession()">
+        {{ ui.retry }}
+      </button>
     } @else {
-      <form class="password-form signup-form" (submit)="submit($event, email, username, password)" novalidate>
+      <form
+        class="password-form signup-form"
+        (submit)="submit($event, email, username, password)"
+        novalidate
+      >
         <label for="signup-email">{{ ui.email }}</label>
-        <input #email id="signup-email" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" maxlength="508" required [disabled]="busy()" [attr.aria-invalid]="fieldError() === 'email' ? 'true' : null" [attr.aria-describedby]="fieldError() === 'email' ? 'signup-email-error' : null" [value]="draft.email()" (input)="clearError('email', email.value)">
-        @if (fieldError() === 'email') { <p id="signup-email-error" class="field-error" role="alert">{{ ui.invalidEmail }}</p> }
+        <input
+          #email
+          id="signup-email"
+          name="email"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
+          autocapitalize="none"
+          autocorrect="off"
+          maxlength="508"
+          required
+          [disabled]="busy()"
+          [attr.aria-invalid]="fieldError() === 'email' ? 'true' : null"
+          [attr.aria-describedby]="fieldError() === 'email' ? 'signup-email-error' : null"
+          [value]="draft.email()"
+          (input)="clearError('email', email.value)"
+        />
+        @if (fieldError() === 'email') {
+          <p id="signup-email-error" class="field-error" role="alert">{{ ui.invalidEmail }}</p>
+        }
         <label for="signup-username">{{ ui.username }}</label>
-        <input #username id="signup-username" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="64" required [disabled]="busy()" [attr.aria-invalid]="fieldError() === 'username' ? 'true' : null" [attr.aria-describedby]="'signup-username-hint' + (fieldError() === 'username' ? ' signup-username-error' : '')" [value]="draft.username()" (input)="clearError('username', username.value)">
+        <input
+          #username
+          id="signup-username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          autocapitalize="none"
+          autocorrect="off"
+          spellcheck="false"
+          maxlength="64"
+          required
+          [disabled]="busy()"
+          [attr.aria-invalid]="fieldError() === 'username' ? 'true' : null"
+          [attr.aria-describedby]="
+            'signup-username-hint' + (fieldError() === 'username' ? ' signup-username-error' : '')
+          "
+          [value]="draft.username()"
+          (input)="clearError('username', username.value)"
+        />
         <p id="signup-username-hint" class="hint">{{ ui.usernameHint }}</p>
-        @if (fieldError() === 'username') { <p id="signup-username-error" class="field-error" role="alert">{{ ui.invalidUsername }}</p> }
+        @if (fieldError() === 'username') {
+          <p id="signup-username-error" class="field-error" role="alert">
+            {{ ui.invalidUsername }}
+          </p>
+        }
         <label for="signup-password">{{ ui.password }}</label>
-        <input #password id="signup-password" name="password" type="password" autocomplete="new-password" maxlength="256" required [disabled]="busy()" [attr.aria-invalid]="fieldError() === 'password' ? 'true' : null" [attr.aria-describedby]="'signup-password-hint' + (fieldError() === 'password' ? ' signup-password-error' : '')" [value]="draft.password()" (input)="clearError('password', password.value)">
+        <input
+          #password
+          id="signup-password"
+          name="password"
+          type="password"
+          autocomplete="new-password"
+          maxlength="256"
+          required
+          [disabled]="busy()"
+          [attr.aria-invalid]="fieldError() === 'password' ? 'true' : null"
+          [attr.aria-describedby]="
+            'signup-password-hint' + (fieldError() === 'password' ? ' signup-password-error' : '')
+          "
+          [value]="draft.password()"
+          (input)="clearError('password', password.value)"
+        />
         <p id="signup-password-hint" class="hint">{{ ui.passwordHint }}</p>
-        @if (fieldError() === 'password') { <p id="signup-password-error" class="field-error" role="alert">{{ ui.invalidPassword }}</p> }
-        @if (failure()) { <p class="field-error" role="alert">{{ errorMessage }}</p> }
-        <button class="primary password-button" type="submit" [disabled]="busy()" [attr.aria-busy]="busy()">{{ busy() ? ui.working : ui.submit }}</button>
+        @if (fieldError() === 'password') {
+          <p id="signup-password-error" class="field-error" role="alert">
+            {{ ui.invalidPassword }}
+          </p>
+        }
+        @if (failure()) {
+          <p class="field-error" role="alert">{{ errorMessage }}</p>
+        }
+        <button
+          class="primary password-button"
+          type="submit"
+          [disabled]="busy()"
+          [attr.aria-busy]="busy()"
+        >
+          {{ busy() ? ui.working : ui.submit }}
+        </button>
       </form>
-      <a class="auth-link" routerLink="/login">{{ ui.signIn }}</a>
+      <a class="auth-link" routerLink="/login" [queryParams]="returnTo ? { returnTo } : null">{{
+        ui.signIn
+      }}</a>
     }
   </main>
 </div>

@@ -3,12 +3,35 @@
     <label [for]="inputId()">{{ ui.label }}</label>
     <p [id]="inputId() + '-hint'" class="hint">{{ ui.hint }}</p>
     <div class="username-controls">
-      <input #field [id]="inputId()" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="64" [value]="username()" [disabled]="saving() || session.loggingOut()" [attr.aria-invalid]="error() === 'username' ? 'true' : null" [attr.aria-describedby]="inputId() + '-hint' + (error() ? ' ' + inputId() + '-error' : '')" (input)="username.set(field.value); error.set(null)">
+      <input
+        #field
+        [id]="inputId()"
+        name="username"
+        type="text"
+        autocomplete="username"
+        autocapitalize="none"
+        autocorrect="off"
+        spellcheck="false"
+        maxlength="64"
+        [value]="username()"
+        [disabled]="saving() || session.loggingOut()"
+        [attr.aria-invalid]="error() === 'username' ? 'true' : null"
+        [attr.aria-describedby]="inputId() + '-hint' + (error() ? ' ' + inputId() + '-error' : '')"
+        (input)="username.set(field.value); error.set(null)"
+      />
       @if (showSaveButton()) {
-        <button type="submit" [disabled]="saving() || session.loggingOut()" [attr.aria-busy]="saving()">{{ saving() ? ui.saving : ui.save }}</button>
+        <button
+          type="submit"
+          [disabled]="saving() || session.loggingOut()"
+          [attr.aria-busy]="saving()"
+        >
+          {{ saving() ? ui.saving : ui.save }}
+        </button>
       }
     </div>
-    @if (error()) { <p class="feedback" [id]="inputId() + '-error'" role="alert">{{ errorMessage }}</p> }
+    @if (error()) {
+      <p class="feedback" [id]="inputId() + '-error'" role="alert">{{ errorMessage }}</p>
+    }
   </form>
 } @else if (saved() && session.status() === 'authenticated') {
   <p class="feedback" role="status">{{ ui.saved }}</p>
@@ -16,7 +39,10 @@
 @if (error() && session.status() !== 'authenticated') {
   <p class="feedback" role="alert">{{ errorMessage }}</p>
   @if (showRecoveryActions() && session.status() !== 'loading') {
-    @if (error() === 'unauthorized') { <a class="recovery" routerLink="/login">{{ ui.signIn }}</a> }
-    @else { <button class="recovery" type="button" (click)="retrySession()">{{ ui.retry }}</button> }
+    @if (error() === 'unauthorized') {
+      <a class="recovery" routerLink="/login">{{ ui.signIn }}</a>
+    } @else {
+      <button class="recovery" type="button" (click)="retrySession()">{{ ui.retry }}</button>
+    }
   }
 }

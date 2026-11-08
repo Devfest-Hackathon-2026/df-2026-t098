@@ -57,9 +57,7 @@ describe('UsersService', () => {
           password_hash: 'test-only-hash',
         }),
       );
-      expect(saved).toEqual(
-        expect.objectContaining({ username: 'Learner', google_id: null }),
-      );
+      expect(saved).toEqual(expect.objectContaining({ username: 'Learner', google_id: null }));
       expect(log).not.toHaveBeenCalled();
       expect(warn).not.toHaveBeenCalled();
       expect(error).not.toHaveBeenCalled();
@@ -93,10 +91,9 @@ describe('UsersService', () => {
 
       expect(repository.createQueryBuilder).toHaveBeenCalledWith('user');
       expect(query.addSelect).toHaveBeenCalledWith('user.password_hash');
-      expect(query.where).toHaveBeenCalledWith(
-        expect.stringContaining(`"${column}"`),
-        { identifier: expected },
-      );
+      expect(query.where).toHaveBeenCalledWith(expect.stringContaining(`"${column}"`), {
+        identifier: expected,
+      });
       const sql = query.where.mock.calls[0][0] as string;
       expect(sql).toContain('LOWER(');
       expect(sql).toContain('LOWER(:identifier)');
@@ -110,10 +107,7 @@ describe('UsersService', () => {
       repository.save.mockRejectedValue(databaseError);
 
       await expect(
-        service.createPasswordUser(
-          { email: 'a@example.test', username: 'learner' },
-          'test-hash',
-        ),
+        service.createPasswordUser({ email: 'a@example.test', username: 'learner' }, 'test-hash'),
       ).rejects.toMatchObject({
         status: 409,
         message: 'Unable to create account',
@@ -126,10 +120,7 @@ describe('UsersService', () => {
     repository.save.mockRejectedValue(databaseError);
 
     await expect(
-      service.createPasswordUser(
-        { email: 'a@example.test', username: 'learner' },
-        'test-hash',
-      ),
+      service.createPasswordUser({ email: 'a@example.test', username: 'learner' }, 'test-hash'),
     ).rejects.toBe(databaseError);
   });
 
@@ -185,27 +176,47 @@ describe('UsersService', () => {
   });
 
   it('persists Google pictures during creation and refreshes only the verified identity', async () => {
-    await service.createUser({ email: 'learner@example.test', googleId: 'google-subject', picture: 'https://example.test/avatar.png' });
-    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ avatar_url: 'https://example.test/avatar.png' }));
+    await service.createUser({
+      email: 'learner@example.test',
+      googleId: 'google-subject',
+      picture: 'https://example.test/avatar.png',
+    });
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ avatar_url: 'https://example.test/avatar.png' }),
+    );
 
     await service.updateGoogleAvatar('user-id', 'google-subject', 'https://example.test/new.png');
     expect(repository.update).toHaveBeenCalledWith(
-      { id: 'user-id', google_id: 'google-subject' }, { avatar_url: 'https://example.test/new.png' },
+      { id: 'user-id', google_id: 'google-subject' },
+      { avatar_url: 'https://example.test/new.png' },
     );
   });
 
-  it.each(['', 'not a URL', 'http://example.test/avatar.png', 'javascript:alert(1)', 'https://user:pass@example.test/avatar.png'])(
-    'does not replace an existing avatar with an invalid picture', async (picture) => {
-      await service.updateGoogleAvatar('user-id', 'google-subject', picture);
-      expect(repository.update).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    '',
+    'not a URL',
+    'http://example.test/avatar.png',
+    'javascript:alert(1)',
+    'https://user:pass@example.test/avatar.png',
+  ])('does not replace an existing avatar with an invalid picture', async (picture) => {
+    await service.updateGoogleAvatar('user-id', 'google-subject', picture);
+    expect(repository.update).not.toHaveBeenCalled();
+  });
 
   it('stores and refreshes a trimmed Google display name without touching username or identity fields', async () => {
-    await service.createUser({ email: 'learner@example.test', googleId: 'google-subject', name: '  Fixture Display Name  ' });
-    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Fixture Display Name' }));
+    await service.createUser({
+      email: 'learner@example.test',
+      googleId: 'google-subject',
+      name: '  Fixture Display Name  ',
+    });
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Fixture Display Name' }),
+    );
     await service.updateGoogleName('user-id', 'google-subject', '  Updated Display Name  ');
-    expect(repository.update).toHaveBeenCalledWith({ id: 'user-id', google_id: 'google-subject' }, { name: 'Updated Display Name' });
+    expect(repository.update).toHaveBeenCalledWith(
+      { id: 'user-id', google_id: 'google-subject' },
+      { name: 'Updated Display Name' },
+    );
   });
 
   it('ignores a blank display name instead of erasing stored metadata', async () => {
@@ -238,18 +249,24 @@ describe('UsersService', () => {
     repository.update.mockResolvedValue({ affected: 0 });
     repository.findOne.mockResolvedValue({ id: 'current-user', username: 'Learner' });
     await expect(service.setUsername('current-user', 'learner')).resolves.toBeUndefined();
-    await expect(service.setUsername('current-user', 'another-name')).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.setUsername('current-user', 'another-name')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('returns 401 when the authenticated user has been deleted', async () => {
     repository.update.mockResolvedValue({ affected: 0 });
     repository.findOne.mockResolvedValue(null);
-    await expect(service.setUsername('deleted-user', 'learner')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.setUsername('deleted-user', 'learner')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('maps a racing unique constraint failure to conflict and preserves other failures', async () => {
     repository.update.mockRejectedValueOnce({ driverError: { code: '23505' } });
-    await expect(service.setUsername('current-user', 'taken')).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.setUsername('current-user', 'taken')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     const failure = new Error('database unavailable');
     repository.update.mockRejectedValueOnce(failure);
     await expect(service.setUsername('current-user', 'learner')).rejects.toBe(failure);

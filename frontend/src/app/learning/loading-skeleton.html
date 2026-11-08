@@ -1,0 +1,63 @@
+<div class="loading-skeleton" role="status" aria-busy="true">
+  <span class="sr-only">{{ label() }}</span>
+  <div aria-hidden="true">
+    @if (variant() === 'account') {
+      <div class="account-placeholder">
+        <span class="placeholder avatar"></span>
+        <div class="identity-placeholder">
+          <span class="placeholder line wide"></span>
+          <span class="placeholder line short"></span>
+        </div>
+      </div>
+    } @else if (variant() === 'question') {
+      <div class="question-placeholder">
+        <span class="placeholder line short"></span>
+        <div class="heading-placeholder">
+          <span class="placeholder heading"></span>
+          <span class="placeholder heading wide"></span>
+          <span class="placeholder heading medium"></span>
+        </div>
+        <div class="actions-placeholder">
+          @for (item of [0, 1, 2, 3]; track item) {
+            <span class="placeholder action"></span>
+          }
+        </div>
+        <span class="placeholder line short"></span>
+        <span class="placeholder answer"></span>
+        <span class="placeholder button"></span>
+      </div>
+    } @else if (variant() === 'profile') {
+      <div class="profile-placeholder">
+        <span class="placeholder heading medium"></span>
+        <span class="placeholder line"></span>
+        <span class="placeholder progress"></span>
+        <div class="stats-placeholder">
+          @for (item of [0, 1, 2, 3]; track item) {
+            <div>
+              <span class="placeholder line"></span>
+              <span class="placeholder heading short"></span>
+            </div>
+          }
+        </div>
+      </div>
+    } @else if (variant() === 'form') {
+      <div class="form-placeholder">
+        @for (item of [0, 1]; track item) {
+          <span class="placeholder line short"></span>
+          <span class="placeholder field"></span>
+        }
+        <span class="placeholder button"></span>
+      </div>
+    } @else {
+      <div class="list-placeholder">
+        @for (item of [0, 1, 2]; track item) {
+          <div class="list-row">
+            <span class="placeholder line short"></span>
+            <span class="placeholder line"></span>
+            <span class="placeholder line medium"></span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

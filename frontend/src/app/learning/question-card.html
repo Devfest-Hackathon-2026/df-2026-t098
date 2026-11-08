@@ -1,0 +1,633 @@
+<article
+  class="question-card"
+  [class.is-daily]="daily()"
+  [class.has-review]="relearn() || !!question().review"
+  [class.is-revealed]="revealed()"
+  [class.is-correct]="tap()?.correct === true"
+  [class.is-wrong]="tap()?.correct === false"
+  [attr.data-question-id]="question().id"
+>
+  <div
+    class="question-content"
+    data-testid="question-stage"
+    (dblclick)="doubleClickLike($event)"
+    (pointerup)="onContentPointerUp($event)"
+  >
+    @if (heartBurst()) {
+      @for (burst of [heartBurst()]; track burst) {
+        <span
+          class="heart-burst"
+          aria-hidden="true"
+          [style.--heart-x.px]="heartAt()?.x"
+          [style.--heart-y.px]="heartAt()?.y"
+          [style.--heart-tilt.deg]="heartAt()?.tilt"
+        >
+          <app-icon name="like" [filled]="true" />
+        </span>
+      }
+    }
+    <div class="question-meta">
+      @if (reasonChip; as chip) {
+        <span class="reason-chip" [class.reason-daily]="daily()"
+          ><app-icon [name]="chip.icon" aria-hidden="true" /> {{ chip.label }}</span
+        >
+      }
+      <span class="format-chip">{{ formatLabel }}</span>
+    </div>
+    <h2>{{ question().prompt }}</h2>
+    <p class="question-summary">
+      <span>{{ topics || question().codeLanguage || formatLabel }}</span>
+      <span>{{ difficulty }}</span>
+    </p>
+    @if (!compact()) {
+      <p class="question-credit">
+        <span class="question-title">{{ question().title }}</span>
+        @if (question().source === 'ai') {
+          <span>{{ text('Gemini が作成', 'Created by Gemini') }}</span>
+        } @else if (question().author; as author) {
+          <a [routerLink]="['/creators', author.id]">{{ author.displayName }}</a>
+        }
+        <span>{{ difficulty }}</span>
+        @if (topics) {
+          <span>{{ topics }}</span>
+        }
+      </p>
+    }
+    @if (codeLines(); as lines) {
+      <div class="code-window bug-hunt" [class.locked]="revealed() || tapping()">
+        <div class="code-head">
+          <span>{{ question().codeLanguage || text('コード', 'Code') }}</span>
+          <span class="code-hint">{{
+            revealed() ? '' : text('バグのある行をタップ', 'Tap the buggy line')
+          }}</span>
+        </div>
+        <div class="code-lines" role="group" [attr.aria-label]="text('コードの行', 'Code lines')">
+          @for (line of lines; track line.number) {
+            @if (line.option >= 0) {
+              <button
+                type="button"
+                class="code-line"
+                [class]="'code-line state-' + (optionState(line.option) ?? 'idle')"
+                [disabled]="revealed() || tapping()"
+                [attr.aria-label]="text(line.number + '行目', 'Line ' + line.number)"
+                (click)="choose(line.option)"
+              >
+                <span class="line-number">{{ line.number }}</span
+                ><code>
+                  @for (
+                    token of line.text | syntaxHighlight: question().codeLanguage || '';
+                    track $index
+                  ) {
+                    <span [class]="'syntax-' + token.kind">{{ token.text }}</span>
+                  }
+                </code>
+              </button>
+            } @else {
+              <div class="code-line plain">
+                <span class="line-number">{{ line.number }}</span
+                ><code>
+                  @for (
+                    token of line.text | syntaxHighlight: question().codeLanguage || '';
+                    track $index
+                  ) {
+                    <span [class]="'syntax-' + token.kind">{{ token.text }}</span>
+                  }
+                </code>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    } @else if (question().code; as code) {
+      <div class="code-window">
+        <div class="code-head">{{ question().codeLanguage || text('コード', 'Code') }}</div>
+        <pre tabindex="0"><code>@for (
+            token of code | syntaxHighlight:(question().codeLanguage || '');
+            track $index
+          ) {<span [class]="'syntax-' + token.kind">{{ token.text }}</span>}</code></pre>
+      </div>
+    }
+    @if (tappable() && !codeLines()) {
+      <div
+        class="quiz-options"
+        [class.two-up]="question().format === 'true_false'"
+        role="group"
+        [attr.aria-label]="text('答えを選ぶ', 'Choose an answer')"
+        (keydown)="onOptionsKeydown($event)"
+      >
+        @for (option of question().options; track $index) {
+          <button
+            type="button"
+            class="quiz-option"
+            [class]="'quiz-option state-' + (optionState($index) ?? 'idle')"
+            [class.mono]="question().format === 'predict_output'"
+            [disabled]="revealed() || tapping()"
+            [attr.aria-pressed]="picked() === $index"
+            (click)="choose($index)"
+          >
+            <span class="option-letter" aria-hidden="true">{{
+              question().format === 'true_false' ? ($index === 0 ? '○' : '×') : letters[$index]
+            }}</span>
+            <span class="option-text">{{ option }}</span>
+            @if (optionState($index) === 'correct') {
+              <app-icon class="option-mark" name="check" aria-hidden="true" />
+            } @else if (optionState($index) === 'wrong') {
+              <app-icon class="option-mark" name="close" aria-hidden="true" />
+            }
+          </button>
+        }
+      </div>
+    }
+    @if (tapError()) {
+      <div class="tap-recovery" data-testid="tap-recovery">
+        <p class="error" role="alert">{{ tapError() }}</p>
+        @if (tapSignIn()) {
+          <a routerLink="/login" [queryParams]="{ returnTo: '/questions/' + question().id }">{{
+            text('ログインして回答する', 'Sign in to answer')
+          }}</a>
+        } @else {
+          <button class="secondary" type="button" [disabled]="tapping()" (click)="retryTap()">
+            {{ text('回答を再送信', 'Retry answer') }}
+          </button>
+        }
+      </div>
+    }
+    @if (tap(); as result) {
+      <section class="reveal" [class.correct]="result.correct" aria-live="polite">
+        <div class="reveal-heading">
+          <strong>{{
+            result.correct ? text('正解！', 'Correct!') : text('おしい！', 'Not quite')
+          }}</strong>
+          @if (tapXp() > 0) {
+            <span class="xp-float" aria-label="XP">+{{ tapXp() }} XP</span>
+          }
+          @if (nextable()) {
+            <button type="button" class="next-button" (click)="next.emit()">
+              {{ text('次へ', 'Next') }} <span aria-hidden="true">↓</span>
+            </button>
+          }
+          @if (!result.correct) {
+            <span class="reveal-note">{{
+              relearn()
+                ? text('次は覚えておこう', 'Lock it in this time')
+                : text('あとでもう一度出題します', 'It’ll come back in a few cards')
+            }}</span>
+          }
+        </div>
+        <p>{{ result.quickExplanation }}</p>
+      </section>
+    }
+  </div>
+  <div class="card-actions">
+    <button
+      type="button"
+      (click)="toggleLike()"
+      [disabled]="liking()"
+      [attr.aria-pressed]="liked()"
+      [attr.aria-label]="text('いいね', 'Like')"
+    >
+      <app-icon name="like" /><span>{{ likes() }}</span>
+    </button>
+    <button
+      #commentsButton
+      type="button"
+      (click)="toggleComments()"
+      [attr.aria-expanded]="discussion()"
+      [attr.aria-controls]="'discussion-' + controlId()"
+      [attr.aria-label]="text('コメント', 'Comments')"
+    >
+      <app-icon name="comment" /><span>{{ text('コメント', 'Comments') }}</span>
+    </button>
+    <button type="button" (click)="share()" [attr.aria-label]="text('共有', 'Share')">
+      <app-icon name="share" /><span>{{ text('共有', 'Share') }}</span>
+    </button>
+    <button
+      class="save-button"
+      type="button"
+      (click)="toggleSave()"
+      [disabled]="saving()"
+      [attr.aria-pressed]="saved()"
+      [class.is-saved]="saved()"
+    >
+      <app-icon name="save" /><span>{{
+        saved() ? text('保存済み', 'Saved') : text('保存', 'Save')
+      }}</span>
+    </button>
+  </div>
+  <div class="question-answer">
+    @if (socialError()) {
+      <p class="error" role="alert">{{ socialError() }}</p>
+    }
+    @if (shareMessage()) {
+      <p class="hint" role="status">{{ shareMessage() }}</p>
+    }
+    @if (shareUrl()) {
+      <label class="share-url"
+        >{{ text('共有リンク', 'Share link')
+        }}<input readonly [value]="shareUrl()" (focus)="$any($event.target).select()"
+      /></label>
+    }
+    @if (compact()) {
+      <div class="mobile-learning-actions">
+        <button
+          class="deeper-button explain"
+          type="button"
+          (click)="openExplain()"
+          [attr.aria-label]="text('なぜ？を説明する', 'Explain why')"
+        >
+          <app-icon name="pencil" aria-hidden="true" /><span>{{
+            text('なぜ？', 'Explain why')
+          }}</span>
+        </button>
+        @if (revealed()) {
+          <button
+            class="deeper-button ask"
+            type="button"
+            (click)="openAsk($event)"
+            [attr.aria-label]="text('まだモヤモヤ？', 'Still confused?')"
+          >
+            <app-icon name="comment" aria-hidden="true" /><span>{{
+              text('質問する', 'Ask Gemini')
+            }}</span>
+          </button>
+        }
+        <button
+          class="deeper-button info"
+          type="button"
+          (click)="openDetails('info', $event)"
+          [attr.aria-label]="text('問題の詳細', 'Question details')"
+        >
+          <span>{{ text('詳細', 'Details') }}</span>
+        </button>
+      </div>
+    } @else {
+      <ng-container [ngTemplateOutlet]="learningBody" />
+    }
+  </div>
+  <ng-template #learningBody>
+    @if (!compact() && tappable() && !explainOpen() && !result()) {
+      <div class="deeper" [class.ready]="revealed()">
+        <button type="button" class="deeper-button explain" (click)="openExplain()">
+          <app-icon name="pencil" aria-hidden="true" />
+          <span
+            >{{ text('なぜ？を説明する', 'Explain why') }}
+            <small>{{ text('Geminiが採点 · +15 XP', 'Graded by Gemini · +15 XP') }}</small></span
+          >
+        </button>
+        @if (revealed()) {
+          <button
+            type="button"
+            class="deeper-button ask"
+            [attr.aria-expanded]="askOpen()"
+            (click)="openAsk($event)"
+          >
+            <app-icon name="comment" aria-hidden="true" />
+            <span
+              >{{ text('まだモヤモヤ？', 'Still confused?') }}
+              <small>{{ text('Geminiに質問', 'Ask Gemini') }}</small></span
+            >
+          </button>
+        }
+      </div>
+    }
+    @if (askOpen() && authenticated && (!compact() || detailMode() === 'ask')) {
+      <section class="follow-ups" [attr.aria-label]="text('Geminiに質問', 'Ask Gemini')">
+        @for (item of followUps(); track item.id) {
+          <div class="follow-up">
+            <p class="follow-up-question">{{ item.question }}</p>
+            <p class="follow-up-answer">{{ item.answer }}</p>
+          </div>
+        }
+        @if (!followUps().length) {
+          <div class="suggestions">
+            @for (suggestion of suggestions; track suggestion) {
+              <button type="button" [disabled]="asking()" (click)="suggestFollowUp(suggestion)">
+                {{ suggestion }}
+              </button>
+            }
+          </div>
+        }
+        <form class="ask-form" (submit)="$event.preventDefault(); ask()">
+          <input
+            [ngModel]="followUpDraft()"
+            (ngModelChange)="followUpDraft.set($event)"
+            name="followUp"
+            maxlength="500"
+            [disabled]="asking()"
+            [attr.aria-label]="text('Geminiへの質問', 'Your question for Gemini')"
+            [placeholder]="text('例：なぜ他の選択肢は違うの？', 'e.g. Why is option B wrong?')"
+          />
+          <button
+            class="primary"
+            type="submit"
+            [disabled]="asking() || !followUpDraft().trim()"
+            [attr.aria-busy]="asking()"
+          >
+            {{ asking() ? text('考え中…', 'Thinking…') : text('質問', 'Ask') }}
+          </button>
+        </form>
+        @if (followUpError()) {
+          <p class="error" role="alert">{{ followUpError() }}</p>
+        }
+      </section>
+    }
+    @if ((!compact() || detailMode() === 'explain') && (!tappable() || explainOpen() || result())) {
+      @if (authenticated) {
+        @if (result(); as assessment) {
+          <section class="assessment" aria-live="polite">
+            <div class="assessment-heading">
+              <h3>
+                {{ text('理解度', 'Understanding') }}
+                <span class="score">{{ assessment.score }}<small> / 10</small></span>
+              </h3>
+              <span class="outcome" [class.passed]="assessment.passed">{{
+                assessment.passed ? text('合格', 'Passed') : text('もう一度練習', 'Keep practicing')
+              }}</span>
+            </div>
+            <div
+              class="score-bar"
+              [style.--score]="assessment.score / 10"
+              [class.passed]="assessment.passed"
+              aria-hidden="true"
+            ></div>
+            <p>{{ assessment.feedback }}</p>
+            @if (assessment.improvements.length) {
+              <h4>{{ text('次に意識すること', 'What to improve') }}</h4>
+              <ul>
+                @for (improvement of assessment.improvements; track $index) {
+                  <li>{{ improvement }}</li>
+                }
+              </ul>
+            }
+            <details>
+              <summary>{{ text('説明を読む', 'Read the explanation') }}</summary>
+              <p>{{ assessment.explanation }}</p>
+            </details>
+            <p class="assessment-footnote">
+              {{
+                assessment.xpAwarded > 0
+                  ? '+' + assessment.xpAwarded + ' XP'
+                  : text('今回の追加XPはありません。', 'No additional XP for this attempt.')
+              }}
+              · {{ text('Geminiによるフィードバック', 'Feedback from Gemini') }}
+            </p>
+            @if (explanationPublished()) {
+              <p class="hint" role="status">
+                {{ text('あなたの説明を公開しました。', 'Your explanation is public.') }}
+              </p>
+            } @else if (!sharingOpen()) {
+              <button class="secondary" type="button" (click)="openExplanationShare()">
+                {{ text('自分の説明を共有', 'Share my explanation') }}
+              </button>
+            }
+            @if (sharingOpen()) {
+              <form
+                class="explanation-share"
+                data-testid="share-explanation"
+                (submit)="$event.preventDefault(); publishExplanation()"
+              >
+                <label [for]="'shared-explanation-' + controlId()">{{
+                  text('共有する説明', 'Your shared explanation')
+                }}</label>
+                <p class="hint">
+                  {{
+                    text(
+                      '自分の言葉で見直しましょう。この文章はプロフィールとコメント欄に公開されます。',
+                      'Revise it in your own words. This text will be public on your profile and in the discussion.'
+                    )
+                  }}
+                </p>
+                <textarea
+                  [id]="'shared-explanation-' + controlId()"
+                  name="sharedExplanation"
+                  [ngModel]="sharedExplanation()"
+                  (ngModelChange)="sharedExplanation.set($event)"
+                  maxlength="5000"
+                  rows="4"
+                  [disabled]="sharing()"
+                ></textarea>
+                @if (sharingError()) {
+                  <p class="error" role="alert">{{ sharingError() }}</p>
+                }
+                <div class="form-actions">
+                  <button
+                    class="primary"
+                    type="submit"
+                    [disabled]="sharing() || !sharedExplanation().trim()"
+                    [attr.aria-busy]="sharing()"
+                  >
+                    {{
+                      sharing()
+                        ? text('公開中…', 'Publishing…')
+                        : text('説明を公開', 'Publish explanation')
+                    }}
+                  </button>
+                  <button
+                    class="secondary"
+                    type="button"
+                    [disabled]="sharing()"
+                    (click)="sharingOpen.set(false)"
+                  >
+                    {{ text('キャンセル', 'Cancel') }}
+                  </button>
+                </div>
+              </form>
+            }
+            @if (!assessment.passed) {
+              <p class="hint">
+                {{
+                  text(
+                    '復習に保存しました。いつでも取り組めます。',
+                    'Saved to your practice collection. Come back whenever you’re ready.'
+                  )
+                }}
+              </p>
+              <button class="secondary retry-answer" type="button" (click)="retryAnswer()">
+                {{ text('もう一度解く', 'Try again') }}
+              </button>
+            }
+          </section>
+        } @else {
+          <div class="answer-heading">
+            <label [for]="'answer-' + controlId()">{{
+              tappable()
+                ? text('なぜその答えになる？', 'Why is that the answer?')
+                : text('あなたの説明', 'Your explanation')
+            }}</label>
+            <span>{{ text('8 / 10 で合格', '8 / 10 to pass') }}</span>
+          </div>
+          <textarea
+            #explainField
+            [id]="'answer-' + controlId()"
+            [ngModel]="answer()"
+            (ngModelChange)="answer.set($event)"
+            (keydown)="onAnswerKeydown($event)"
+            [disabled]="grading()"
+            maxlength="5000"
+            rows="3"
+            enterkeyhint="send"
+            [placeholder]="
+              text(
+                'なぜそうなるのか、自分の言葉で説明してみましょう。',
+                'Explain why it works in your own words.'
+              )
+            "
+          ></textarea>
+          @if (error()) {
+            <p class="error" role="alert">{{ error() }}</p>
+          }
+          <button
+            class="primary assessment-submit"
+            type="button"
+            [disabled]="grading()"
+            [attr.aria-busy]="grading()"
+            (click)="grade()"
+          >
+            {{
+              grading()
+                ? text('Geminiが採点中…', 'Gemini is grading…')
+                : text('理解度をチェック', 'Check understanding')
+            }}
+          </button>
+        }
+      } @else {
+        <p class="guest-note">
+          {{
+            text(
+              'ログインして、あなたの説明へのフィードバックと学習の進み具合を確認しましょう。',
+              'Sign in for feedback on your explanation and progress that stays with you.'
+            )
+          }}
+          <a routerLink="/login">{{ text('ログイン', 'Sign in') }}</a>
+        </p>
+      }
+    }
+    @if (!compact() || detailMode() === 'info') {
+      @if (compact()) {
+        <section class="question-provenance">
+          <h4>{{ question().title }}</h4>
+          <p>{{ question().prompt }}</p>
+          <p class="hint">{{ formatLabel }} · {{ difficulty }} · {{ topics }}</p>
+          @if (question().source === 'ai') {
+            <p class="hint">{{ text('Gemini が作成', 'Created by Gemini') }}</p>
+          } @else if (question().author; as author) {
+            <a [routerLink]="['/creators', author.id]">{{ author.displayName }}</a>
+          }
+        </section>
+      }
+      @if (question().references?.length) {
+        <section class="question-references" data-testid="question-references">
+          <h3>{{ text('参考資料', 'Further reading') }}</h3>
+          <ul>
+            @for (reference of question().references; track reference.url) {
+              <li>
+                <a
+                  [href]="reference.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  referrerpolicy="no-referrer"
+                  >{{ reference.title }}</a
+                >
+              </li>
+            }
+          </ul>
+        </section>
+      }
+      <details class="question-report">
+        <summary>{{ text('問題を報告', 'Report a problem') }}</summary>
+        @if (authenticated) {
+          <form data-testid="report-question" (submit)="$event.preventDefault(); reportQuestion()">
+            <label [for]="'report-reason-' + controlId()">{{
+              text('報告の理由', 'Report reason')
+            }}</label>
+            <select
+              [id]="'report-reason-' + controlId()"
+              name="reportReason"
+              [ngModel]="reportReason()"
+              (ngModelChange)="reportReason.set($event); reportSent.set(false)"
+              [disabled]="reporting()"
+            >
+              <option value="incorrect">
+                {{ text('答えや説明が違う', 'Incorrect answer or explanation') }}
+              </option>
+              <option value="unclear">{{ text('内容が分かりにくい', 'Unclear wording') }}</option>
+              <option value="outdated">{{ text('情報が古い', 'Outdated information') }}</option>
+            </select>
+            <label [for]="'report-details-' + controlId()">{{
+              text('補足（任意）', 'Details (optional)')
+            }}</label>
+            <textarea
+              [id]="'report-details-' + controlId()"
+              name="reportDetails"
+              [ngModel]="reportDetails()"
+              (ngModelChange)="reportDetails.set($event); reportSent.set(false)"
+              [disabled]="reporting()"
+              maxlength="1000"
+              rows="2"
+            ></textarea>
+            @if (reportError()) {
+              <p class="error" role="alert">{{ reportError() }}</p>
+            }
+            @if (reportSent()) {
+              <p class="hint" role="status">
+                {{
+                  text(
+                    '報告を受け付けました。チームが確認します。',
+                    'Report received. The team will review it.'
+                  )
+                }}
+              </p>
+            }
+            <button
+              class="secondary"
+              type="submit"
+              [disabled]="reporting() || reportSent()"
+              [attr.aria-busy]="reporting()"
+            >
+              {{ reporting() ? text('送信中…', 'Sending…') : text('報告を送信', 'Submit report') }}
+            </button>
+          </form>
+        } @else {
+          <p class="guest-note">
+            <a routerLink="/login">{{ text('ログインして報告', 'Sign in to report a problem') }}</a>
+          </p>
+        }
+      </details>
+    }
+  </ng-template>
+  @if (compact()) {
+    <dialog
+      #detailPanel
+      class="learning-details"
+      [id]="'learning-details-' + controlId()"
+      [attr.aria-labelledby]="'learning-details-heading-' + controlId()"
+      (close)="detailsClosed()"
+      (cancel)="$event.preventDefault(); closeDetails()"
+      (click)="detailsBackdrop($event)"
+      (keydown)="detailsKeydown($event)"
+    >
+      <header class="learning-details-heading">
+        <h3 #detailHeading [id]="'learning-details-heading-' + controlId()" tabindex="-1">
+          {{ detailTitle }}
+        </h3>
+        <button
+          type="button"
+          (click)="closeDetails()"
+          [attr.aria-label]="text('学習の詳細を閉じる', 'Close learning details')"
+        >
+          <app-icon name="close" />
+        </button>
+      </header>
+      <div class="learning-details-body"><ng-container [ngTemplateOutlet]="learningBody" /></div>
+    </dialog>
+  }
+  <app-question-discussion
+    [questionId]="question().id"
+    [viewId]="controlId()"
+    [refreshKey]="discussionRefresh()"
+    [language]="language()"
+    [open]="discussion()"
+    [answered]="revealed() || !!result()"
+    (closed)="closeComments()"
+  />
+</article>

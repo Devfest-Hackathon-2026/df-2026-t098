@@ -14,14 +14,14 @@ Once the server is running, open your browser and navigate to `http://localhost:
 
 The development server forwards `/api` requests to the backend on `127.0.0.1:3000`. Start the backend separately to use Google sign-in and account restoration. The sign-in page is `/login`; the local Google OAuth redirect must be registered as `http://localhost:4200/auth/google/callback`.
 
-The backend's HttpOnly cookie maintains the session; the frontend reloads the profile from `/api/v1/auth/me` and does not save tokens in browser storage. The current Google flow is enabled only on `http://localhost:4200`. Native sign-in, backend-bound OAuth state and PKCE, CSRF protection, and deployment routing still need to be completed and tested before release.
+In a browser, the backend's HttpOnly cookie maintains the session; the frontend reloads the profile from `/api/v1/auth/me` and does not save tokens in browser storage. In the iOS/Android app the session token is kept in the Keychain/Keystore and sent as a Bearer header (see [../docs/mobile.md](../docs/mobile.md)). The current Google flow is enabled only on `http://localhost:4200` and is not available in the app. Native Google sign-in, backend-bound OAuth state and PKCE, and a per-environment origin allowlist still need to be completed and tested before release.
 
 The Profile account section displays the returned `avatarUrl`, with an icon
 fallback for a missing or failed image. Its Sign out / ログアウト button calls
 `POST /api/v1/auth/logout` with the session cookie; a confirmed response shows the
 guest account panel. Pending requests disable the button, and failures offer a
-retry without claiming logout succeeded. Local learning preferences and progress
-are retained. Google avatar refresh is handled by the backend on the next Google
+retry without claiming logout succeeded. Learning preferences are retained, and
+authenticated learning progress is stored by the backend. Google avatar refresh is handled on the next Google
 login, including accounts whose stored avatar is currently NULL.
 
 `/signup` creates an account with email, username and password. The login form
@@ -34,6 +34,41 @@ and set it later in Profile. A supplied onboarding username is saved before
 learning starts. The Profile editor appears only while the account has no name;
 a saved username is shown as `@username`. Setup uses the authenticated
 `PATCH /api/v1/auth/me/username` endpoint and the existing unique-name rules.
+
+## Learning feed
+
+Onboarding supports multiple interests, a searchable language/framework catalog,
+custom technology names, and starting difficulty. Existing JavaScript onboarding
+choices migrate locally, and authenticated preferences are saved and restored
+through `/api/v1/learning/preferences`.
+
+The personal feed requests five Gemini questions, then prefetches the next batch
+when the third question becomes active. Generation and written-answer assessment
+use the real backend. Without configured Gemini credentials the interface presents
+a retryable preparation message. Test fixtures live in the E2E harness.
+
+Gemini assessments score understanding from 0 to 10. Scores below 8 appear in the
+private Practice collection, and a later pass removes them. Profile shows daily
+goals, XP, levels, streaks, achievements, and explicitly saved questions. The weekly
+ranking uses Japan time. Published questions have stable `/questions/:id` links,
+and the question action row supports likes, flat comments, sharing and bookmarks.
+
+Guests can read published community questions. Sign-in enables personal generation,
+assessment, publishing and social writes. Controls adapt to phone, tablet and desktop
+widths. Browser mobile emulation and actual Capacitor device testing are separate.
+
+### Mobile apps (Capacitor)
+
+`ios/` and `android/` hold the Capacitor projects. Build the app bundle and sync it with:
+
+```bash
+npm run native:build:dev   # http://localhost:3000 (or WHYLINT_API_URL), syncs both platforms
+npm run native:ios         # same, then opens Xcode
+WHYLINT_API_URL=https://learn.example.com npm run native:build   # production bundle
+```
+
+The backend must list the app's origins in `NATIVE_APP_ORIGINS`. Requirements, what was verified in
+the iOS Simulator, and what is still open are in [../docs/mobile.md](../docs/mobile.md).
 
 `/login` rechecks the session and redirects authenticated users to `/` (or onboarding when required). If the session cannot be checked, the page offers a retry rather than assuming the user is signed out. The Google callback remains accessible long enough to validate and consume its one-time state and code. This frontend guard controls navigation only; protected backend endpoints must still verify the session.
 
@@ -71,13 +106,16 @@ ng test
 
 ## Running end-to-end tests
 
-For end-to-end (e2e) testing, run:
+The sibling E2E package starts a real NestJS backend with a disposable PostgreSQL
+cluster and runs mobile and desktop Playwright tests. Stop the development frontend
+on port 4200 before running:
 
 ```bash
-ng e2e
+cd ../e2e
+npm test
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+See `../e2e/README.md` for prerequisites and fixture boundaries.
 
 ## Additional Resources
 

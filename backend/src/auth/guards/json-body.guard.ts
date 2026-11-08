@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnsupportedMediaTypeException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnsupportedMediaTypeException,
+} from '@nestjs/common';
 import type { Request } from 'express';
 
 @Injectable()

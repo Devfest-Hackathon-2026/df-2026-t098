@@ -1,16 +1,23 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Index('UQ_users_email_normalized', { synchronize: false })
 @Index('UQ_users_username_normalized', { synchronize: false })
 @Entity('users')
 export class UserEntity {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   @Column({ type: 'varchar', nullable: true, unique: true })
   google_id!: string | null;
 
-  @Column({nullable: false })
+  @Column({ nullable: false })
   email!: string;
 
   @Column({ type: 'varchar', nullable: true })
@@ -19,10 +26,10 @@ export class UserEntity {
   @Column({ type: 'varchar', nullable: true, select: false })
   password_hash!: string | null;
 
-  @Column({ type:'varchar', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   name!: string | null;
 
-  @Column({type: 'varchar', nullable: true})
+  @Column({ type: 'varchar', nullable: true })
   avatar_url!: string | null;
 
   @CreateDateColumn({ nullable: false })

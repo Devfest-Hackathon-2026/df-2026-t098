@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const origin = `http://localhost:${process.env.WHYLINT_E2E_FRONTEND_PORT ?? 4200}`;
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
@@ -12,7 +14,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   outputDir: './test-results',
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: origin,
     locale: 'ja-JP',
     serviceWorkers: 'block',
     screenshot: 'only-on-failure',
@@ -22,11 +24,14 @@ export default defineConfig({
   },
   projects: [
     { name: 'mobile-chromium', use: { ...devices['Pixel 7'] } },
-    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
+    {
+      name: 'desktop-chromium',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+    },
   ],
   webServer: {
     command: 'node scripts/stack.mjs',
-    url: 'http://localhost:4200/login',
+    url: `${origin}/login`,
     reuseExistingServer: false,
     timeout: 180_000,
     gracefulShutdown: { signal: 'SIGTERM', timeout: 15_000 },

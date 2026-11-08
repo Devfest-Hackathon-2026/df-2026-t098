@@ -29,7 +29,23 @@ import { SessionsService } from './sessions/sessions.service';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
     UsersModule,
   ],
-  providers: [AuthService, SessionsService, JwtGuard, AuthOriginGuard, JsonBodyGuard, DatabaseErrorFilter, ThrottlerGuard],
+  providers: [
+    AuthService,
+    SessionsService,
+    JwtGuard,
+    AuthOriginGuard,
+    JsonBodyGuard,
+    DatabaseErrorFilter,
+    ThrottlerGuard,
+  ],
   controllers: [AuthController],
+  exports: [
+    JwtGuard,
+    SessionsService,
+    AuthOriginGuard,
+    JsonBodyGuard,
+    DatabaseErrorFilter,
+    ThrottlerModule,
+  ],
 })
 export class AuthModule {}

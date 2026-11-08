@@ -19,8 +19,12 @@ export class PasswordAuthSessions1793930000000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "google_id" DROP NOT NULL`);
     await queryRunner.query(`ALTER TABLE "users" ADD "username" character varying`);
     await queryRunner.query(`ALTER TABLE "users" ADD "password_hash" character varying`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "UQ_users_email_normalized" ON "users" (lower(btrim("email")))`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "UQ_users_username_normalized" ON "users" (lower(btrim("username"))) WHERE "username" IS NOT NULL`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "UQ_users_email_normalized" ON "users" (lower(btrim("email")))`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "UQ_users_username_normalized" ON "users" (lower(btrim("username"))) WHERE "username" IS NOT NULL`,
+    );
     await queryRunner.query(`
       CREATE TABLE "sessions" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),

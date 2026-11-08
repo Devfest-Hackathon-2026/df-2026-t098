@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException,} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthenticatedRequest } from './jwt.dto';
 import { extractToken, verifyToken } from './jwt-token';
@@ -20,7 +20,7 @@ export class JwtGuard implements CanActivate {
     }
 
     const payload = await verifyToken(this.jwtService, token);
-    if (!payload || !await this.sessionsService.isActive(payload.sid, payload.sub)) {
+    if (!payload || !(await this.sessionsService.isActive(payload.sid, payload.sub))) {
       throw new UnauthorizedException('Token Invalid');
     }
 

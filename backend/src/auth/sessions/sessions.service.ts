@@ -10,7 +10,7 @@ export const SESSION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 export class SessionsService {
   constructor(
     @InjectRepository(SessionEntity) private sessionsRepository: Repository<SessionEntity>,
-  ){}
+  ) {}
 
   async create(userId: string, manager?: EntityManager): Promise<SessionEntity> {
     const repository = manager ? manager.getRepository(SessionEntity) : this.sessionsRepository;

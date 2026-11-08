@@ -1,0 +1,90 @@
+form {
+  margin-top: 28px;
+}
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 24px 0 10px;
+}
+input,
+textarea,
+select {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.6;
+  caret-color: var(--accent);
+}
+textarea {
+  resize: vertical;
+}
+textarea::placeholder {
+  color: var(--muted);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+details {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-top: 28px;
+  padding-bottom: 12px;
+}
+summary {
+  min-height: 44px;
+  padding: 14px 0 2px;
+  cursor: pointer;
+  font-size: 14px;
+}
+form > button {
+  width: 100%;
+  margin-top: 20px;
+}
+.published {
+  padding-top: 12px;
+}
+.published a {
+  display: block;
+  padding: 12px 0;
+}
+.published button {
+  margin-top: 24px;
+}
+
+.quiz-fields {
+  margin: 24px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.quiz-fields legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.quiz-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.quiz-field input[type='radio'] {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+.quiz-field input:not([type='radio']) {
+  flex: 1;
+  min-width: 0;
+}

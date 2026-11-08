@@ -5,7 +5,10 @@ import { AuthSession } from './auth/auth-session';
 import type { SessionStatus } from './auth/auth-session';
 
 describe('App', () => {
-  const session = { status: signal<SessionStatus>('guest'), refresh: vi.fn().mockResolvedValue(false) };
+  const session = {
+    status: signal<SessionStatus>('guest'),
+    refresh: vi.fn().mockResolvedValue(false),
+  };
 
   beforeEach(async () => {
     session.refresh.mockClear();
@@ -29,12 +32,14 @@ describe('App', () => {
     expect(compiled.querySelector('router-outlet')).not.toBeNull();
   });
 
-  it('shows an account-checking state while the first route waits on the session', async () => {
+  it('shows an accessible skeleton while the first route waits on the session', async () => {
     session.status.set('loading');
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
-    expect((fixture.nativeElement as HTMLElement).querySelector('[role="status"]')?.textContent)
-      .toContain('アカウントを確認しています');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[role="status"]')?.textContent,
+    ).toContain('画面を読み込み中');
+    expect(fixture.nativeElement.querySelector('app-loading-skeleton')).not.toBeNull();
   });
 
   it('checks the session at startup and when the app returns to the foreground', () => {

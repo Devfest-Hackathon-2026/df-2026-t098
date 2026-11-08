@@ -7,9 +7,7 @@ import type { EntityManager } from 'typeorm';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    @InjectRepository(UserEntity) private usersRepository: Repository<UserEntity>,
-  ){}
+  constructor(@InjectRepository(UserEntity) private usersRepository: Repository<UserEntity>) {}
 
   async createUser(userData: GoogleAccountDto): Promise<UserEntity> {
     try {
@@ -77,10 +75,7 @@ export class UsersService {
     const avatarUrl = this.googleAvatarUrl(picture);
     if (!avatarUrl) return;
 
-    await this.usersRepository.update(
-      { id, google_id: googleId },
-      { avatar_url: avatarUrl },
-    );
+    await this.usersRepository.update({ id, google_id: googleId }, { avatar_url: avatarUrl });
   }
 
   async updateGoogleName(id: string, googleId: string, name: string): Promise<void> {
@@ -91,7 +86,7 @@ export class UsersService {
 
   async findById(id: string) {
     return this.usersRepository.findOne({
-      where: { id }
+      where: { id },
     });
   }
 

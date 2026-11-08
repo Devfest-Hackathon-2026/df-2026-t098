@@ -54,6 +54,37 @@ Email ownership is not verified yet. Do not automatically link password and Goog
 
 The PostgreSQL integration test needs an empty local `whylint_auth_e2e_*` test database through `TEST_DATABASE_URL`; it skips when this variable is absent and refuses other database names or non-local hosts. Never point tests at your development database.
 
+## Core learning engine
+
+The learning API is specified in [the repository specification](../specs.md).
+Apply the learning migration with `npm run migration:run` on the intended database
+before using these endpoints. The test harness applies migrations only in its own
+disposable PostgreSQL database.
+
+Set `GEMINI_API_KEY` and `GEMINI_MODEL` in the backend environment to enable question
+generation, answer assessment, and community question review. Choose a model available
+to your Gemini account that supports structured JSON output. Configuration stays on
+the server. The adapter uses the fixed Google `generateContent` endpoint, a 45-second
+timeout, and validates every returned question and score. Missing configuration gives
+`AI_NOT_CONFIGURED`; temporary provider failures give `AI_UNAVAILABLE`. A failed AI
+request can be retried and never awards XP or records an incorrect answer.
+
+The frontend fetches five generated questions initially and requests five more when
+the third question becomes active. Scores from 8 through 10 pass. Lower scores enter
+the user's retry collection until they pass. First assessment earns 5 XP and the first
+pass earns an additional 15 XP, with a lifetime cap of 20 XP per question. A user's own
+published questions earn them no XP. Goals, streaks, and weekly rankings use Japan time.
+
+Question responses format JavaScript, TypeScript, JSX, JSON, CSS-family, and GraphQL
+snippets on the server through the runtime Prettier dependency. Existing records and
+cached responses use the same display formatting. Unsupported or unparseable examples
+use their supplied source text. The Gemini prompt requests normal indentation for
+all languages. This formatting path parses source text without executing it.
+
+Real Gemini generation and grading require credentials and live verification. The
+automated integration suite injects deterministic AI responses at the external HTTP
+boundary. Authentication continues to use verified JWTs and persisted revocable sessions.
+
 ## Project setup
 
 ```bash
@@ -88,16 +119,10 @@ $ npm run test:cov
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+The repository root `Dockerfile` builds one image that serves the Angular app and this API from the
+same origin. Environment variables, the release job (`npm run release`: migrations and the question
+pool from compiled output), the health probes, and a Cloud Run outline are in
+[../docs/deployment.md](../docs/deployment.md).
 
 ## Resources
 

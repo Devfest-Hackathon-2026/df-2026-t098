@@ -1,0 +1,372 @@
+:host {
+  display: contents;
+  --discussion-inset-left: calc(20px + env(safe-area-inset-left, 0px));
+  --discussion-inset-right: calc(20px + env(safe-area-inset-right, 0px));
+}
+.discussion {
+  position: fixed;
+  z-index: 5;
+  inset: auto 0 0;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  height: min(78dvh, 640px);
+  max-height: calc(100dvh - max(12px, env(safe-area-inset-top, 0px)));
+  padding: 0;
+  border: 0;
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+  color: var(--text);
+  overflow: hidden;
+}
+.discussion[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+/* The sheet rises from the bottom edge and retreats the same way; transitions stay interruptible. */
+.discussion {
+  transform: translateY(100%);
+  transition:
+    transform 320ms var(--ease-drawer),
+    display 320ms allow-discrete,
+    overlay 320ms allow-discrete;
+}
+.discussion[open] {
+  transform: none;
+}
+@starting-style {
+  .discussion[open] {
+    transform: translateY(100%);
+  }
+}
+.discussion::backdrop {
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
+  opacity: 0;
+  transition:
+    opacity 320ms var(--ease-out),
+    display 320ms allow-discrete,
+    overlay 320ms allow-discrete;
+}
+.discussion[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  .discussion[open]::backdrop {
+    opacity: 0;
+  }
+}
+.grab-handle {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+.discussion-heading {
+  position: relative;
+  touch-action: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px var(--discussion-inset-right) 16px var(--discussion-inset-left);
+  border-bottom: 1px solid var(--border);
+}
+.discussion-heading h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+}
+.discussion-heading button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--text);
+}
+.discussion-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px var(--discussion-inset-right) 24px var(--discussion-inset-left);
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) var(--surface);
+}
+.discussion ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.discussion-entry {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px 0;
+}
+.comment-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--muted);
+}
+.comment-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+.comment-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.comment-byline,
+.comment-actions,
+.composer-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.comment-author {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 4px;
+}
+.contribution-kind {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+.discussion .discussion-replies {
+  margin-left: 20px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+.discussion-replies .discussion-entry {
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 8px;
+}
+.discussion-replies .comment-avatar {
+  width: 32px;
+  height: 32px;
+}
+.deleted-comment {
+  color: var(--muted);
+  font-style: italic;
+}
+.comment-content .is-helpful {
+  color: var(--accent);
+}
+.comment-content p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+.comment-content button,
+.reload-comments,
+.cancel-reply {
+  min-height: 48px;
+  min-width: 48px;
+  border: 0;
+  padding: 8px 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-underline-offset: 4px;
+}
+.discussion .empty-discussion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 200px;
+  color: var(--muted);
+  text-align: center;
+}
+.empty-discussion p,
+.error,
+.discussion-sign-in {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+.empty-discussion p {
+  max-width: 28ch;
+  margin: 0;
+}
+.comment-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: end;
+  gap: 12px;
+  padding: 16px var(--discussion-inset-right) calc(16px + env(safe-area-inset-bottom, 0px))
+    var(--discussion-inset-left);
+  border-top: 1px solid var(--border);
+}
+.composer-context {
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.composer-context label,
+.composer-context span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.composer-context select {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  max-width: 180px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: max(16px, 1rem);
+}
+.comment-composer textarea {
+  width: 100%;
+  min-height: 56px;
+  max-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: max(16px, 1rem);
+  line-height: 1.5;
+  caret-color: var(--accent);
+}
+.comment-composer textarea::placeholder {
+  color: var(--muted);
+}
+.comment-composer .send-comment {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--button-bg);
+  color: var(--button-text);
+}
+.discussion-sign-in {
+  padding: 16px var(--discussion-inset-right) calc(16px + env(safe-area-inset-bottom, 0px))
+    var(--discussion-inset-left);
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+.discussion-sign-in a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--accent);
+  text-underline-offset: 4px;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (min-width: 1200px) {
+  .discussion {
+    inset: 0 0 0 auto;
+    width: 360px;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    transform: translateX(100%);
+    transition-duration: 240ms;
+  }
+  @starting-style {
+    .discussion[open] {
+      transform: translateX(100%);
+    }
+  }
+  .grab-handle {
+    display: none;
+  }
+  .discussion-heading {
+    touch-action: auto;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .discussion,
+  .discussion[open] {
+    transform: none;
+    transition:
+      opacity 200ms ease,
+      display 200ms allow-discrete,
+      overlay 200ms allow-discrete;
+  }
+  .discussion {
+    opacity: 0;
+  }
+  .discussion[open] {
+    opacity: 1;
+  }
+  @starting-style {
+    .discussion[open] {
+      transform: none;
+      opacity: 0;
+    }
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .discussion-heading button:hover {
+    color: var(--accent);
+  }
+  .comment-content button:hover,
+  .reload-comments:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .comment-composer .send-comment:not(:disabled):hover {
+    background: var(--accent);
+    color: var(--canvas);
+  }
+  .comment-author:hover {
+    text-decoration: underline;
+  }
+}
+
+.spoiler {
+  display: block;
+  width: 100%;
+  margin: 6px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--control);
+  color: var(--muted);
+  min-height: 48px;
+  font-size: 0.875rem;
+  text-align: left;
+}

@@ -1,5 +1,27 @@
-:host { display: block; min-height: 100dvh; background: var(--canvas); }
-.session-loading { max-width: 680px; margin: 0 auto; padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px)); }
-.session-brand { color: var(--accent); font: 700 18px 'DM Sans', sans-serif; letter-spacing: -.04em; }
-.session-brand span { color: var(--text); }
-.session-loading p { margin-top: 48px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--canvas);
+}
+.session-loading {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px
+    calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.session-brand {
+  color: var(--accent);
+  font:
+    700 18px 'DM Sans',
+    sans-serif;
+  letter-spacing: -0.04em;
+}
+.session-brand span {
+  color: var(--text);
+}
+.session-loading p {
+  margin-top: 48px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}

@@ -6,7 +6,8 @@ describe('AuthSession', () => {
     id: 'user-id',
     email: 'user@example.com',
     name: 'Example User',
-    avatarUrl: null, username: null,
+    avatarUrl: null,
+    username: null,
   };
   let fetchMock: ReturnType<typeof vi.fn>;
   let session: AuthSession;
@@ -56,9 +57,14 @@ describe('AuthSession', () => {
     fetchMock.mockResolvedValueOnce(response(204));
 
     await expect(session.logout()).resolves.toBe(true);
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/auth/logout', expect.objectContaining({
-      method: 'POST', credentials: 'same-origin', referrerPolicy: 'no-referrer',
-    }));
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/v1/auth/logout',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        referrerPolicy: 'no-referrer',
+      }),
+    );
     expect(session.status()).toBe('guest');
     expect(session.user()).toBeNull();
     expect(session.loggingOut()).toBe(false);
@@ -66,25 +72,32 @@ describe('AuthSession', () => {
     expect(clear).not.toHaveBeenCalled();
   });
 
-  it.each(['http', 'network'])('keeps the account and permits retry after a logout %s failure', async (failure) => {
-    fetchMock.mockResolvedValueOnce(response(200, account));
-    await session.refresh();
-    if (failure === 'http') fetchMock.mockResolvedValueOnce(response(503));
-    else fetchMock.mockRejectedValueOnce(new Error('connection failed'));
+  it.each(['http', 'network'])(
+    'keeps the account and permits retry after a logout %s failure',
+    async (failure) => {
+      fetchMock.mockResolvedValueOnce(response(200, account));
+      await session.refresh();
+      if (failure === 'http') fetchMock.mockResolvedValueOnce(response(503));
+      else fetchMock.mockRejectedValueOnce(new Error('connection failed'));
 
-    await expect(session.logout()).resolves.toBe(false);
-    expect(session.status()).toBe('authenticated');
-    expect(session.user()).toEqual(account);
-    expect(session.loggingOut()).toBe(false);
-    fetchMock.mockResolvedValueOnce(response(204));
-    await expect(session.logout()).resolves.toBe(true);
-  });
+      await expect(session.logout()).resolves.toBe(false);
+      expect(session.status()).toBe('authenticated');
+      expect(session.user()).toEqual(account);
+      expect(session.loggingOut()).toBe(false);
+      fetchMock.mockResolvedValueOnce(response(204));
+      await expect(session.logout()).resolves.toBe(true);
+    },
+  );
 
   it('shares a pending logout and makes concurrent refresh wait for its result', async () => {
     fetchMock.mockResolvedValueOnce(response(200, account));
     await session.refresh();
     let resolveLogout!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveLogout = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveLogout = resolve;
+      }),
+    );
 
     const logout = session.logout();
     expect(session.logout()).toBe(logout);
@@ -101,7 +114,11 @@ describe('AuthSession', () => {
     fetchMock.mockResolvedValueOnce(response(200, account));
     await session.refresh();
     let resolveOlder!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveOlder = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveOlder = resolve;
+      }),
+    );
     const older = session.refresh();
     fetchMock.mockResolvedValueOnce(response(204));
 
@@ -116,7 +133,11 @@ describe('AuthSession', () => {
     fetchMock.mockResolvedValueOnce(response(200, account));
     await session.refresh();
     let resolveOlder!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveOlder = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveOlder = resolve;
+      }),
+    );
     const older = session.refresh();
     fetchMock.mockRejectedValueOnce(new Error('connection failed'));
 
@@ -133,7 +154,11 @@ describe('AuthSession', () => {
     await session.refresh();
     vi.useFakeTimers();
     let resolveLate!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveLate = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveLate = resolve;
+      }),
+    );
     const logout = session.logout();
     const signal = (fetchMock.mock.calls[1][1] as RequestInit).signal;
     await vi.advanceTimersByTimeAsync(10_000);
@@ -181,7 +206,11 @@ describe('AuthSession', () => {
 
   it('reports loading while checking the session', async () => {
     let resolveRequest!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveRequest = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
 
     const pending = session.refresh();
     expect(session.status()).toBe('loading');
@@ -206,7 +235,13 @@ describe('AuthSession', () => {
   });
 
   it('treats an unreadable response as unavailable', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error('bad JSON'); } });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new Error('bad JSON');
+      },
+    });
 
     await expect(session.refresh()).resolves.toBe(false);
     expect(session.status()).toBe('unavailable');
@@ -215,7 +250,11 @@ describe('AuthSession', () => {
 
   it('does not let an older success overwrite a newer signed-out response', async () => {
     let resolveOlder!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveOlder = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveOlder = resolve;
+      }),
+    );
     fetchMock.mockResolvedValueOnce(response(401));
 
     const older = session.refresh();
@@ -230,7 +269,11 @@ describe('AuthSession', () => {
 
   it('does not let an older 401 overwrite a newer authenticated response', async () => {
     let resolveOlder!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveOlder = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveOlder = resolve;
+      }),
+    );
     fetchMock.mockResolvedValueOnce(response(200, account));
 
     const older = session.refresh();
@@ -255,7 +298,11 @@ describe('AuthSession', () => {
   it('times out and aborts a hung fetch without accepting a late response', async () => {
     vi.useFakeTimers();
     let resolveLate!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveLate = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveLate = resolve;
+      }),
+    );
 
     const pending = session.refresh();
     const signal = (fetchMock.mock.calls[0][1] as RequestInit).signal;
@@ -275,7 +322,12 @@ describe('AuthSession', () => {
   it('times out while reading the response body and ignores a late body', async () => {
     vi.useFakeTimers();
     let resolveBody!: (value: unknown) => void;
-    const json = vi.fn(() => new Promise((resolve) => { resolveBody = resolve; }));
+    const json = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveBody = resolve;
+        }),
+    );
     fetchMock.mockResolvedValueOnce({ status: 200, ok: true, json });
 
     const pending = session.refresh();
@@ -297,13 +349,23 @@ describe('AuthSession', () => {
     vi.useFakeTimers();
     let resolveOlder!: (value: Response) => void;
     let resolveNewer!: (value: Response) => void;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveOlder = resolve; }));
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { resolveNewer = resolve; }));
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveOlder = resolve;
+      }),
+    );
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveNewer = resolve;
+      }),
+    );
 
     const older = session.refresh();
     const olderSignal = (fetchMock.mock.calls[0][1] as RequestInit).signal;
     let olderFinished = false;
-    void older.then(() => { olderFinished = true; });
+    void older.then(() => {
+      olderFinished = true;
+    });
     await vi.advanceTimersByTimeAsync(5_000);
     const newer = session.refresh();
     expect(olderSignal?.aborted).toBe(true);

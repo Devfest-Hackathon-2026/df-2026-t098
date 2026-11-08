@@ -39,8 +39,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "8kB",
+                  "maximumError": "16kB"
                 }
               ],
               "outputHashing": "all"
@@ -49,6 +49,9 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "native": {
+              "outputPath": "dist/native"
             }
           },
           "defaultConfiguration": "production"
