@@ -1,1 +1,4 @@
-CAPACITOR_DEBUG = true
+CAPACITOR_DEBUG[config=Debug] = true
+CAPACITOR_DEBUG[config=Release] = false
+WHYLINT_IOS_GOOGLE_URL_SCHEME = whylint-google-unconfigured
+#include? "google-signin.local.xcconfig"

@@ -1,6 +1,7 @@
 # Keep secrets, local state and other packages out of the build context.
 **/.env
 **/.env.*
+**/google-signin.local.xcconfig
 **/*.pem
 **/*.key
 **/service-account*.json

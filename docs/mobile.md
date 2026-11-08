@@ -81,6 +81,13 @@ WHYLINT_API_URL=https://learn.example.com npm run native:build
 This runs `ng build --configuration production,native` into `dist/native`, bakes in the API origin, and
 runs `cap sync`. Then archive from Xcode or Android Studio.
 
+For iOS Google sign-in, put the iOS OAuth client ID in the ignored
+`frontend/.env.ios-client-id` before the native build. The build configures the native callback
+scheme and includes the public client ID in the app. The backend verifies ID tokens against its
+existing `GOOGLE_CLIENT_ID` and issues the normal revocable native session. The iOS Google client
+must use the app's bundle identifier and belong to the same Google project as the web server client.
+The deployed backend must include the native Google login endpoint before this flow can succeed.
+
 **Run on a signed build.** Do not pass `CODE_SIGNING_ALLOWED=NO` to a build you intend to launch: without
 the app's entitlements the Keychain refuses writes (`-34018`), so the session would not survive a
 restart. That flag is fine for a compile-only check (CI uses it).
@@ -91,9 +98,9 @@ restart. That flag is fine for a compile-only check (CI uses it).
   change after the first submission.
 - Signing, icons, splash assets, store listings, privacy labels, and the account-deletion flow Apple
   requires (readiness item B5).
-- **Native Google sign-in.** The button shows "coming soon" in the app: Google rejects OAuth inside
-  embedded web views. It needs the system browser or a native SDK, iOS and Android OAuth client IDs in
-  Google Cloud, and a backend path that verifies an ID token. Password sign-in works now.
+- **Native Google sign-in.** iOS uses the native Google SDK and backend token verification. Verify
+  the flow on a physical device with a real Google account after deploying the backend. Android
+  Google sign-in remains unimplemented and needs its own OAuth client and signing configuration.
 - Universal / app links so shared links open the app, and push notifications for the 09:00 review.
 - The page loads its fonts from Google Fonts at runtime; bundle them so the app looks right offline.
 

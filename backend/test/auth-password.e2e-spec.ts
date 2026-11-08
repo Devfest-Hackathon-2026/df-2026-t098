@@ -249,6 +249,47 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
     };
   });
 
+  it('uses the same Google account for a native session and revokes it on logout', async () => {
+    const previous = process.env.NATIVE_APP_ORIGINS;
+    process.env.NATIVE_APP_ORIGINS = 'capacitor://localhost';
+    try {
+      const webProfile = await request(server())
+        .get('/api/v1/auth/me')
+        .set('Cookie', googleCookie)
+        .expect(200);
+      const nativeLogin = await request(server())
+        .post('/api/v1/auth/google/native')
+        .set('Origin', 'capacitor://localhost')
+        .send({ idToken: 'fixture-google-id-token' })
+        .expect(200);
+      expect(nativeLogin.headers['set-cookie']).toBeUndefined();
+      expect(typeof nativeLogin.body.token).toBe('string');
+      const authorization = `Bearer ${nativeLogin.body.token as string}`;
+      const nativeProfile = await request(server())
+        .get('/api/v1/auth/me')
+        .set('Authorization', authorization)
+        .expect(200);
+      expect(nativeProfile.body.id).toBe(webProfile.body.id);
+      await request(server())
+        .post('/api/v1/auth/google/native')
+        .set('Origin', origin)
+        .send({ idToken: 'fixture-google-id-token' })
+        .expect(403);
+      await request(server())
+        .post('/api/v1/auth/logout')
+        .set('Origin', 'capacitor://localhost')
+        .set('Authorization', authorization)
+        .expect(204);
+      await request(server())
+        .get('/api/v1/auth/me')
+        .set('Authorization', authorization)
+        .expect(401);
+    } finally {
+      if (previous === undefined) delete process.env.NATIVE_APP_ORIGINS;
+      else process.env.NATIVE_APP_ORIGINS = previous;
+    }
+  });
+
   it('backfills an existing NULL Google avatar and preserves it when a later claim omits the picture', async () => {
     const original = await database
       .getRepository(UserEntity)

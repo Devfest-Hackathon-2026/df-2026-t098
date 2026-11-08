@@ -17,6 +17,10 @@ export class AuthApi {
     return this.mutate('/api/v1/auth/password/login', 'POST', { identifier, password });
   }
 
+  nativeGoogleLogin(idToken: string): Promise<AuthResult> {
+    return this.mutate('/api/v1/auth/google/native', 'POST', { idToken });
+  }
+
   setUsername(username: string): Promise<AuthResult> {
     return this.mutate('/api/v1/auth/me/username', 'PATCH', { username });
   }

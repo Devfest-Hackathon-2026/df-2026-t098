@@ -1,6 +1,11 @@
 import type { TokenStore } from './token-store';
 
-const SIGN_IN_PATHS = ['/api/v1/auth/signup', '/api/v1/auth/password/login', '/api/v1/auth/login'];
+const SIGN_IN_PATHS = [
+  '/api/v1/auth/signup',
+  '/api/v1/auth/password/login',
+  '/api/v1/auth/login',
+  '/api/v1/auth/google/native',
+];
 const LOGOUT_PATH = '/api/v1/auth/logout';
 
 export interface NativeFetchOptions {

@@ -1,10 +1,15 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthController } from './auth.controller';
 import type { AuthService } from './auth.service';
 
 describe('AuthController', () => {
-  const authService = { login: jest.fn(), signup: jest.fn(), passwordLogin: jest.fn() };
+  const authService = {
+    login: jest.fn(),
+    loginNative: jest.fn(),
+    signup: jest.fn(),
+    passwordLogin: jest.fn(),
+  };
   const controller = new AuthController(authService as unknown as AuthService);
   const response = { cookie: jest.fn() } as unknown as Response;
   const webRequest = { headers: { origin: 'http://localhost:4200' } } as unknown as Request;
@@ -50,6 +55,18 @@ describe('AuthController', () => {
       'test-token',
       expect.objectContaining({ httpOnly: true }),
     );
+  });
+
+  it('returns native Google sessions only to configured native origins', async () => {
+    const nativeRequest = { headers: { origin: 'capacitor://localhost' } } as unknown as Request;
+    authService.loginNative.mockResolvedValue({ token: 'test-token', message: 'ok' });
+    await expect(controller.nativeGoogleLogin('test-google-id-token', nativeRequest, response))
+      .resolves.toEqual({ message: 'ok', token: 'test-token' });
+    expect(response.cookie).not.toHaveBeenCalled();
+    await expect(controller.nativeGoogleLogin('test-google-id-token', webRequest, response))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(controller.nativeGoogleLogin('', nativeRequest, response))
+      .rejects.toBeInstanceOf(BadRequestException);
   });
   describe('session delivery', () => {
     const result = { token: 'session-token', message: 'ok' };

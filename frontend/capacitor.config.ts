@@ -19,6 +19,9 @@ const config: CapacitorConfig = {
   // Both must be listed in the backend's NATIVE_APP_ORIGINS.
   server: developmentApi ? { cleartext: true } : undefined,
   plugins: {
+    SocialLogin: {
+      providers: { google: true, facebook: false, apple: false, twitter: false },
+    },
     SplashScreen: { backgroundColor: '#080808', launchShowDuration: 0, launchAutoHide: true },
     Keyboard: { resize: 'native' },
   },

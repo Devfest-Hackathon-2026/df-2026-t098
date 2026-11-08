@@ -108,9 +108,8 @@ cookie. Leave the variable empty for a web-only deployment.
 See [production-readiness.md](production-readiness.md) for the full list. The ones that change how
 this deployment behaves:
 
-- **Google sign-in will not work on a deployed origin yet.** The frontend allowlists only
-  `http://localhost:4200` (`frontend/src/app/google-login/google-login.ts`) and the OAuth client has
-  no production redirect URI. Password sign-up and sign-in work.
+- The web Google sign-in flow permits the configured Cloud Run origin and localhost. A different
+  public domain requires updating the frontend allowlist and the Google OAuth redirect URI.
 - **Rate limits are per instance** (in-memory throttler), and Gemini spend has no global budget.
 - No password reset, email verification, privacy policy, or account deletion (B4, B5).
 - The Angular shell has no Content-Security-Policy yet (H5).

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Body,
   Controller,
   Get,
@@ -61,6 +62,24 @@ export class AuthController {
     }
 
     return this.startSession(req, res, await this.authService.login(code));
+  }
+
+  @Post('google/native')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @UseGuards(AuthOriginGuard, JsonBodyGuard, ThrottlerGuard)
+  async nativeGoogleLogin(
+    @Body('idToken') idToken: unknown,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (req.headers.origin === webOrigin() || !isNativeAppOrigin(req.headers.origin)) {
+      throw new ForbiddenException('Request origin is not allowed');
+    }
+    if (typeof idToken !== 'string' || !idToken.trim() || idToken.length > 16384) {
+      throw new BadRequestException('Google ID token is required');
+    }
+    return this.startSession(req, res, await this.authService.loginNative(idToken));
   }
 
   @Post('signup')
