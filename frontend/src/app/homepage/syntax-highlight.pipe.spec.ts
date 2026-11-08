@@ -15,7 +15,11 @@ describe('SyntaxHighlightPipe', () => {
   it('keeps unsupported code as plain text and supports Python and SQL', () => {
     const source = '<img src=x onerror=alert(1)>\n';
     expect(pipe.transform(source, 'unknown')).toEqual([{ text: source, kind: 'plain' }]);
-    expect(pipe.transform('return True', 'Python').some((token) => token.kind === 'keyword')).toBe(true);
-    expect(pipe.transform('SELECT id FROM users', 'SQL').some((token) => token.kind === 'keyword')).toBe(true);
+    expect(pipe.transform('return True', 'Python').some((token) => token.kind === 'keyword')).toBe(
+      true,
+    );
+    expect(
+      pipe.transform('SELECT id FROM users', 'SQL').some((token) => token.kind === 'keyword'),
+    ).toBe(true);
   });
 });

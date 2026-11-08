@@ -22,7 +22,11 @@
     "migration:generate": "npm run typeorm -- migration:generate ./migrations/Migrations",
     "migration:run": "npm run typeorm migration:run",
     "migration:create": "npx typeorm migration:create ./migrations/ManualMigration",
-    "migration:revert": "npm run typeorm migration:revert"
+    "migration:revert": "npm run typeorm migration:revert",
+    "pool:generate": "ts-node scripts/generate-question-pool.ts",
+    "pool:concepts": "ts-node scripts/label-pool-concepts.ts",
+    "pool:seed": "ts-node scripts/seed-question-pool.ts",
+    "release": "node dist/scripts/release.js"
   },
   "dependencies": {
     "@nestjs/axios": "^12.0.1",
@@ -40,6 +44,7 @@
     "dotenv": "^18.0.9",
     "google-auth-library": "^11.3.3",
     "pg": "^8.23.1",
+    "prettier": "^3.9.10",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^1.1.2"
@@ -60,7 +65,6 @@
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^16.0.0",
     "jest": "^30.5.2",
-    "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.15",
@@ -89,5 +93,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "overrides": {
+    "multer": "2.5.0"
   }
 }

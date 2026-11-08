@@ -1,0 +1,32 @@
+<fieldset class="language-picker" [disabled]="disabled()">
+  <legend>{{ language() === 'ja' ? '表示言語' : 'App language' }}</legend>
+  <p>
+    {{
+      language() === 'ja'
+        ? '画面と新しい問題に使う言語を選んでください。'
+        : 'Choose the language for the app and new questions.'
+    }}
+  </p>
+  <div class="language-options">
+    <label [class.selected]="selected() === 'ja'">
+      <input
+        type="radio"
+        name="app-language"
+        value="ja"
+        [checked]="selected() === 'ja'"
+        (change)="changed.emit('ja')"
+      />
+      <span lang="ja">日本語</span>
+    </label>
+    <label [class.selected]="selected() === 'en'">
+      <input
+        type="radio"
+        name="app-language"
+        value="en"
+        [checked]="selected() === 'en'"
+        (change)="changed.emit('en')"
+      />
+      <span lang="en">English</span>
+    </label>
+  </div>
+</fieldset>

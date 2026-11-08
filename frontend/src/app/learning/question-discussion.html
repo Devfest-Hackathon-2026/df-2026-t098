@@ -1,0 +1,228 @@
+<dialog
+  #panel
+  class="discussion"
+  [id]="'discussion-' + controlId()"
+  [attr.aria-labelledby]="'comments-heading-' + controlId()"
+  [attr.aria-modal]="!desktop()"
+  (close)="onNativeClose()"
+  (cancel)="close($event)"
+  (click)="onBackdrop($event)"
+  (keydown)="keepFocus($event)"
+>
+  <header
+    class="discussion-heading"
+    (pointerdown)="onDragStart($event)"
+    (pointermove)="onDragMove($event)"
+    (pointerup)="onDragEnd($event)"
+    (pointercancel)="onDragEnd($event, true)"
+  >
+    <span class="grab-handle" aria-hidden="true"></span>
+    <h2 #heading [id]="'comments-heading-' + controlId()" tabindex="-1">
+      {{ text('コメント', 'Comments') }}
+    </h2>
+    <button
+      type="button"
+      (click)="close()"
+      [attr.aria-label]="text('コメントを閉じる', 'Close comments')"
+    >
+      <app-icon name="close" />
+    </button>
+  </header>
+  <div #body class="discussion-body">
+    @if (loading()) {
+      <app-loading-skeleton [label]="text('コメントを読み込み中…', 'Loading comments…')" />
+    }
+    <ng-template #entry let-comment let-isReply="isReply">
+      <span class="comment-avatar" aria-hidden="true">
+        <app-icon name="profile" />
+        @if (!comment.deleted && comment.author.avatarUrl) {
+          <img
+            [src]="comment.author.avatarUrl"
+            alt=""
+            loading="lazy"
+            referrerpolicy="no-referrer"
+            (error)="$any($event.target).hidden = true"
+          />
+        }
+      </span>
+      <div class="comment-content">
+        @if (comment.deleted) {
+          <p class="deleted-comment">
+            {{ text('この投稿は削除されました。', 'This contribution was deleted.') }}
+          </p>
+        } @else {
+          <div class="comment-byline">
+            <a class="comment-author" [routerLink]="['/creators', comment.author.id]">{{
+              comment.author.displayName
+            }}</a>
+            @if (comment.kind && comment.kind !== 'comment') {
+              <span class="contribution-kind">{{ kindLabel(comment.kind) }}</span>
+            }
+          </div>
+          @if (isSpoiler(comment)) {
+            <button type="button" class="spoiler" (click)="revealSpoiler(comment.id)">
+              {{
+                text(
+                  '答えが含まれています。先に解くか、タップして表示',
+                  'Contains the answer. Answer first, or tap to reveal'
+                )
+              }}
+            </button>
+          } @else {
+            <p>{{ comment.text }}</p>
+          }
+          <div class="comment-actions">
+            <button
+              type="button"
+              class="helpful-button"
+              [class.is-helpful]="comment.helpful"
+              [attr.aria-label]="text('参考になった', 'Helpful')"
+              [attr.aria-pressed]="!!comment.helpful"
+              [disabled]="
+                !authenticated ||
+                helping() !== null ||
+                loading() ||
+                comment.author.id === session.user()?.id
+              "
+              (click)="toggleHelpful(comment)"
+            >
+              {{ text('参考になった', 'Helpful') }} <span>{{ comment.helpfulCount ?? 0 }}</span>
+            </button>
+            @if (authenticated && !isReply) {
+              <button
+                type="button"
+                class="reply-button"
+                [attr.aria-label]="text('返信', 'Reply')"
+                [disabled]="mutating"
+                (click)="reply(comment)"
+              >
+                {{ text('返信', 'Reply') }}
+              </button>
+            }
+            @if (comment.author.id === session.user()?.id) {
+              <button
+                type="button"
+                class="delete-comment"
+                [attr.aria-label]="text('コメントを削除', 'Delete comment')"
+                [disabled]="mutating || loading()"
+                (click)="deleteComment(comment)"
+              >
+                {{ text('削除', 'Delete') }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </ng-template>
+    <ol>
+      @for (comment of roots(); track comment.id) {
+        <li class="discussion-thread">
+          <div class="discussion-entry" [attr.data-comment-id]="comment.id">
+            <ng-container
+              [ngTemplateOutlet]="entry"
+              [ngTemplateOutletContext]="{ $implicit: comment, isReply: false }"
+            />
+          </div>
+          @if (replies(comment.id); as children) {
+            @if (children.length) {
+              <ol class="discussion-replies">
+                @for (child of children; track child.id) {
+                  <li class="discussion-entry" [attr.data-comment-id]="child.id">
+                    <ng-container
+                      [ngTemplateOutlet]="entry"
+                      [ngTemplateOutletContext]="{ $implicit: child, isReply: true }"
+                    />
+                  </li>
+                }
+              </ol>
+            }
+          }
+        </li>
+      } @empty {
+        @if (!loading() && !error()) {
+          <li class="empty-discussion">
+            <app-icon name="comment" />
+            <p>
+              {{
+                text(
+                  'まだコメントはありません。気づきを共有しよう。',
+                  'No comments yet. Share what you noticed.'
+                )
+              }}
+            </p>
+          </li>
+        }
+      }
+    </ol>
+    @if (error()) {
+      <p role="alert" class="error">{{ error() }}</p>
+      <button class="reload-comments" type="button" (click)="loadComments()">
+        {{ text('再読み込み', 'Reload comments') }}
+      </button>
+    }
+  </div>
+  @if (authenticated) {
+    <form class="comment-composer" (ngSubmit)="postComment()">
+      <div class="composer-context">
+        @if (replyingTo(); as parent) {
+          <span>{{
+            text(parent.author.displayName + 'に返信', 'Replying to ' + parent.author.displayName)
+          }}</span>
+          <button
+            class="cancel-reply"
+            type="button"
+            [disabled]="mutating"
+            [attr.aria-label]="text('返信を取り消す', 'Cancel reply')"
+            (click)="replyingTo.set(null)"
+          >
+            {{ text('取り消す', 'Cancel') }}
+          </button>
+        } @else {
+          <label [for]="'comment-kind-' + controlId()">{{
+            text('投稿の種類', 'Contribution type')
+          }}</label>
+          <select
+            [id]="'comment-kind-' + controlId()"
+            name="kind"
+            [ngModel]="kind()"
+            (ngModelChange)="kind.set($event)"
+            [disabled]="mutating"
+          >
+            @for (option of kinds; track option) {
+              <option [value]="option">{{ kindLabel(option) }}</option>
+            }
+          </select>
+        }
+      </div>
+      <label class="sr-only" [for]="'comment-' + controlId()">{{
+        text('コメントを書く', 'Write a comment')
+      }}</label>
+      <textarea
+        #composer
+        [id]="'comment-' + controlId()"
+        name="comment"
+        [ngModel]="comment()"
+        (ngModelChange)="comment.set($event)"
+        [placeholder]="text('コメントを追加…', 'Add a comment…')"
+        [maxlength]="!replyingTo() && kind() === 'explanation' ? 5000 : 1000"
+        rows="2"
+        [disabled]="mutating"
+      ></textarea>
+      <button
+        class="primary send-comment"
+        type="submit"
+        [disabled]="mutating || loading() || !comment().trim()"
+        [attr.aria-busy]="commenting()"
+        [attr.aria-label]="
+          commenting() ? text('投稿中…', 'Posting…') : text('コメントを投稿', 'Post comment')
+        "
+      >
+        <app-icon name="send" />
+      </button>
+    </form>
+  } @else {
+    <p class="discussion-sign-in">
+      <a routerLink="/login">{{ text('ログインしてコメントする', 'Sign in to comment') }}</a>
+    </p>
+  }
+</dialog>

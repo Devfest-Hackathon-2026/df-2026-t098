@@ -12,14 +12,11 @@ describe('JsonBodyGuard', () => {
     return { context, is };
   }
 
-  it.each([true, 'application/json'])(
-    'accepts an application/json request',
-    (result) => {
-      const { context, is } = contextFor(result);
-      expect(guard.canActivate(context)).toBe(true);
-      expect(is).toHaveBeenCalledWith('application/json');
-    },
-  );
+  it.each([true, 'application/json'])('accepts an application/json request', (result) => {
+    const { context, is } = contextFor(result);
+    expect(guard.canActivate(context)).toBe(true);
+    expect(is).toHaveBeenCalledWith('application/json');
+  });
 
   it.each([false, null, undefined])(
     'rejects a non-JSON or missing content type with HTTP 415',

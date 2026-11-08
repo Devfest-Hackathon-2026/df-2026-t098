@@ -1,9 +1,14 @@
 <main>
-  <router-outlet #outlet="outlet"/>
-  @if (!outlet.isActivated && session.status() === 'loading') {
-    <div class="session-loading" role="status" [attr.lang]="sessionLanguage">
+  <router-outlet #outlet="outlet" />
+  @if (!outlet.isActivated) {
+    <div class="session-loading" [attr.lang]="settings.language()">
       <span class="session-brand" aria-hidden="true">w<span>_</span> whylint.</span>
-      <p>{{ sessionLanguage === 'ja' ? 'アカウントを確認しています…' : 'Checking your account…' }}</p>
+      <app-loading-skeleton
+        variant="question"
+        [label]="
+          settings.language() === 'ja' ? '画面を読み込み中…' : 'Loading your learning space…'
+        "
+      />
     </div>
   }
 </main>

@@ -1,16 +1,8 @@
 import { Transform } from 'class-transformer';
-import {
-  IsDefined,
-  IsNotEmpty,
-  IsString,
-  Length,
-  MaxLength,
-} from 'class-validator';
+import { IsDefined, IsNotEmpty, IsString, Length, MaxLength } from 'class-validator';
 
 export class PasswordLoginDto {
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsDefined()
   @IsString()
   @IsNotEmpty()

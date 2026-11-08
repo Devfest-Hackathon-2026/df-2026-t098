@@ -5,6 +5,11 @@ repeatable Playwright Test suite: it starts Angular, the real built NestJS app,
 and a new PostgreSQL cluster, then runs the same scenarios on mobile and desktop
 Chromium. No application `.env` file or development database is used.
 
+The core learning scenarios also exercise the Gemini adapter through a local HTTP
+fixture. The actual frontend, Nest controllers, guards, migrations and PostgreSQL
+persistence run normally. Gemini returns deterministic five-question batches,
+scores and publication reviews so these checks can run without an API key.
+
 ## First run
 
 Use Node.js 24.15 or newer and PostgreSQL binaries (`initdb`, `pg_ctl`, `psql`) on
@@ -57,6 +62,7 @@ npm test -- --headed    # Watch the actual browser
 npm test -- --grep "UI logout"
 npm run report         # Open the most recent HTML report
 npm run test:backend    # Existing Jest integration tests in a separate fresh DB
+npm test -- learning.spec.ts # Core feed, assessment, community and recovery flows
 ```
 
 One worker and no retries keep the initial suite within the real auth rate limits.
@@ -64,6 +70,29 @@ Each test receives a fresh browser context and unique fixture accounts. Avoid
 raising the worker count, adding retries, or using `--repeat-each` without
 accounting for the backend's per-route request limits. A fresh `npm test` starts a
 new backend with a fresh limiter and database.
+
+Core learning tests use dedicated users and revocable sessions inserted into the
+owned disposable database during bootstrap. Their signed fixture cookies stay in
+memory. This keeps account preparation independent of the auth suite's real signup
+and login throttles. The auth suite continues to exercise the public login and
+signup endpoints. Fixture account creation is guarded by the test environment and
+the disposable database URL, and has no application HTTP endpoint.
+
+## Core learning coverage
+
+- Exactly five generated questions, the general-topic question, and next-batch
+  prefetch on the third active card.
+- Server-side assessment, a failing score in the private review collection, a
+  passing retry, replay-safe XP, daily goals, levels and weekly rankings.
+- Publishing a reviewed community question, showing it to another learner,
+  idempotent likes, saved questions, comments and stable share links.
+- Explicitly injected AI setup/assessment outages, retained answer drafts and
+  recovery through the real backend. These browser error cases complement the
+  provider and backend tests for missing configuration and upstream failures.
+
+The share test substitutes the browser clipboard API to check the copied URL.
+Gemini outputs are fixtures. Live Gemini quality/latency and native device sharing
+need separate verification after credentials and a device are available.
 
 ## What the suite proves
 

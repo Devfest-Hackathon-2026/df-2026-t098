@@ -1,98 +1,201 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { Onboarding } from './onboarding';
 import { OnboardingState } from './onboarding-state';
+import { AuthSession, AuthUser, SessionStatus } from '../auth/auth-session';
+import { LearningApi } from '../learning/learning-api';
+import { LEARNING_CATALOG } from '../learning/learning-catalog';
 
-describe('onboarding', () => {
+describe('Learning interests onboarding', () => {
+  const user = signal<AuthUser | null>(null);
+  const status = signal<SessionStatus>('guest');
+  const send = vi.fn();
+  const get = vi.fn();
+
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({ imports: [Onboarding], providers: [provideRouter([])] });
+    user.set(null);
+    status.set('guest');
+    send.mockReset().mockResolvedValue({});
+    get.mockReset().mockResolvedValue(LEARNING_CATALOG);
+    TestBed.configureTestingModule({
+      imports: [Onboarding],
+      providers: [
+        provideRouter([]),
+        {
+          provide: AuthSession,
+          useValue: {
+            user,
+            status,
+            loggingOut: signal(false),
+            refresh: vi.fn().mockResolvedValue(false),
+          },
+        },
+        { provide: LearningApi, useValue: { send, get } },
+      ],
+    });
   });
   afterEach(() => localStorage.clear());
 
-  it('validates stored domain and supported stack together', () => {
-    const state = TestBed.inject(OnboardingState);
-    localStorage.setItem('whylint-onboarding-v1', JSON.stringify({ domain: 'backend', stack: 'javascript', onboardingCompleted: true }));
-    expect(state.read()).toBeNull();
-    expect(state.save('frontend', 'javascript')).toBe(true);
-    expect(state.read()).toEqual({ domain: 'frontend', stack: 'javascript', onboardingCompleted: true });
+  it('migrates the supported old JavaScript preference without losing the choice', () => {
+    localStorage.setItem(
+      'whylint-onboarding-v1',
+      JSON.stringify({ domain: 'frontend', stack: 'javascript', onboardingCompleted: true }),
+    );
+    expect(TestBed.inject(OnboardingState).read()).toEqual({
+      interests: ['frontend'],
+      technologies: ['JavaScript'],
+      difficulty: 'beginner',
+      onboardingCompleted: true,
+    });
   });
 
-  it('filters options, preserves selection on back, and clears it when domain changes', async () => {
+  it('rejects malformed stored preferences', () => {
+    localStorage.setItem(
+      'whylint-onboarding-v2',
+      JSON.stringify({
+        interests: ['unknown'],
+        technologies: ['JavaScript'],
+        difficulty: 'beginner',
+        onboardingCompleted: true,
+      }),
+    );
+    expect(TestBed.inject(OnboardingState).read()).toBeNull();
+  });
+
+  it('allows multiple domains and frameworks, including custom technologies', async () => {
     const fixture = TestBed.createComponent(Onboarding);
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
-    const buttons = () => [...root.querySelectorAll('button')];
-    expect((root.querySelector('.primary') as HTMLButtonElement).disabled).toBe(true);
-    buttons().find(b => b.textContent?.includes('フロントエンド'))!.click();
+    const buttons = () => [...root.querySelectorAll<HTMLButtonElement>('button')];
+    buttons()
+      .find((button) => button.textContent?.includes('フロントエンド'))!
+      .click();
+    buttons()
+      .find((button) => button.textContent?.includes('バックエンド'))!
+      .click();
     fixture.detectChanges();
-    (root.querySelector('.primary') as HTMLButtonElement).click();
+    expect(root.querySelectorAll('.domain[aria-pressed="true"]')).toHaveLength(2);
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
     fixture.detectChanges();
-    const input = root.querySelector('input')!;
-    input.value = 'SCRIPT'; input.dispatchEvent(new Event('input'));
+    buttons()
+      .find((button) => button.textContent?.trim() === 'React')!
+      .click();
+    const search = root.querySelector<HTMLInputElement>('#technology-search')!;
+    search.value = 'MyFramework';
+    search.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    expect(root.querySelectorAll('.stack-list button').length).toBe(2);
-    buttons().find(b => b.textContent?.includes('JavaScript'))!.click();
+    root.querySelector<HTMLButtonElement>('.custom-add')!.click();
     fixture.detectChanges();
-    buttons().find(b => b.classList.contains('back'))!.click();
-    fixture.detectChanges();
-    (root.querySelector('.primary') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.stack-list button.selected')?.textContent).toContain('JavaScript');
-    buttons().find(b => b.classList.contains('back'))!.click();
-    fixture.detectChanges();
-    buttons().find(b => b.textContent?.includes('バックエンド'))!.click();
-    fixture.detectChanges();
-    (root.querySelector('.primary') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect((root.querySelector('.primary') as HTMLButtonElement).disabled).toBe(true);
-    expect(root.querySelector('.stack-list button.selected')).toBeNull();
+    expect(root.querySelector('.selected-technologies')?.textContent).toContain('React');
+    expect(root.querySelector('.selected-technologies')?.textContent).toContain('MyFramework');
   });
 
-  it('saves before navigating to the feed', async () => {
-    const fixture = TestBed.createComponent(Onboarding);
-    const router = TestBed.inject(Router);
-    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
-    await fixture.whenStable();
-    const root = fixture.nativeElement as HTMLElement;
-    [...root.querySelectorAll('button')].find(b => b.textContent?.includes('フロントエンド'))!.click();
-    fixture.detectChanges();
-    (root.querySelector('.primary') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    [...root.querySelectorAll<HTMLButtonElement>('.stack-list button')].find(b => b.textContent?.includes('JavaScript'))!.click();
-    fixture.detectChanges();
-    (root.querySelector('.primary') as HTMLButtonElement).click();
-    expect(TestBed.inject(OnboardingState).read()?.stack).toBe('javascript');
-    expect(navigate).toHaveBeenCalledWith('/');
-  });
-
-  it('searches categories and technologies across domains without enabling unavailable stacks', async () => {
-    const fixture = TestBed.createComponent(Onboarding);
-    await fixture.whenStable();
-    const root = fixture.nativeElement as HTMLElement;
-    const input = root.querySelector<HTMLInputElement>('#category-search')!;
-    const search = (value: string) => { input.value = value; input.dispatchEvent(new Event('input')); fixture.detectChanges(); };
-    search('sQl');
-    const sql = [...root.querySelectorAll<HTMLButtonElement>('.stack-list button')];
-    expect(sql.length).toBe(4); // SQL in two categories, PostgreSQL and MySQL.
-    expect(sql.every(button => button.disabled)).toBe(true);
-    expect(root.textContent).toContain('データベース');
-    search('フロント');
-    expect(root.querySelectorAll('.domain').length).toBe(1);
-    expect(root.querySelector('.domain')?.textContent).toContain('フロントエンド');
-    search('no-such-stack');
-    expect(root.querySelector('[role="status"]')?.textContent).toContain('一致する候補がありません');
-  });
-
-  it('completes directly from an available technology search result', async () => {
+  it('saves general-interest preferences even with no selected programming language', async () => {
     const fixture = TestBed.createComponent(Onboarding);
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
-    const input = root.querySelector<HTMLInputElement>('#category-search')!;
-    input.value = 'javaScript'; input.dispatchEvent(new Event('input')); fixture.detectChanges();
-    root.querySelector<HTMLButtonElement>('.stack-list button')!.click();
-    expect(TestBed.inject(OnboardingState).read()).toEqual({ domain: 'frontend', stack: 'javascript', onboardingCompleted: true });
-    expect(navigate).toHaveBeenCalledWith('/');
+    [...root.querySelectorAll<HTMLButtonElement>('.domain')]
+      .find((button) => button.textContent?.includes('ネットワーク'))!
+      .click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    await fixture.whenStable();
+    expect(TestBed.inject(OnboardingState).read()?.interests).toEqual(['networking']);
+    expect(TestBed.inject(OnboardingState).read()?.technologies).toEqual([]);
+    expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('persists authenticated preferences before entering the feed', async () => {
+    user.set({
+      id: 'learner',
+      email: 'learner@example.test',
+      name: 'Learner',
+      username: 'learner',
+      avatarUrl: null,
+    });
+    status.set('authenticated');
+    const fixture = TestBed.createComponent(Onboarding);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.domain')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    await fixture.whenStable();
+    expect(send).toHaveBeenCalledWith(
+      '/preferences',
+      'PUT',
+      { interests: ['frontend'], technologies: [], difficulty: 'beginner', language: 'ja' },
+      expect.any(AbortSignal),
+    );
+    expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+  });
+
+  it('restores server preferences on a device without local onboarding', async () => {
+    user.set({
+      id: 'learner',
+      email: 'learner@example.test',
+      name: 'Learner',
+      username: 'learner',
+      avatarUrl: null,
+    });
+    status.set('authenticated');
+    const preferences = {
+      interests: ['security'],
+      technologies: ['Go'],
+      difficulty: 'advanced',
+      language: 'en',
+    };
+    get.mockResolvedValueOnce({ preferences });
+    await expect(TestBed.inject(OnboardingState).restore()).resolves.toMatchObject(preferences);
+    expect(document.documentElement.lang).toBe('en');
+    expect(localStorage.getItem('whylint-language')).toBe('en');
+  });
+
+  it('offers language during onboarding and keeps a guest selection on the device', async () => {
+    const fixture = TestBed.createComponent(Onboarding);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.settings [aria-label="Switch to English"]')).toBeNull();
+    root.querySelector<HTMLInputElement>('[value="en"]')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('h1')?.textContent).toContain('What would you like');
+    root.querySelector<HTMLButtonElement>('.domain')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    await fixture.whenStable();
+    expect(TestBed.inject(OnboardingState).read()?.language).toBe('en');
+    expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('does not copy another signed-in user’s preferences into a new account', async () => {
+    const state = TestBed.inject(OnboardingState);
+    state.save(
+      { interests: ['frontend'], technologies: ['React'], difficulty: 'beginner' },
+      'someone-else',
+    );
+    user.set({
+      id: 'learner',
+      email: 'learner@example.test',
+      name: 'Learner',
+      username: 'learner',
+      avatarUrl: null,
+    });
+    status.set('authenticated');
+    get.mockResolvedValueOnce({ preferences: null });
+    await expect(state.restore()).resolves.toBeNull();
+    expect(send).not.toHaveBeenCalled();
   });
 });

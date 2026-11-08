@@ -1,41 +1,145 @@
 <div class="auth-shell">
   <header class="header">
-    <a class="brand" routerLink="/" aria-label="WhyLint"><span class="brand-mark" aria-hidden="true">w<span>_</span></span><span>whylint<span class="brand-dot">.</span></span></a>
+    <a class="brand" routerLink="/" aria-label="WhyLint"
+      ><span class="brand-mark" aria-hidden="true">w<span>_</span></span>
+      <span>whylint<span class="brand-dot">.</span></span></a
+    >
     <div class="settings">
-      <button type="button" (click)="toggleLanguage()" [attr.aria-label]="language() === 'ja' ? 'Switch to English' : '日本語に切り替え'" [attr.lang]="language() === 'ja' ? 'en' : 'ja'">{{ language() === 'ja' ? 'EN' : '日本語' }}</button>
-      <button type="button" (click)="toggleTheme()" [attr.aria-label]="theme() === 'dark' ? ui.light : ui.dark">@if (theme() === 'dark') {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>} @else {<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z"/></svg>}</button>
+      <button
+        type="button"
+        (click)="toggleTheme()"
+        [attr.aria-label]="theme() === 'dark' ? ui.light : ui.dark"
+      >
+        @if (theme() === 'dark') {
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"
+            />
+          </svg>
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z" />
+          </svg>
+        }
+      </button>
     </div>
   </header>
   <main class="content">
     <a routerLink="/" class="back"><span aria-hidden="true">←</span> {{ ui.back }}</a>
-      <h1>{{ ui.title }}</h1><p class="intro">{{ ui.intro }}</p>
-      @if (redirectFailed() && session.status() === 'authenticated') {
-        <p class="error" role="alert">{{ ui.navigationError }}</p>
-        <button class="primary retry-button" type="button" (click)="retryRedirect()">{{ ui.retry }}</button>
-      } @else if (phase() === 'working' || session.status() === 'loading') {
-        <p class="status" role="status">{{ ui.waiting }}</p>
-      } @else if (session.status() === 'unavailable') {
-        <p class="error" role="alert">{{ ui.connection }}</p>
-        <button class="primary retry-button" type="button" (click)="retrySession()">{{ ui.retry }}</button>
-      } @else if (session.status() === 'authenticated') {
-        <p class="status" role="status">{{ ui.redirecting }}</p>
-      } @else {
-        @if (error(); as message) { <p class="error" role="alert">{{ ui[message] }}</p> }
-        <p class="password-notice">{{ ui.passwordNotice }}</p>
-        <form class="password-form" (submit)="submitPassword($event, identifier, password)" novalidate>
-          <label for="login-identifier">{{ ui.identifierLabel }}</label>
-          <input #identifier id="login-identifier" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="508" required [disabled]="passwordBusy()" [attr.aria-invalid]="passwordStatus() === 'missingIdentifier' ? 'true' : null" [attr.aria-describedby]="passwordStatus() === 'missingIdentifier' ? 'identifier-error' : null" (input)="clearPasswordStatus('identifier', identifier)">
-          @if (passwordStatus() === 'missingIdentifier') { <p id="identifier-error" class="field-error" role="alert">{{ ui.missingIdentifier }}</p> }
-          <label for="login-password">{{ ui.passwordLabel }}</label>
-          <input #password id="login-password" name="password" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" maxlength="256" required [disabled]="passwordBusy()" [attr.aria-invalid]="passwordStatus() === 'missingPassword' ? 'true' : null" [attr.aria-describedby]="passwordStatus() === 'missingPassword' ? 'password-error' : null" (input)="clearPasswordStatus('password', password)">
-          @if (passwordStatus() === 'missingPassword') { <p id="password-error" class="field-error" role="alert">{{ ui.missingPassword }}</p> }
-          <button class="primary password-button" type="submit" [disabled]="passwordBusy()" [attr.aria-busy]="passwordBusy()">{{ passwordBusy() ? ui.passwordWorking : ui.passwordSignIn }}</button>
-          @if (passwordStatus() === 'invalidPassword') { <p id="password-status" class="password-status" role="alert">{{ ui.invalidPassword }}</p> }
-          @if (passwordStatus() === 'passwordFailed') { <p id="password-status" class="password-status" role="alert">{{ passwordError }}</p> }
-        </form>
-        <a class="auth-link" routerLink="/signup">{{ ui.signup }}</a>
-        <div class="divider"><span>{{ ui.or }}</span></div>
-        <button class="primary google-button" type="button" [disabled]="passwordBusy()" (click)="startSignIn()"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M43.6 24.5c0-1.5-.1-3-.4-4.4H24v8.3h11c-.5 2.7-2 4.9-4.3 6.4v5.4h6.9c4-3.7 6-9.2 6-15.7Z"/><path fill="#34A853" d="M24 44.5c5.5 0 10.1-1.8 13.5-4.9l-6.9-5.4c-1.8 1.2-4.1 1.9-6.6 1.9-5.3 0-9.8-3.6-11.4-8.4H5.5v5.5C8.8 39.9 15.8 44.5 24 44.5Z"/><path fill="#FBBC05" d="M12.6 27.7a12.3 12.3 0 0 1 0-7.9v-5.5H5.5a20.5 20.5 0 0 0 0 18.9l7.1-5.5Z"/><path fill="#EA4335" d="M24 11.4c3 0 5.7 1 7.8 3l5.9-5.9C34.1 5.4 29.5 3.5 24 3.5c-8.2 0-15.2 4.6-18.5 11.3l7.1 5.5c1.6-4.8 6.1-8.9 11.4-8.9Z"/></svg><span>{{ ui.submit }}</span></button>
+    <h1>{{ ui.title }}</h1>
+    <p class="intro">{{ ui.intro }}</p>
+    @if (redirectFailed() && session.status() === 'authenticated') {
+      <p class="error" role="alert">{{ ui.navigationError }}</p>
+      <button class="primary retry-button" type="button" (click)="retryRedirect()">
+        {{ ui.retry }}
+      </button>
+    } @else if (phase() === 'working' || session.status() === 'loading') {
+      <app-loading-skeleton variant="form" [label]="ui.waiting" />
+    } @else if (session.status() === 'unavailable') {
+      <p class="error" role="alert">{{ ui.connection }}</p>
+      <button class="primary retry-button" type="button" (click)="retrySession()">
+        {{ ui.retry }}
+      </button>
+    } @else if (session.status() === 'authenticated') {
+      <app-loading-skeleton variant="form" [label]="ui.redirecting" />
+    } @else {
+      @if (error(); as message) {
+        <p class="error" role="alert">{{ ui[message] }}</p>
       }
+      <p class="password-notice">{{ ui.passwordNotice }}</p>
+      <form
+        class="password-form"
+        (submit)="submitPassword($event, identifier, password)"
+        novalidate
+      >
+        <label for="login-identifier">{{ ui.identifierLabel }}</label>
+        <input
+          #identifier
+          id="login-identifier"
+          name="username"
+          type="text"
+          autocomplete="username"
+          autocapitalize="none"
+          autocorrect="off"
+          spellcheck="false"
+          maxlength="508"
+          required
+          [disabled]="passwordBusy()"
+          [attr.aria-invalid]="passwordStatus() === 'missingIdentifier' ? 'true' : null"
+          [attr.aria-describedby]="
+            passwordStatus() === 'missingIdentifier' ? 'identifier-error' : null
+          "
+          (input)="clearPasswordStatus('identifier', identifier)"
+        />
+        @if (passwordStatus() === 'missingIdentifier') {
+          <p id="identifier-error" class="field-error" role="alert">{{ ui.missingIdentifier }}</p>
+        }
+        <label for="login-password">{{ ui.passwordLabel }}</label>
+        <input
+          #password
+          id="login-password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          autocapitalize="none"
+          autocorrect="off"
+          maxlength="256"
+          required
+          [disabled]="passwordBusy()"
+          [attr.aria-invalid]="passwordStatus() === 'missingPassword' ? 'true' : null"
+          [attr.aria-describedby]="passwordStatus() === 'missingPassword' ? 'password-error' : null"
+          (input)="clearPasswordStatus('password', password)"
+        />
+        @if (passwordStatus() === 'missingPassword') {
+          <p id="password-error" class="field-error" role="alert">{{ ui.missingPassword }}</p>
+        }
+        <button
+          class="primary password-button"
+          type="submit"
+          [disabled]="passwordBusy()"
+          [attr.aria-busy]="passwordBusy()"
+        >
+          {{ passwordBusy() ? ui.passwordWorking : ui.passwordSignIn }}
+        </button>
+        @if (passwordStatus() === 'invalidPassword') {
+          <p id="password-status" class="password-status" role="alert">{{ ui.invalidPassword }}</p>
+        }
+        @if (passwordStatus() === 'passwordFailed') {
+          <p id="password-status" class="password-status" role="alert">{{ passwordError }}</p>
+        }
+      </form>
+      <a class="auth-link" routerLink="/signup" [queryParams]="returnTo ? { returnTo } : null">{{
+        ui.signup
+      }}</a>
+      <div class="divider">
+        <span>{{ ui.or }}</span>
+      </div>
+      <button
+        class="primary google-button"
+        type="button"
+        [disabled]="passwordBusy()"
+        (click)="startSignIn()"
+      >
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path
+            fill="#4285F4"
+            d="M43.6 24.5c0-1.5-.1-3-.4-4.4H24v8.3h11c-.5 2.7-2 4.9-4.3 6.4v5.4h6.9c4-3.7 6-9.2 6-15.7Z"
+          />
+          <path
+            fill="#34A853"
+            d="M24 44.5c5.5 0 10.1-1.8 13.5-4.9l-6.9-5.4c-1.8 1.2-4.1 1.9-6.6 1.9-5.3 0-9.8-3.6-11.4-8.4H5.5v5.5C8.8 39.9 15.8 44.5 24 44.5Z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M12.6 27.7a12.3 12.3 0 0 1 0-7.9v-5.5H5.5a20.5 20.5 0 0 0 0 18.9l7.1-5.5Z"
+          />
+          <path
+            fill="#EA4335"
+            d="M24 11.4c3 0 5.7 1 7.8 3l5.9-5.9C34.1 5.4 29.5 3.5 24 3.5c-8.2 0-15.2 4.6-18.5 11.3l7.1 5.5c1.6-4.8 6.1-8.9 11.4-8.9Z"
+          /></svg
+        ><span>{{ ui.submit }}</span>
+      </button>
+    }
   </main>
 </div>

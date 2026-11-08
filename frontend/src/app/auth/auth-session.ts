@@ -1,4 +1,7 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
+import { createNativeFetch } from '../native/native-fetch';
+import { isNativePlatform, nativeApiBaseUrl } from '../native/platform';
+import { NATIVE_TOKEN_STORE } from '../native/token-store';
 
 export interface AuthUser {
   id: string;
@@ -9,12 +12,20 @@ export interface AuthUser {
 }
 
 export type SessionStatus = 'loading' | 'authenticated' | 'guest' | 'unavailable';
-type SessionResult = { status: 'authenticated'; user: AuthUser } | { status: 'guest' | 'unavailable'; user: null };
+type SessionResult =
+  { status: 'authenticated'; user: AuthUser } | { status: 'guest' | 'unavailable'; user: null };
 const SESSION_TIMEOUT_MS = 10_000;
 
 export const AUTH_FETCH = new InjectionToken<typeof fetch>('AUTH_FETCH', {
   providedIn: 'root',
-  factory: () => globalThis.fetch.bind(globalThis),
+  factory: () => {
+    const browserFetch = globalThis.fetch.bind(globalThis);
+    // Browsers call the relative /api on their own origin. The native shell calls the configured API.
+    if (!isNativePlatform()) return browserFetch;
+    const baseUrl = nativeApiBaseUrl();
+    if (!baseUrl) console.error('This native build has no API address. Build it with npm run native:build.');
+    return createNativeFetch({ fetchImpl: browserFetch, baseUrl, tokens: inject(NATIVE_TOKEN_STORE) });
+  },
 });
 
 @Injectable({ providedIn: 'root' })
@@ -33,7 +44,8 @@ export class AuthSession {
   readonly loggingOut = this.logoutPending.asReadonly();
 
   refresh(): Promise<boolean> {
-    if (this.pendingLogout) return this.pendingLogout.then(() => this.currentStatus() === 'authenticated');
+    if (this.pendingLogout)
+      return this.pendingLogout.then(() => this.currentStatus() === 'authenticated');
     const previousController = this.activeController;
     const controller = new AbortController();
     const version = ++this.requestVersion;
@@ -72,8 +84,11 @@ export class AuthSession {
     try {
       const response = await Promise.race([
         this.request('/api/v1/auth/logout', {
-          method: 'POST', credentials: 'same-origin', cache: 'no-store',
-          referrerPolicy: 'no-referrer', signal: controller.signal,
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          referrerPolicy: 'no-referrer',
+          signal: controller.signal,
         }),
         cancelled,
       ]);
@@ -136,9 +151,15 @@ export class AuthSession {
 function isAuthUser(value: unknown): value is AuthUser {
   if (!value || typeof value !== 'object') return false;
   const user = value as Record<string, unknown>;
-  return typeof user['id'] === 'string' && user['id'].trim().length > 0 &&
-    typeof user['email'] === 'string' && user['email'].trim().length > 0 &&
+  return (
+    typeof user['id'] === 'string' &&
+    user['id'].trim().length > 0 &&
+    typeof user['email'] === 'string' &&
+    user['email'].trim().length > 0 &&
     (typeof user['name'] === 'string' || user['name'] === null) &&
     (typeof user['avatarUrl'] === 'string' || user['avatarUrl'] === null) &&
-    (user['username'] === undefined || user['username'] === null || typeof user['username'] === 'string');
+    (user['username'] === undefined ||
+      user['username'] === null ||
+      typeof user['username'] === 'string')
+  );
 }

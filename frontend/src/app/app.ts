@@ -2,9 +2,11 @@ import { DOCUMENT } from '@angular/common';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthSession } from './auth/auth-session';
+import { DisplaySettings } from './learning/display-settings';
+import { LoadingSkeleton } from './learning/loading-skeleton';
 
 @Component({
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, LoadingSkeleton],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
@@ -13,7 +15,7 @@ export class App {
   protected readonly title = signal('frontend');
   protected readonly session = inject(AuthSession);
   private readonly document = inject(DOCUMENT);
-  protected readonly sessionLanguage = this.readSessionLanguage();
+  protected readonly settings = inject(DisplaySettings);
 
   constructor() {
     const destroyRef = inject(DestroyRef);
@@ -23,14 +25,8 @@ export class App {
       if (this.document.visibilityState === 'visible') void this.session.refresh();
     };
     this.document.addEventListener('visibilitychange', onVisibilityChange);
-    destroyRef.onDestroy(() => this.document.removeEventListener('visibilitychange', onVisibilityChange));
-  }
-
-  private readSessionLanguage(): 'ja' | 'en' {
-    try {
-      return this.document.defaultView?.localStorage.getItem('whylint-language') === 'en' ? 'en' : 'ja';
-    } catch {
-      return 'ja';
-    }
+    destroyRef.onDestroy(() =>
+      this.document.removeEventListener('visibilitychange', onVisibilityChange),
+    );
   }
 }

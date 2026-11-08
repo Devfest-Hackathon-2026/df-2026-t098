@@ -35,12 +35,16 @@ describe('JwtGuard', () => {
 
     await expect(guard.canActivate(contextFor(request))).resolves.toBe(true);
     expect(sessions.isActive).toHaveBeenCalledWith(sessionId, userId);
-    expect(request.user).toEqual(expect.objectContaining({ sub: userId, sid: sessionId, exp: expect.any(Number) }));
+    expect(request.user).toEqual(
+      expect.objectContaining({ sub: userId, sid: sessionId, exp: expect.any(Number) }),
+    );
   });
 
   it('accepts a valid bearer token', async () => {
     const token = await issueToken();
-    const request: Partial<AuthenticatedRequest> = { headers: { authorization: `Bearer ${token}` } };
+    const request: Partial<AuthenticatedRequest> = {
+      headers: { authorization: `Bearer ${token}` },
+    };
 
     await expect(guard.canActivate(contextFor(request))).resolves.toBe(true);
     expect(sessions.isActive).toHaveBeenCalledWith(sessionId, userId);
@@ -52,12 +56,18 @@ describe('JwtGuard', () => {
     const [header, payload, signature] = valid.split('.');
     const tampered = `${header}.${payload}.${signature[0] === 'a' ? 'b' : 'a'}${signature.slice(1)}`;
     const otherSigner = new JwtService({ secret: 'another-test-key' });
-    const wrongKey = await otherSigner.signAsync({ sub: userId, sid: sessionId }, { expiresIn: '15m' });
+    const wrongKey = await otherSigner.signAsync(
+      { sub: userId, sid: sessionId },
+      { expiresIn: '15m' },
+    );
 
-    await expect(guard.canActivate(contextFor({ headers: {} }))).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(guard.canActivate(contextFor({ headers: {} }))).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
     for (const token of [tampered, wrongKey]) {
-      await expect(guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })))
-        .rejects.toBeInstanceOf(UnauthorizedException);
+      await expect(
+        guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
     }
     expect(sessions.isActive).not.toHaveBeenCalled();
   });
@@ -71,26 +81,35 @@ describe('JwtGuard', () => {
     const noExpiry = await jwtService.signAsync({ sub: userId, sid: sessionId });
 
     for (const token of [expired, legacy, invalidUser, invalidSession, missingSubject, noExpiry]) {
-      await expect(guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })))
-        .rejects.toBeInstanceOf(UnauthorizedException);
+      await expect(
+        guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
     }
     expect(sessions.isActive).not.toHaveBeenCalled();
   });
 
-  it.each(['HS384', 'HS512'] as const)('rejects tokens signed with %s instead of HS256', async (algorithm) => {
-    const token = await jwtService.signAsync({ sub: userId, sid: sessionId }, { expiresIn: '15m', algorithm });
+  it.each(['HS384', 'HS512'] as const)(
+    'rejects tokens signed with %s instead of HS256',
+    async (algorithm) => {
+      const token = await jwtService.signAsync(
+        { sub: userId, sid: sessionId },
+        { expiresIn: '15m', algorithm },
+      );
 
-    await expect(guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })))
-      .rejects.toBeInstanceOf(UnauthorizedException);
-    expect(sessions.isActive).not.toHaveBeenCalled();
-  });
+      await expect(
+        guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(sessions.isActive).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(['revoked', 'expired', 'foreign'])('rejects a %s session', async () => {
     sessions.isActive.mockResolvedValue(false);
     const token = await issueToken();
 
-    await expect(guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })))
-      .rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(
+      guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(sessions.isActive).toHaveBeenCalledWith(sessionId, userId);
   });
 
@@ -99,7 +118,8 @@ describe('JwtGuard', () => {
     sessions.isActive.mockRejectedValue(databaseError);
     const token = await issueToken();
 
-    await expect(guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })))
-      .rejects.toBe(databaseError);
+    await expect(
+      guard.canActivate(contextFor({ headers: {}, cookies: { access_token: token } })),
+    ).rejects.toBe(databaseError);
   });
 });

@@ -1,8 +1,4 @@
-import {
-  BadGatewayException,
-  ConflictException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadGatewayException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import * as argon2 from 'argon2';
@@ -34,9 +30,8 @@ describe('AuthService', () => {
     marker: 'transaction-manager',
   } as unknown as EntityManager;
   const dataSource = {
-    transaction: jest.fn(
-      async (callback: (manager: EntityManager) => Promise<unknown>) =>
-        callback(transactionManager),
+    transaction: jest.fn(async (callback: (manager: EntityManager) => Promise<unknown>) =>
+      callback(transactionManager),
     ),
   };
   const originalEnv = {
@@ -75,9 +70,7 @@ describe('AuthService', () => {
     users.updateGoogleAvatar.mockResolvedValue(undefined);
     users.updateGoogleName.mockResolvedValue(undefined);
     jest.spyOn(axios, 'get').mockRejectedValue(new Error('Unexpected profile request'));
-    exchange = jest
-      .spyOn(axios, 'post')
-      .mockRejectedValue(new Error('Unexpected network request'));
+    exchange = jest.spyOn(axios, 'post').mockRejectedValue(new Error('Unexpected network request'));
     verifyGoogle = jest.spyOn(OAuth2Client.prototype, 'verifyIdToken');
   });
 
@@ -112,8 +105,13 @@ describe('AuthService', () => {
     expect(claims).not.toHaveProperty('password_hash');
   }
 
-  function mockGoogleIdentity(picture: string | null = 'https://example.test/avatar.png', name: string | null = 'Learner') {
-    exchange.mockResolvedValueOnce({ data: { id_token: 'test-id-token', access_token: 'test-only-google-access-token' } });
+  function mockGoogleIdentity(
+    picture: string | null = 'https://example.test/avatar.png',
+    name: string | null = 'Learner',
+  ) {
+    exchange.mockResolvedValueOnce({
+      data: { id_token: 'test-id-token', access_token: 'test-only-google-access-token' },
+    });
     verifyGoogle.mockResolvedValueOnce({
       getPayload: () => ({
         sub: 'google-subject',
@@ -178,12 +176,10 @@ describe('AuthService', () => {
       }
     });
     const signingError = new Error('test signing failed');
-    const sign = jest
-      .spyOn(jwtService, 'signAsync')
-      .mockImplementationOnce(async () => {
-        expect(transactionActive).toBe(true);
-        throw signingError;
-      });
+    const sign = jest.spyOn(jwtService, 'signAsync').mockImplementationOnce(async () => {
+      expect(transactionActive).toBe(true);
+      throw signingError;
+    });
 
     await expect(
       service.signup({
@@ -224,24 +220,19 @@ describe('AuthService', () => {
       user: { id: userId, password_hash: 'REAL_HASH' },
       attempted: 'wrong password',
     },
-  ])(
-    'returns the same unauthorized error for $label',
-    async ({ user, attempted }) => {
-      const resolvedUser =
-        user?.password_hash === 'REAL_HASH'
-          ? { ...user, password_hash: passwordHash }
-          : user;
-      users.findByIdentifier.mockResolvedValue(resolvedUser);
+  ])('returns the same unauthorized error for $label', async ({ user, attempted }) => {
+    const resolvedUser =
+      user?.password_hash === 'REAL_HASH' ? { ...user, password_hash: passwordHash } : user;
+    users.findByIdentifier.mockResolvedValue(resolvedUser);
 
-      await expect(
-        service.passwordLogin({ identifier: 'learner', password: attempted }),
-      ).rejects.toMatchObject({
-        status: 401,
-        message: 'Invalid credentials',
-      });
-      expect(sessions.create).not.toHaveBeenCalled();
-    },
-  );
+    await expect(
+      service.passwordLogin({ identifier: 'learner', password: attempted }),
+    ).rejects.toMatchObject({
+      status: 401,
+      message: 'Invalid credentials',
+    });
+    expect(sessions.create).not.toHaveBeenCalled();
+  });
 
   it('returns a sanitized current-user profile', async () => {
     users.findById.mockResolvedValue({
@@ -260,9 +251,7 @@ describe('AuthService', () => {
       username: null,
     });
     users.findById.mockResolvedValue(null);
-    await expect(service.getCurrentUser(userId)).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(service.getCurrentUser(userId)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('revokes the session for a valid signed token', async () => {
@@ -272,10 +261,7 @@ describe('AuthService', () => {
   });
 
   it('does not revoke anything for missing, invalid, expired or legacy tokens', async () => {
-    const expired = await jwtService.signAsync(
-      { sub: userId, sid: sessionId },
-      { expiresIn: -1 },
-    );
+    const expired = await jwtService.signAsync({ sub: userId, sid: sessionId }, { expiresIn: -1 });
     const legacy = await jwtService.signAsync({ sub: userId });
     const otherJwt = new JwtService({
       secret: 'different-test-secret',
@@ -286,13 +272,7 @@ describe('AuthService', () => {
       sid: sessionId,
     });
 
-    for (const token of [
-      undefined,
-      'invalid.token.value',
-      expired,
-      legacy,
-      wrongSignature,
-    ]) {
+    for (const token of [undefined, 'invalid.token.value', expired, legacy, wrongSignature]) {
       await expect(service.logout(token)).resolves.toBeUndefined();
     }
     expect(sessions.revoke).not.toHaveBeenCalled();
@@ -315,9 +295,9 @@ describe('AuthService', () => {
     sessions.create.mockRejectedValueOnce(databaseError);
     const sign = jest.spyOn(jwtService, 'signAsync');
 
-    await expect(
-      service.passwordLogin({ identifier: 'learner', password }),
-    ).rejects.toBe(databaseError);
+    await expect(service.passwordLogin({ identifier: 'learner', password })).rejects.toBe(
+      databaseError,
+    );
     expect(sign).not.toHaveBeenCalled();
   });
 
@@ -334,9 +314,7 @@ describe('AuthService', () => {
     expect((body as URLSearchParams).get('redirect_uri')).toBe(
       'http://localhost:4200/auth/google/callback',
     );
-    expect((body as URLSearchParams).get('grant_type')).toBe(
-      'authorization_code',
-    );
+    expect((body as URLSearchParams).get('grant_type')).toBe('authorization_code');
     expect(options?.headers).toEqual(
       expect.objectContaining({
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -347,7 +325,11 @@ describe('AuthService', () => {
       audience: 'test-client-id',
     });
     expect(users.findByGoogleId).toHaveBeenCalledWith('google-subject');
-    expect(users.updateGoogleAvatar).toHaveBeenCalledWith(userId, 'google-subject', 'https://example.test/avatar.png');
+    expect(users.updateGoogleAvatar).toHaveBeenCalledWith(
+      userId,
+      'google-subject',
+      'https://example.test/avatar.png',
+    );
     expect(users.updateGoogleName).toHaveBeenCalledWith(userId, 'google-subject', 'Learner');
     expect(users.createUser).not.toHaveBeenCalled();
     expect(users.findByIdentifier).not.toHaveBeenCalled();
@@ -374,20 +356,36 @@ describe('AuthService', () => {
   it('fills a missing avatar from UserInfo only for the verified Google subject', async () => {
     mockGoogleIdentity(null);
     users.findByGoogleId.mockResolvedValueOnce({ id: userId, avatar_url: null });
-    jest.mocked(axios.get).mockResolvedValueOnce({ data: { sub: 'google-subject', picture: 'https://example.test/profile.png' } });
+    jest
+      .mocked(axios.get)
+      .mockResolvedValueOnce({
+        data: { sub: 'google-subject', picture: 'https://example.test/profile.png' },
+      });
 
     await service.login('test-authorization-code');
 
     expect(axios.get).toHaveBeenCalledWith('https://openidconnect.googleapis.com/v1/userinfo', {
-      headers: { Authorization: 'Bearer test-only-google-access-token' }, timeout: 3000,
+      headers: { Authorization: 'Bearer test-only-google-access-token' },
+      timeout: 3000,
     });
-    expect(users.updateGoogleAvatar).toHaveBeenCalledWith(userId, 'google-subject', 'https://example.test/profile.png');
+    expect(users.updateGoogleAvatar).toHaveBeenCalledWith(
+      userId,
+      'google-subject',
+      'https://example.test/profile.png',
+    );
   });
 
   it('ignores a UserInfo picture for a different subject and keeps the stored avatar', async () => {
     mockGoogleIdentity(null);
-    users.findByGoogleId.mockResolvedValueOnce({ id: userId, avatar_url: 'https://example.test/stored.png' });
-    jest.mocked(axios.get).mockResolvedValueOnce({ data: { sub: 'another-subject', picture: 'https://example.test/other.png' } });
+    users.findByGoogleId.mockResolvedValueOnce({
+      id: userId,
+      avatar_url: 'https://example.test/stored.png',
+    });
+    jest
+      .mocked(axios.get)
+      .mockResolvedValueOnce({
+        data: { sub: 'another-subject', picture: 'https://example.test/other.png' },
+      });
 
     await expectIssuedSession(await service.login('test-authorization-code'), 'Login successful!');
     expect(users.updateGoogleAvatar).not.toHaveBeenCalled();
@@ -395,7 +393,10 @@ describe('AuthService', () => {
 
   it('keeps the stored avatar and permits login when optional UserInfo is unavailable', async () => {
     mockGoogleIdentity(null);
-    users.findByGoogleId.mockResolvedValueOnce({ id: userId, avatar_url: 'https://example.test/stored.png' });
+    users.findByGoogleId.mockResolvedValueOnce({
+      id: userId,
+      avatar_url: 'https://example.test/stored.png',
+    });
 
     await expectIssuedSession(await service.login('test-authorization-code'), 'Login successful!');
     expect(users.updateGoogleAvatar).not.toHaveBeenCalled();
@@ -403,7 +404,10 @@ describe('AuthService', () => {
 
   it('does not rewrite an unchanged avatar or call UserInfo when the token has a picture', async () => {
     mockGoogleIdentity();
-    users.findByGoogleId.mockResolvedValueOnce({ id: userId, avatar_url: 'https://example.test/avatar.png' });
+    users.findByGoogleId.mockResolvedValueOnce({
+      id: userId,
+      avatar_url: 'https://example.test/avatar.png',
+    });
 
     await service.login('test-authorization-code');
     expect(users.updateGoogleAvatar).not.toHaveBeenCalled();
@@ -422,44 +426,96 @@ describe('AuthService', () => {
 
   it('uses UserInfo for a missing name even when the verified token already has a picture', async () => {
     mockGoogleIdentity('https://example.test/avatar.png', null);
-    users.findByGoogleId.mockResolvedValueOnce({ id: userId, name: null, avatar_url: 'https://example.test/avatar.png' });
-    jest.mocked(axios.get).mockResolvedValueOnce({ data: { sub: 'google-subject', name: '  Fixture Display Name  ', picture: 'https://example.test/other.png' } });
+    users.findByGoogleId.mockResolvedValueOnce({
+      id: userId,
+      name: null,
+      avatar_url: 'https://example.test/avatar.png',
+    });
+    jest
+      .mocked(axios.get)
+      .mockResolvedValueOnce({
+        data: {
+          sub: 'google-subject',
+          name: '  Fixture Display Name  ',
+          picture: 'https://example.test/other.png',
+        },
+      });
     await service.login('test-authorization-code');
     expect(axios.get).toHaveBeenCalledTimes(1);
-    expect(users.updateGoogleName).toHaveBeenCalledWith(userId, 'google-subject', 'Fixture Display Name');
+    expect(users.updateGoogleName).toHaveBeenCalledWith(
+      userId,
+      'google-subject',
+      'Fixture Display Name',
+    );
     expect(users.updateGoogleAvatar).not.toHaveBeenCalled();
   });
 
   it('passes a UserInfo display name into new Google account creation', async () => {
     mockGoogleIdentity(null, null);
     users.findByGoogleId.mockResolvedValueOnce(null);
-    users.createUser.mockResolvedValueOnce({ id: userId, name: 'Fixture Display Name', avatar_url: 'https://example.test/profile.png' });
-    jest.mocked(axios.get).mockResolvedValueOnce({ data: { sub: 'google-subject', name: 'Fixture Display Name', picture: 'https://example.test/profile.png' } });
+    users.createUser.mockResolvedValueOnce({
+      id: userId,
+      name: 'Fixture Display Name',
+      avatar_url: 'https://example.test/profile.png',
+    });
+    jest
+      .mocked(axios.get)
+      .mockResolvedValueOnce({
+        data: {
+          sub: 'google-subject',
+          name: 'Fixture Display Name',
+          picture: 'https://example.test/profile.png',
+        },
+      });
     await service.login('test-authorization-code');
-    expect(users.createUser).toHaveBeenCalledWith(expect.objectContaining({ name: 'Fixture Display Name', picture: 'https://example.test/profile.png' }));
+    expect(users.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Fixture Display Name',
+        picture: 'https://example.test/profile.png',
+      }),
+    );
     expect(users.updateGoogleName).not.toHaveBeenCalled();
   });
 
   it('ignores a UserInfo name for a different Google subject', async () => {
     mockGoogleIdentity(null, null);
     users.findByGoogleId.mockResolvedValueOnce({ id: userId, name: 'Stored Name' });
-    jest.mocked(axios.get).mockResolvedValueOnce({ data: { sub: 'another-subject', name: 'Different Name' } });
+    jest
+      .mocked(axios.get)
+      .mockResolvedValueOnce({ data: { sub: 'another-subject', name: 'Different Name' } });
     await expectIssuedSession(await service.login('test-authorization-code'), 'Login successful!');
     expect(users.updateGoogleName).not.toHaveBeenCalled();
     expect(users.updateGoogleAvatar).not.toHaveBeenCalled();
   });
 
-  it.each(['unavailable', 'empty'])('preserves a stored name when optional profile data is %s', async (outcome) => {
-    mockGoogleIdentity('https://example.test/avatar.png', null);
-    users.findByGoogleId.mockResolvedValueOnce({ id: userId, name: 'Stored Name', avatar_url: 'https://example.test/avatar.png' });
-    if (outcome === 'empty') jest.mocked(axios.get).mockResolvedValueOnce({ data: { sub: 'google-subject', name: '   ' } });
-    await expectIssuedSession(await service.login('test-authorization-code'), 'Login successful!');
-    expect(users.updateGoogleName).not.toHaveBeenCalled();
-  });
+  it.each(['unavailable', 'empty'])(
+    'preserves a stored name when optional profile data is %s',
+    async (outcome) => {
+      mockGoogleIdentity('https://example.test/avatar.png', null);
+      users.findByGoogleId.mockResolvedValueOnce({
+        id: userId,
+        name: 'Stored Name',
+        avatar_url: 'https://example.test/avatar.png',
+      });
+      if (outcome === 'empty')
+        jest
+          .mocked(axios.get)
+          .mockResolvedValueOnce({ data: { sub: 'google-subject', name: '   ' } });
+      await expectIssuedSession(
+        await service.login('test-authorization-code'),
+        'Login successful!',
+      );
+      expect(users.updateGoogleName).not.toHaveBeenCalled();
+    },
+  );
 
   it('does not rewrite an unchanged verified display name', async () => {
     mockGoogleIdentity();
-    users.findByGoogleId.mockResolvedValueOnce({ id: userId, name: 'Learner', avatar_url: 'https://example.test/avatar.png' });
+    users.findByGoogleId.mockResolvedValueOnce({
+      id: userId,
+      name: 'Learner',
+      avatar_url: 'https://example.test/avatar.png',
+    });
     await service.login('test-authorization-code');
     expect(users.updateGoogleName).not.toHaveBeenCalled();
   });
@@ -475,9 +531,7 @@ describe('AuthService', () => {
 
   it('handles a concurrent Google creation only by rechecking the verified subject', async () => {
     mockGoogleIdentity();
-    users.findByGoogleId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: userId });
+    users.findByGoogleId.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: userId });
     users.createUser.mockRejectedValueOnce(new ConflictException('duplicate'));
 
     const result = await service.login('test-authorization-code');
@@ -490,14 +544,12 @@ describe('AuthService', () => {
 
   it('rejects an email collision rather than linking another identity', async () => {
     mockGoogleIdentity();
-    users.findByGoogleId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
+    users.findByGoogleId.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
     users.createUser.mockRejectedValueOnce(new ConflictException('duplicate'));
 
-    await expect(
-      service.login('test-authorization-code'),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.login('test-authorization-code')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
     expect(users.findByGoogleId).toHaveBeenCalledTimes(2);
     expect(users.findByIdentifier).not.toHaveBeenCalled();
     expect(sessions.create).not.toHaveBeenCalled();
@@ -510,24 +562,24 @@ describe('AuthService', () => {
       response: { status: 400 },
       message: 'private-test-data',
     });
-    await expect(
-      service.login('test-authorization-code'),
-    ).rejects.toMatchObject({
+    await expect(service.login('test-authorization-code')).rejects.toMatchObject({
       status: 401,
       message: 'Unable to sign in with Google',
     });
 
     exchange.mockRejectedValueOnce(new Error('private-test-data'));
-    await expect(
-      service.login('test-authorization-code'),
-    ).rejects.toBeInstanceOf(BadGatewayException);
+    await expect(service.login('test-authorization-code')).rejects.toBeInstanceOf(
+      BadGatewayException,
+    );
     expect(verifyGoogle).not.toHaveBeenCalled();
     expect(sessions.create).not.toHaveBeenCalled();
   });
 
   it('treats Google certificate-fetch failures as an upstream error without leaking details', async () => {
     exchange.mockResolvedValueOnce({ data: { id_token: 'test-id-token' } });
-    verifyGoogle.mockRejectedValueOnce(new Error('Failed to retrieve verification certificates: sensitive-fixture') as never);
+    verifyGoogle.mockRejectedValueOnce(
+      new Error('Failed to retrieve verification certificates: sensitive-fixture') as never,
+    );
 
     await expect(service.login('test-authorization-code')).rejects.toMatchObject({
       status: 502,
@@ -545,9 +597,9 @@ describe('AuthService', () => {
         email_verified: false,
       }),
     } as never);
-    await expect(
-      service.login('test-authorization-code'),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.login('test-authorization-code')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
     expect(users.findByGoogleId).not.toHaveBeenCalled();
     expect(sessions.create).not.toHaveBeenCalled();
   });

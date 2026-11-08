@@ -1,0 +1,446 @@
+.question-content {
+  position: relative;
+}
+.question-meta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+}
+.reason-chip,
+.format-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.reason-chip {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+}
+.reason-chip.reason-daily {
+  background: var(--accent);
+  color: var(--canvas);
+  font-weight: 600;
+}
+.format-chip {
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.meta-detail {
+  margin-left: auto;
+  color: var(--muted);
+}
+.question-credit span + span::before {
+  content: '';
+}
+
+/* Tap answers */
+.quiz-options {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+.quiz-options.two-up {
+  grid-template-columns: 1fr 1fr;
+}
+.quiz-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--control);
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  text-align: left;
+  transition:
+    transform 160ms var(--ease-out),
+    border-color 200ms ease,
+    background-color 200ms ease,
+    opacity 200ms ease;
+}
+.quiz-options.two-up .quiz-option {
+  justify-content: center;
+  min-height: 72px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.quiz-option:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.quiz-option:not(:disabled):active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
+}
+@media (hover: hover) and (pointer: fine) {
+  .quiz-option:not(:disabled):hover {
+    border-color: var(--selected-border);
+  }
+}
+.option-letter {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--canvas);
+  color: var(--muted);
+  font:
+    600 13px 'DM Mono',
+    monospace;
+}
+.quiz-options.two-up .option-letter {
+  font-size: 1.125rem;
+}
+.option-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.quiz-option.mono .option-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+.option-mark {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+}
+/* Side-by-side answers are narrow: tuck the mark into the corner so the label keeps its width. */
+.quiz-options.two-up .option-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.reason-chip app-icon {
+  width: 14px;
+  height: 14px;
+}
+.deeper-button app-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+.state-picked {
+  border-color: var(--accent);
+}
+.state-correct {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 18%, var(--control));
+  animation: pop 280ms var(--ease-out);
+}
+.state-correct .option-letter {
+  background: var(--success);
+  color: #0b1400;
+}
+.state-correct .option-mark {
+  color: var(--success);
+}
+.state-wrong {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, var(--control));
+  animation: shake 320ms var(--ease-in-out);
+}
+.state-wrong .option-letter {
+  background: var(--danger);
+  color: #fff;
+}
+.state-wrong .option-mark {
+  color: var(--danger);
+}
+.state-dim {
+  opacity: 0.45;
+}
+
+/* Reveal */
+.reveal {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  animation: slide-up 240ms var(--ease-out);
+}
+.reveal.correct {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+.reveal-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.reveal-heading strong {
+  font-size: 1.125rem;
+}
+.reveal.correct .reveal-heading strong {
+  color: var(--success);
+}
+.reveal-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.reveal p {
+  margin: 8px 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.xp-float {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--canvas);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  animation: xp-pop 420ms var(--ease-spring);
+}
+
+/* Go deeper */
+.deeper {
+  display: grid;
+  gap: 10px;
+}
+.deeper.ready {
+  grid-template-columns: 1fr 1fr;
+}
+.deeper-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.deeper-button small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+.deeper-button.explain {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.follow-ups {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+.follow-up {
+  display: grid;
+  gap: 6px;
+}
+.follow-up-question {
+  justify-self: end;
+  max-width: 85%;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--control);
+  font-size: 0.875rem;
+}
+.follow-up-answer {
+  max-width: 92%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px 14px 14px 4px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  white-space: pre-line;
+  animation: slide-up 220ms var(--ease-out);
+}
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.suggestions button {
+  min-height: 48px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8125rem;
+}
+.ask-form {
+  display: flex;
+  gap: 8px;
+}
+.ask-form input {
+  flex: 1;
+  min-width: 0;
+}
+.ask-form .primary {
+  flex-shrink: 0;
+}
+.score-bar {
+  position: relative;
+  height: 6px;
+  margin: 12px 0 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--control);
+}
+.score-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--danger);
+  transform: scaleX(var(--score));
+  transform-origin: left;
+  animation: fill 500ms var(--ease-out);
+}
+.score-bar.passed::after {
+  background: var(--success);
+}
+
+/* Double-tap like */
+.heart-burst {
+  position: absolute;
+  left: var(--heart-x, 50%);
+  top: var(--heart-y, 40%);
+  z-index: 3;
+  color: #ff4d6d;
+  width: 88px;
+  height: 88px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6) rotate(var(--heart-tilt, -8deg));
+  animation: heart 700ms var(--ease-out) forwards;
+  filter: drop-shadow(0 6px 16px rgb(0 0 0 / 35%));
+}
+.heart-burst app-icon {
+  width: 100%;
+  height: 100%;
+}
+
+.question-card.is-daily {
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+
+@keyframes pop {
+  40% {
+    transform: scale(1.03);
+  }
+}
+@keyframes shake {
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes xp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+}
+@keyframes heart {
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1) rotate(var(--heart-tilt, -8deg));
+  }
+  32% {
+    transform: translate(-50%, -50%) scale(0.96) rotate(var(--heart-tilt, -8deg));
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -62%) scale(1) rotate(var(--heart-tilt, -8deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -90%) scale(1) rotate(var(--heart-tilt, -8deg));
+  }
+}
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes heart-fade {
+  30%,
+  60% {
+    opacity: 1;
+  }
+}
+@media (max-width: 400px) {
+  .deeper.ready {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .state-correct,
+  .state-wrong,
+  .score-bar::after {
+    animation: none;
+  }
+  .reveal,
+  .xp-float,
+  .follow-up-answer {
+    animation-name: fade;
+  }
+  .heart-burst {
+    animation-name: heart-fade;
+    transform: translate(-50%, -50%);
+  }
+}
+.next-button {
+  order: 3;
+  margin-left: auto;
+  min-height: 48px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+.reveal-note {
+  flex-basis: 100%;
+  order: 4;
+}
+/* Double-tap to like should never zoom the page. */
+.question-content {
+  touch-action: manipulation;
+}

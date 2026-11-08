@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { DOCUMENT } from '@angular/common';
 import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
-import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { AuthApi } from '../auth/auth-api';
 import { GoogleLogin } from './google-login';
 import { AUTH_FETCH, AuthSession } from '../auth/auth-session';
@@ -10,6 +10,7 @@ import type { AuthUser, SessionStatus } from '../auth/auth-session';
 import { STATE_KEY } from './oauth-flow';
 import { routes } from '../app.routes';
 import { guestOnlyGuard } from '../auth/guest.guard';
+import { saveQuestionReturn } from '../auth/auth-return';
 
 describe('Google sign-in screen', () => {
   const passwordLogin = vi.fn();
@@ -30,7 +31,11 @@ describe('Google sign-in screen', () => {
     };
     TestBed.configureTestingModule({
       imports: [GoogleLogin],
-      providers: [provideRouter([]), { provide: AuthSession, useValue: session }, { provide: AuthApi, useValue: { passwordLogin } }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSession, useValue: session },
+        { provide: AuthApi, useValue: { passwordLogin } },
+      ],
     });
   });
 
@@ -49,21 +54,42 @@ describe('Google sign-in screen', () => {
     expect(password?.autocomplete).toBe('current-password');
     expect(root.querySelector('form.password-form')).not.toBeNull();
     expect(root.querySelector('button.password-button')).not.toBeNull();
-    expect(root.querySelector('.password-notice')?.textContent).toContain('メールアドレスまたはユーザー名でログインできます。');
+    expect(root.querySelector('.password-notice')?.textContent).toContain(
+      'メールアドレスまたはユーザー名でログインできます。',
+    );
     expect(root.querySelector('.google-button')?.textContent).toContain('Googleで続ける');
     expect(root.textContent).not.toContain('クライアント ID');
   });
 
+  it('preserves a public explanation destination through password sign-in and signup', async () => {
+    const target = '/questions/894a7456-75cf-43c8-bb51-02f6b84a6cc3?explain=1';
+    vi.spyOn(TestBed.inject(ActivatedRoute).snapshot, 'queryParamMap', 'get').mockReturnValue(
+      convertToParamMap({ returnTo: target }),
+    );
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(GoogleLogin);
+    await fixture.whenStable();
+    const link = fixture.nativeElement.querySelector('a.auth-link') as HTMLAnchorElement;
+    expect(new URL(link.href).searchParams.get('returnTo')).toBe(target);
+    session.status.set('authenticated');
+    await fixture.whenStable();
+    expect(navigate).toHaveBeenCalledWith(target, { replaceUrl: true });
+  });
+
   it('translates the password form and availability message', async () => {
+    localStorage.setItem('whylint-language', 'en');
     const fixture = TestBed.createComponent(GoogleLogin);
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
 
-    root.querySelector<HTMLButtonElement>('button[aria-label="Switch to English"]')!.click();
-    fixture.detectChanges();
-    expect(root.querySelector('label[for="login-identifier"]')?.textContent).toContain('Email or username');
+    expect(root.querySelector('button[aria-label="Switch to English"]')).toBeNull();
+    expect(root.querySelector('label[for="login-identifier"]')?.textContent).toContain(
+      'Email or username',
+    );
     expect(root.querySelector('label[for="login-password"]')?.textContent).toContain('Password');
-    expect(root.querySelector('.password-notice')?.textContent).toContain('Sign in with your email address or username.');
+    expect(root.querySelector('.password-notice')?.textContent).toContain(
+      'Sign in with your email address or username.',
+    );
     expect(root.querySelector('.google-button')?.textContent).toContain('Continue with Google');
   });
 
@@ -72,14 +98,20 @@ describe('Google sign-in screen', () => {
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
 
-    root.querySelector<HTMLFormElement>('form.password-form')!.dispatchEvent(
-      new Event('submit', { bubbles: true, cancelable: true }),
-    );
+    root
+      .querySelector<HTMLFormElement>('form.password-form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
 
-    expect(root.querySelector('#identifier-error')?.textContent).toContain('メールアドレスまたはユーザー名を入力してください。');
-    expect(root.querySelector<HTMLInputElement>('#login-identifier')?.getAttribute('aria-invalid')).toBe('true');
-    expect(root.querySelector<HTMLInputElement>('#login-identifier')?.getAttribute('aria-describedby')).toBe('identifier-error');
+    expect(root.querySelector('#identifier-error')?.textContent).toContain(
+      'メールアドレスまたはユーザー名を入力してください。',
+    );
+    expect(
+      root.querySelector<HTMLInputElement>('#login-identifier')?.getAttribute('aria-invalid'),
+    ).toBe('true');
+    expect(
+      root.querySelector<HTMLInputElement>('#login-identifier')?.getAttribute('aria-describedby'),
+    ).toBe('identifier-error');
     expect(root.querySelector('#password-error')).toBeNull();
     expect(root.querySelector('#password-status')).toBeNull();
   });
@@ -95,12 +127,14 @@ describe('Google sign-in screen', () => {
     password.value = '   ';
     password.dispatchEvent(new Event('input', { bubbles: true }));
     fixture.detectChanges();
-    root.querySelector<HTMLFormElement>('form.password-form')!.dispatchEvent(
-      new Event('submit', { bubbles: true, cancelable: true }),
-    );
+    root
+      .querySelector<HTMLFormElement>('form.password-form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
 
-    expect(root.querySelector('#identifier-error')?.textContent).toContain('メールアドレスまたはユーザー名を入力してください。');
+    expect(root.querySelector('#identifier-error')?.textContent).toContain(
+      'メールアドレスまたはユーザー名を入力してください。',
+    );
     expect(root.querySelector('#password-error')).toBeNull();
     expect(root.querySelector('#password-status')).toBeNull();
   });
@@ -113,15 +147,21 @@ describe('Google sign-in screen', () => {
     identifier.value = 'learner';
     identifier.dispatchEvent(new Event('input', { bubbles: true }));
     fixture.detectChanges();
-    root.querySelector<HTMLFormElement>('form.password-form')!.dispatchEvent(
-      new Event('submit', { bubbles: true, cancelable: true }),
-    );
+    root
+      .querySelector<HTMLFormElement>('form.password-form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
 
     expect(root.querySelector('#identifier-error')).toBeNull();
-    expect(root.querySelector('#password-error')?.textContent).toContain('パスワードを入力してください。');
-    expect(root.querySelector<HTMLInputElement>('#login-password')?.getAttribute('aria-invalid')).toBe('true');
-    expect(root.querySelector<HTMLInputElement>('#login-password')?.getAttribute('aria-describedby')).toBe('password-error');
+    expect(root.querySelector('#password-error')?.textContent).toContain(
+      'パスワードを入力してください。',
+    );
+    expect(
+      root.querySelector<HTMLInputElement>('#login-password')?.getAttribute('aria-invalid'),
+    ).toBe('true');
+    expect(
+      root.querySelector<HTMLInputElement>('#login-password')?.getAttribute('aria-describedby'),
+    ).toBe('password-error');
   });
 
   it('keeps the relevant validation error until that field is valid', async () => {
@@ -172,17 +212,22 @@ describe('Google sign-in screen', () => {
       password.value = '   ';
       password.dispatchEvent(new Event('input', { bubbles: true }));
       fixture.detectChanges();
-      root.querySelector<HTMLFormElement>('form.password-form')!.dispatchEvent(
-        new Event('submit', { bubbles: true, cancelable: true }),
-      );
+      root
+        .querySelector<HTMLFormElement>('form.password-form')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       fixture.detectChanges();
 
       expect(root.querySelector('#identifier-error')).toBeNull();
       expect(root.querySelector('#password-error')).toBeNull();
       await fixture.whenStable();
-      await vi.waitFor(() => { fixture.detectChanges(); expect(root.querySelector('#password-status')?.getAttribute('role')).toBe('alert'); });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(root.querySelector('#password-status')?.getAttribute('role')).toBe('alert');
+      });
       expect(passwordLogin).toHaveBeenCalledWith(value, '   ');
-      expect(root.querySelector('#password-status')?.textContent).toContain('パスワードを確認してください');
+      expect(root.querySelector('#password-status')?.textContent).toContain(
+        'パスワードを確認してください',
+      );
       expect(root.querySelector('.google-button')).not.toBeNull();
       expect(request).not.toHaveBeenCalled();
       expect(storageWrite).not.toHaveBeenCalled();
@@ -205,11 +250,11 @@ describe('Google sign-in screen', () => {
     expect(root.querySelector('.google-button')).not.toBeNull();
   });
 
-  it('exposes user-facing login and Google callback routes', () => {
+  it('exposes user-facing login and Google callback routes', async () => {
     const login = routes.find((route) => route.path === 'login');
     const callback = routes.find((route) => route.path === 'auth/google/callback');
-    expect(login?.component).toBe(GoogleLogin);
-    expect(callback?.component).toBe(GoogleLogin);
+    expect(await login?.loadComponent?.()).toBe(GoogleLogin);
+    expect(await callback?.loadComponent?.()).toBe(GoogleLogin);
     expect(login?.canActivate).toContain(guestOnlyGuard);
     expect(callback?.canActivate).toBeUndefined();
     expect(login?.canMatch).toBeUndefined();
@@ -222,7 +267,13 @@ describe('Google sign-in screen', () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const root = fixture.nativeElement as HTMLElement;
 
-    session.user.set({ id: 'test-user', email: 'test@example.com', name: 'Test', avatarUrl: null, username: null });
+    session.user.set({
+      id: 'test-user',
+      email: 'test@example.com',
+      name: 'Test',
+      avatarUrl: null,
+      username: null,
+    });
     session.status.set('authenticated');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -254,11 +305,16 @@ describe('Google sign-in screen', () => {
 
   it('blocks sign-in while the session is unavailable and allows retry', async () => {
     session.status.set('unavailable');
-    session.refresh.mockImplementation(async () => { session.status.set('guest'); return false; });
+    session.refresh.mockImplementation(async () => {
+      session.status.set('guest');
+      return false;
+    });
     const fixture = TestBed.createComponent(GoogleLogin);
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.querySelector('[role="alert"]')?.textContent).toContain('アカウントを確認できませんでした');
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain(
+      'アカウントを確認できませんでした',
+    );
     expect(root.querySelector('.google-button')).toBeNull();
     expect(root.querySelector('.password-form')).toBeNull();
 
@@ -272,7 +328,12 @@ describe('Google sign-in screen', () => {
 });
 
 describe('Google sign-in callback', () => {
-  function setupCallback(state: string, savedState: string | null, error?: string) {
+  function setupCallback(
+    state: string,
+    savedState: string | null,
+    error?: string,
+    returnTo?: string,
+  ) {
     const session = new Map<string, string>();
     if (savedState) session.set(STATE_KEY, savedState);
     const fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 });
@@ -291,28 +352,50 @@ describe('Google sign-in callback', () => {
         localStorage: { getItem: () => null },
         sessionStorage: {
           getItem: (key: string) => session.get(key) ?? null,
+          setItem: (key: string, value: string) => session.set(key, value),
           removeItem: (key: string) => session.delete(key),
         },
         fetch,
       },
     };
-    TestBed.configureTestingModule({ providers: [
-      { provide: DOCUMENT, useValue: fakeDocument },
-      { provide: AUTH_FETCH, useValue: fetch },
-      { provide: ActivatedRoute, useValue: { snapshot: { routeConfig: { path: 'auth/google/callback' } } } },
-      { provide: Router, useValue: router },
-    ] });
+    if (returnTo && savedState) {
+      saveQuestionReturn(
+        fakeDocument.defaultView.sessionStorage as unknown as Storage,
+        savedState,
+        returnTo,
+      );
+    }
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DOCUMENT, useValue: fakeDocument },
+        { provide: AUTH_FETCH, useValue: fetch },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { routeConfig: { path: 'auth/google/callback' } } },
+        },
+        { provide: Router, useValue: router },
+      ],
+    });
     const component = TestBed.runInInjectionContext(() => new GoogleLogin());
     return { component, fetch, replaceState, session, router };
   }
 
   it('exchanges a matched callback and requests the profile using cookies', async () => {
-    const { component, fetch, replaceState, session, router } = setupCallback('expected', 'expected');
+    const { component, fetch, replaceState, session, router } = setupCallback(
+      'expected',
+      'expected',
+    );
     fetch.mockResolvedValueOnce({ ok: false, status: 401 });
     fetch.mockResolvedValueOnce({ ok: true });
     fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: 'test-user', email: 'test@example.com', name: null, avatarUrl: null, username: null }),
+      json: async () => ({
+        id: 'test-user',
+        email: 'test@example.com',
+        name: null,
+        avatarUrl: null,
+        username: null,
+      }),
     });
 
     component.ngOnInit();
@@ -323,14 +406,64 @@ describe('Google sign-in callback', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true });
     expect(replaceState).toHaveBeenCalledWith(null, '', '/login');
     expect(session.has(STATE_KEY)).toBe(false);
-    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/auth/login', expect.objectContaining({
-      method: 'POST',
-      credentials: 'same-origin',
-      referrerPolicy: 'no-referrer',
-      body: JSON.stringify({ code: 'test-code' }),
-    }));
-    expect(fetch).toHaveBeenNthCalledWith(1, '/api/v1/auth/me', expect.objectContaining({ credentials: 'same-origin', cache: 'no-store', referrerPolicy: 'no-referrer' }));
-    expect(fetch).toHaveBeenNthCalledWith(3, '/api/v1/auth/me', expect.objectContaining({ credentials: 'same-origin', cache: 'no-store', referrerPolicy: 'no-referrer' }));
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/auth/login',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        referrerPolicy: 'no-referrer',
+        body: JSON.stringify({ code: 'test-code' }),
+      }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/auth/me',
+      expect.objectContaining({
+        credentials: 'same-origin',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+      }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/auth/me',
+      expect.objectContaining({
+        credentials: 'same-origin',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+      }),
+    );
+  });
+
+  it('returns a matched Google callback to its original explanation task', async () => {
+    const target = '/questions/894a7456-75cf-43c8-bb51-02f6b84a6cc3?explain=1';
+    const { component, fetch, router, replaceState } = setupCallback(
+      'expected',
+      'expected',
+      undefined,
+      target,
+    );
+    fetch.mockResolvedValueOnce({ ok: false, status: 401 });
+    fetch.mockResolvedValueOnce({ ok: true });
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 'test-user',
+        email: 'fixture@example.test',
+        name: null,
+        avatarUrl: null,
+      }),
+    });
+    component.ngOnInit();
+    await vi.waitFor(() =>
+      expect(router.navigateByUrl).toHaveBeenCalledWith(target, { replaceUrl: true }),
+    );
+    expect(replaceState).toHaveBeenCalledWith(
+      null,
+      '',
+      '/login?' + new URLSearchParams({ returnTo: target }),
+    );
   });
 
   it('times out a stuck code exchange and checks the session without accepting a late response', async () => {
@@ -339,7 +472,11 @@ describe('Google sign-in callback', () => {
       const { component, fetch, router, session } = setupCallback('expected', 'expected');
       let resolveExchange!: (value: unknown) => void;
       fetch.mockResolvedValueOnce({ ok: false, status: 401 });
-      fetch.mockReturnValueOnce(new Promise((resolve) => { resolveExchange = resolve; }));
+      fetch.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveExchange = resolve;
+        }),
+      );
 
       component.ngOnInit();
       expect(session.has(STATE_KEY)).toBe(false);
@@ -356,7 +493,9 @@ describe('Google sign-in callback', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(fetch).toHaveBeenCalledTimes(3);
       expect(router.navigateByUrl).not.toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('aborts a pending code exchange when the component is destroyed', async () => {
@@ -378,9 +517,19 @@ describe('Google sign-in callback', () => {
   it('finishes a valid exchange before redirecting an already authenticated user', async () => {
     const { component, fetch, router, session } = setupCallback('expected', 'expected');
     let resolveExchange!: (value: unknown) => void;
-    const account = { id: 'test-user', email: 'test@example.com', name: null, avatarUrl: null, username: null };
+    const account = {
+      id: 'test-user',
+      email: 'test@example.com',
+      name: null,
+      avatarUrl: null,
+      username: null,
+    };
     fetch.mockResolvedValueOnce({ ok: false, status: 401 });
-    fetch.mockReturnValueOnce(new Promise((resolve) => { resolveExchange = resolve; }));
+    fetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveExchange = resolve;
+      }),
+    );
     fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => account });
     fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => account });
 
@@ -391,19 +540,33 @@ describe('Google sign-in callback', () => {
     expect(session.has(STATE_KEY)).toBe(false);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
     resolveExchange({ ok: true });
-    await vi.waitFor(() => expect(router.navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true }));
+    await vi.waitFor(() =>
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true }),
+    );
     expect(fetch.mock.calls.filter(([url]) => url === '/api/v1/auth/login')).toHaveLength(1);
   });
 
   it('does not exchange the code when a user signed in before the callback', async () => {
-    const { component, fetch, replaceState, session, router } = setupCallback('expected', 'expected');
+    const { component, fetch, replaceState, session, router } = setupCallback(
+      'expected',
+      'expected',
+    );
     fetch.mockResolvedValueOnce({
-      ok: true, status: 200,
-      json: async () => ({ id: 'test-user', email: 'test@example.com', name: null, avatarUrl: null, username: null }),
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: 'test-user',
+        email: 'test@example.com',
+        name: null,
+        avatarUrl: null,
+        username: null,
+      }),
     });
 
     component.ngOnInit();
-    await vi.waitFor(() => expect(router.navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true }));
+    await vi.waitFor(() =>
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true }),
+    );
     expect(replaceState).toHaveBeenCalledWith(null, '', '/login');
     expect(session.has(STATE_KEY)).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -415,7 +578,11 @@ describe('Google sign-in callback', () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 503 });
     component.ngOnInit();
     const authSession = TestBed.inject(AuthSession);
-    const state = component as unknown as { phase: () => string; error: () => string | null; retrySession: () => Promise<void> };
+    const state = component as unknown as {
+      phase: () => string;
+      error: () => string | null;
+      retrySession: () => Promise<void>;
+    };
     await vi.waitFor(() => expect(state.error()).toBe('restart'));
     expect(authSession.status()).toBe('unavailable');
     expect(session.has(STATE_KEY)).toBe(false);
@@ -453,23 +620,35 @@ describe('Google sign-in callback', () => {
     expect(fetch.mock.calls[2][0]).toBe('/api/v1/auth/me');
   });
 
-  it.each(['invalid', 'cancelled'])('redirects a signed-in user after a %s callback without sending its code', async (kind) => {
-    const { component, fetch, replaceState, session, router } = kind === 'cancelled'
-      ? setupCallback('expected', 'expected', 'access_denied')
-      : setupCallback('wrong', 'expected');
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ id: 'test-user', email: 'test@example.com', name: null, avatarUrl: null, username: null }),
-    });
+  it.each(['invalid', 'cancelled'])(
+    'redirects a signed-in user after a %s callback without sending its code',
+    async (kind) => {
+      const { component, fetch, replaceState, session, router } =
+        kind === 'cancelled'
+          ? setupCallback('expected', 'expected', 'access_denied')
+          : setupCallback('wrong', 'expected');
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'test-user',
+          email: 'test@example.com',
+          name: null,
+          avatarUrl: null,
+          username: null,
+        }),
+      });
 
-    component.ngOnInit();
-    await vi.waitFor(() => expect(router.navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true }));
-    expect(replaceState).toHaveBeenCalledWith(null, '', '/login');
-    expect(session.has(STATE_KEY)).toBe(false);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0][0]).toBe('/api/v1/auth/me');
-  });
+      component.ngOnInit();
+      await vi.waitFor(() =>
+        expect(router.navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true }),
+      );
+      expect(replaceState).toHaveBeenCalledWith(null, '', '/login');
+      expect(session.has(STATE_KEY)).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][0]).toBe('/api/v1/auth/me');
+    },
+  );
 
   it('allows a retry after an unavailable callback session and redirects if it succeeds', async () => {
     const { component, fetch, router } = setupCallback('wrong', 'expected');
@@ -480,7 +659,13 @@ describe('Google sign-in callback', () => {
     fetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ id: 'test-user', email: 'test@example.com', name: null, avatarUrl: null, username: null }),
+      json: async () => ({
+        id: 'test-user',
+        email: 'test@example.com',
+        name: null,
+        avatarUrl: null,
+        username: null,
+      }),
     });
 
     await (component as unknown as { retrySession: () => Promise<void> }).retrySession();
@@ -506,8 +691,16 @@ describe('Google sign-in callback', () => {
     let resolveForegroundRefresh!: (value: unknown) => void;
     fetch.mockResolvedValueOnce({ ok: false, status: 401 });
     fetch.mockResolvedValueOnce({ ok: true });
-    fetch.mockReturnValueOnce(new Promise((resolve) => { resolveLoginRefresh = resolve; }));
-    fetch.mockReturnValueOnce(new Promise((resolve) => { resolveForegroundRefresh = resolve; }));
+    fetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveLoginRefresh = resolve;
+      }),
+    );
+    fetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveForegroundRefresh = resolve;
+      }),
+    );
 
     component.ngOnInit();
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
@@ -520,7 +713,13 @@ describe('Google sign-in callback', () => {
     resolveForegroundRefresh({
       ok: true,
       status: 200,
-      json: async () => ({ id: 'test-user', email: 'test@example.com', name: null, avatarUrl: null, username: null }),
+      json: async () => ({
+        id: 'test-user',
+        email: 'test@example.com',
+        name: null,
+        avatarUrl: null,
+        username: null,
+      }),
     });
     await expect(newer).resolves.toBe(true);
     await vi.waitFor(() => expect(state.phase()).toBe('signed-in'));
@@ -539,20 +738,39 @@ describe('Google sign-in initiation', () => {
         localStorage: { getItem: () => null },
         sessionStorage: {
           setItem: (key: string, value: string) => stored.set(key, value),
+          removeItem: (key: string) => stored.delete(key),
         },
         crypto: { getRandomValues: (bytes: Uint8Array) => bytes.fill(1) },
         Capacitor: { isNativePlatform: () => native },
       },
     };
-    TestBed.configureTestingModule({ providers: [
-      { provide: DOCUMENT, useValue: fakeDocument },
-      { provide: ActivatedRoute, useValue: { snapshot: { routeConfig: { path: 'login' } } } },
-      { provide: Router, useValue: { navigateByUrl: vi.fn().mockResolvedValue(true) } },
-      { provide: AuthSession, useValue: { status: signal<SessionStatus>(status), refresh: vi.fn() } },
-    ] });
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DOCUMENT, useValue: fakeDocument },
+        { provide: ActivatedRoute, useValue: { snapshot: { routeConfig: { path: 'login' } } } },
+        { provide: Router, useValue: { navigateByUrl: vi.fn().mockResolvedValue(true) } },
+        {
+          provide: AuthSession,
+          useValue: { status: signal<SessionStatus>(status), refresh: vi.fn() },
+        },
+      ],
+    });
     const component = TestBed.runInInjectionContext(() => new GoogleLogin());
     component.ngOnInit();
-    return { component: component as unknown as { startSignIn: () => void; submitPassword: (event: Event, identifier: HTMLInputElement, password: HTMLInputElement) => void; error: () => string | null; passwordStatus: () => string | null }, assign, stored };
+    return {
+      component: component as unknown as {
+        startSignIn: () => void;
+        submitPassword: (
+          event: Event,
+          identifier: HTMLInputElement,
+          password: HTMLInputElement,
+        ) => void;
+        error: () => string | null;
+        passwordStatus: () => string | null;
+      },
+      assign,
+      stored,
+    };
   }
 
   it('starts Google sign-in from the configured local browser origin', () => {
@@ -579,18 +797,21 @@ describe('Google sign-in initiation', () => {
     expect(component.error()).toBe('native');
   });
 
-  it.each(['loading', 'unavailable', 'authenticated'] as const)('ignores stale sign-in actions while session is %s', (status) => {
-    const { component, assign, stored } = setup('http://localhost:4200', false, status);
-    component.startSignIn();
-    const event = new Event('submit', { cancelable: true });
-    const identifier = document.createElement('input');
-    const password = document.createElement('input');
-    identifier.value = 'sample-user';
-    password.value = 'sample-password';
-    component.submitPassword(event, identifier, password);
-    expect(event.defaultPrevented).toBe(true);
-    expect(component.passwordStatus()).toBeNull();
-    expect(assign).not.toHaveBeenCalled();
-    expect(stored.has(STATE_KEY)).toBe(false);
-  });
+  it.each(['loading', 'unavailable', 'authenticated'] as const)(
+    'ignores stale sign-in actions while session is %s',
+    (status) => {
+      const { component, assign, stored } = setup('http://localhost:4200', false, status);
+      component.startSignIn();
+      const event = new Event('submit', { cancelable: true });
+      const identifier = document.createElement('input');
+      const password = document.createElement('input');
+      identifier.value = 'sample-user';
+      password.value = 'sample-password';
+      component.submitPassword(event, identifier, password);
+      expect(event.defaultPrevented).toBe(true);
+      expect(component.passwordStatus()).toBeNull();
+      expect(assign).not.toHaveBeenCalled();
+      expect(stored.has(STATE_KEY)).toBe(false);
+    },
+  );
 });

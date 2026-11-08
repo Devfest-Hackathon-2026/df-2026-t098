@@ -1,0 +1,202 @@
+<section class="panel">
+  <h1>{{ text('あなたの「なぜ」を共有しよう', 'Share a question worth understanding') }}</h1>
+  <p class="intro">
+    {{
+      text(
+        '気づきや疑問を、誰かの学びに。Geminiが質問と説明を確認してから公開します。',
+        'Turn something you’ve learned into someone else’s next discovery. Gemini reviews your question and explanation before publication.'
+      )
+    }}
+  </p>
+  @if (session.status() !== 'authenticated') {
+    <a routerLink="/login">{{ text('ログインして質問を投稿', 'Sign in to post a question') }}</a>
+  } @else if (published(); as question) {
+    <section class="published" role="status">
+      <h2>{{ text('質問を公開しました', 'Your question is published') }}</h2>
+      <p>{{ question.prompt }}</p>
+      <a [routerLink]="['/questions', question.id]">{{
+        text('公開した質問を開く', 'Open your question')
+      }}</a
+      ><button class="secondary" type="button" (click)="clear()">
+        {{ text('次の質問を書く', 'Write another question') }}
+      </button>
+    </section>
+  } @else {
+    <form (submit)="publish($event)">
+      <label for="question-title">{{ text('タイトル', 'Title') }}</label
+      ><input
+        id="question-title"
+        name="title"
+        [ngModel]="title()"
+        (ngModelChange)="title.set($event)"
+        minlength="3"
+        maxlength="160"
+        required
+        [disabled]="publishing()"
+      />
+      <label for="question-prompt">{{ text('質問', 'Question') }}</label
+      ><textarea
+        id="question-prompt"
+        name="prompt"
+        [ngModel]="prompt()"
+        (ngModelChange)="prompt.set($event)"
+        minlength="10"
+        maxlength="3000"
+        rows="3"
+        required
+        [disabled]="publishing()"
+        [placeholder]="
+          text(
+            '例：JWTの検証は、なぜサーバーのセッション保存なしでできる？',
+            'For example: why can a server validate a JWT without storing a session?'
+          )
+        "
+      ></textarea>
+      <div class="form-row">
+        <div>
+          <label for="question-topic">{{ text('分野', 'Topic') }}</label
+          ><select
+            id="question-topic"
+            name="topic"
+            [ngModel]="topic()"
+            (ngModelChange)="topic.set($event)"
+            [disabled]="publishing()"
+          >
+            <option value="general">{{ text('共通知識', 'General technology') }}</option>
+            @for (interest of interests; track interest.id) {
+              <option [value]="interest.id">{{ interest.label[language()] }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label for="question-difficulty">{{ text('難易度', 'Difficulty') }}</label
+          ><select
+            id="question-difficulty"
+            name="difficulty"
+            [ngModel]="difficulty()"
+            (ngModelChange)="difficulty.set($event)"
+            [disabled]="publishing()"
+          >
+            <option value="beginner">{{ text('初級', 'Beginner') }}</option>
+            <option value="intermediate">{{ text('中級', 'Intermediate') }}</option>
+            <option value="advanced">{{ text('上級', 'Advanced') }}</option>
+          </select>
+        </div>
+      </div>
+      <details #codeFields>
+        <summary>{{ text('コードを追加（任意）', 'Add code (optional)') }}</summary>
+        <p id="question-code-help" class="hint">
+          {{
+            text(
+              'コードと言語はセットで入力してください。コードのない質問では、どちらも空欄で構いません。',
+              'Include both the code and its language. You can leave both empty for a conceptual question.'
+            )
+          }}
+        </p>
+        <label for="question-code-language">{{ text('コードの言語', 'Code language') }}</label
+        ><input
+          id="question-code-language"
+          name="codeLanguage"
+          [ngModel]="codeLanguage()"
+          (ngModelChange)="codeLanguage.set($event); codeError.set('')"
+          maxlength="60"
+          [disabled]="publishing()"
+          [attr.aria-invalid]="codeError() && !codeLanguage().trim() ? 'true' : null"
+          [attr.aria-describedby]="
+            'question-code-help' + (codeError() ? ' question-code-error' : '')
+          "
+        /><label for="question-code">{{ text('コード', 'Code') }}</label
+        ><textarea
+          id="question-code"
+          name="code"
+          [ngModel]="code()"
+          (ngModelChange)="code.set($event); codeError.set('')"
+          maxlength="8000"
+          rows="5"
+          spellcheck="false"
+          [disabled]="publishing()"
+          [attr.aria-invalid]="codeError() && !code().trim() ? 'true' : null"
+          [attr.aria-describedby]="
+            'question-code-help' + (codeError() ? ' question-code-error' : '')
+          "
+        ></textarea>
+        @if (codeError()) {
+          <p id="question-code-error" role="alert">{{ codeError() }}</p>
+        }
+      </details>
+      <label for="question-reference">{{ text('お手本の説明', 'Reference explanation') }}</label
+      ><textarea
+        id="question-reference"
+        name="reference"
+        [ngModel]="referenceAnswer()"
+        (ngModelChange)="referenceAnswer.set($event)"
+        minlength="10"
+        maxlength="6000"
+        rows="5"
+        required
+        [disabled]="publishing()"
+      ></textarea>
+      <p class="hint">
+        {{
+          text(
+            '正しい考え方と理由を書いてください。この説明をもとに理解度を確認します。',
+            'Explain the correct reasoning. This helps us assess learners’ understanding.'
+          )
+        }}
+      </p>
+      <fieldset class="quiz-fields">
+        <legend>{{ text('タップクイズ（おすすめ）', 'Tap quiz (recommended)') }}</legend>
+        <p class="hint">
+          {{
+            text(
+              '選択肢を入れると、フィードで数秒で答えられる問題になります。正解を選んでください。',
+              'Add options so learners can answer in seconds in the feed. Mark the correct one.'
+            )
+          }}
+        </p>
+        @for (option of options(); track $index) {
+          <div class="quiz-field">
+            <input
+              type="radio"
+              name="correct-option"
+              [id]="'correct-' + $index"
+              [checked]="correctOption() === $index"
+              (change)="correctOption.set($index)"
+              [disabled]="publishing()"
+              [attr.aria-label]="
+                text(letters[$index] + 'を正解にする', 'Mark ' + letters[$index] + ' correct')
+              "
+            />
+            <label class="sr-only" [for]="'option-' + $index"
+              >{{ text('選択肢', 'Option') }} {{ letters[$index] }}</label
+            >
+            <input
+              [id]="'option-' + $index"
+              [name]="'option-' + $index"
+              [ngModel]="option"
+              (ngModelChange)="setOption($index, $event)"
+              maxlength="200"
+              [disabled]="publishing()"
+              [placeholder]="text('選択肢', 'Option') + ' ' + letters[$index]"
+            />
+          </div>
+        }
+      </fieldset>
+      @if (error()) {
+        <p role="alert">{{ error() }}</p>
+      }
+      <button
+        class="primary"
+        type="submit"
+        [disabled]="publishing()"
+        [attr.aria-busy]="publishing()"
+      >
+        {{
+          publishing()
+            ? text('質問を確認中…', 'Reviewing your question…')
+            : text('質問を投稿', 'Publish question')
+        }}
+      </button>
+    </form>
+  }
+</section>

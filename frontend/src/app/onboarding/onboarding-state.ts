@@ -1,55 +1,135 @@
 import { DOCUMENT } from '@angular/common';
 import { inject, Injectable } from '@angular/core';
-export type Domain = 'frontend' | 'backend' | 'database';
-export const STACKS: Record<Domain, { id: string; label: string; available: boolean }[]> = {
-  frontend: [
-    { id: 'javascript', label: 'JavaScript', available: true },
-    { id: 'typescript', label: 'TypeScript', available: false },
-    { id: 'react', label: 'React', available: false },
-    { id: 'angular', label: 'Angular', available: false },
-    { id: 'vue', label: 'Vue.js', available: false },
-  ],
-  backend: [
-    { id: 'python', label: 'Python', available: false },
-    { id: 'java', label: 'Java', available: false },
-    { id: 'nodejs', label: 'TypeScript / Node.js', available: false },
-    { id: 'sql', label: 'SQL', available: false },
-    { id: 'go', label: 'Go', available: false },
-  ],
-  database: [
-    { id: 'sql', label: 'SQL', available: false },
-    { id: 'postgresql', label: 'PostgreSQL', available: false },
-    { id: 'mysql', label: 'MySQL', available: false },
-  ],
-};
-export interface LearningPreference { domain: Domain; stack: string; onboardingCompleted: true; }
+import { AuthSession } from '../auth/auth-session';
+import { LearningApi } from '../learning/learning-api';
+import { LEARNING_CATALOG } from '../learning/learning-catalog';
+import { DisplaySettings } from '../learning/display-settings';
+import type { Preferences } from '../learning/learning.types';
+
+export interface LearningPreference extends Preferences {
+  onboardingCompleted: true;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OnboardingState {
   private readonly document = inject(DOCUMENT);
-  private readonly key = 'whylint-onboarding-v1';
+  private readonly session = inject(AuthSession);
+  private readonly api = inject(LearningApi);
+  private readonly settings = inject(DisplaySettings);
+  private readonly key = 'whylint-onboarding-v2';
+
   read(): LearningPreference | null {
     try {
-      const raw = this.document.defaultView?.localStorage.getItem(this.key);
-      if (!raw) return null;
-      const value: unknown = JSON.parse(raw);
-      return this.isValid(value) ? value : null;
-    } catch { return null; }
+      const storage = this.document.defaultView?.localStorage;
+      const raw = storage?.getItem(this.key);
+      if (raw) {
+        const value = JSON.parse(raw);
+        return this.isValid(value) ? value : null;
+      }
+      const legacy = JSON.parse(storage?.getItem('whylint-onboarding-v1') ?? 'null');
+      if (
+        legacy?.onboardingCompleted === true &&
+        legacy.domain === 'frontend' &&
+        legacy.stack === 'javascript'
+      ) {
+        return {
+          interests: ['frontend'],
+          technologies: ['JavaScript'],
+          difficulty: 'beginner',
+          onboardingCompleted: true,
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
-  save(domain: Domain, stack: string): boolean {
-    const value: LearningPreference = { domain, stack, onboardingCompleted: true };
+
+  save(
+    preferences: Preferences,
+    ownerId: string | null = this.session.user()?.id ?? null,
+  ): boolean {
+    const value = {
+      ...preferences,
+      language: preferences.language ?? this.settings.language(),
+      onboardingCompleted: true as const,
+    };
     if (!this.isValid(value)) return false;
     try {
       const storage = this.document.defaultView?.localStorage;
       if (!storage) return false;
-      storage.setItem(this.key, JSON.stringify(value));
+      storage.setItem(this.key, JSON.stringify({ ...value, ownerId }));
       return true;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
+
+  async restore(): Promise<LearningPreference | null> {
+    if (this.session.status() === 'loading') await this.session.refresh();
+    const userId = this.session.user()?.id;
+    const local = this.read();
+    if (!userId) return local;
+    try {
+      const result = await this.api.get<{ preferences: Preferences | null }>('/preferences');
+      if (this.session.user()?.id !== userId) return null;
+      if (result.preferences) {
+        if (result.preferences.language === 'ja' || result.preferences.language === 'en') {
+          this.settings.setLanguage(result.preferences.language);
+        }
+        this.save(result.preferences, userId);
+        return { ...result.preferences, onboardingCompleted: true };
+      }
+      if (local && !this.owner()) {
+        await this.api.send('/preferences', 'PUT', this.preferences(local));
+        if (this.session.user()?.id !== userId) return null;
+        this.save(local, userId);
+        return local;
+      }
+      return null;
+    } catch {
+      return this.owner() === userId ? local : null;
+    }
+  }
+
+  preferences(value: Preferences): Preferences {
+    return {
+      interests: [...value.interests],
+      technologies: [...value.technologies],
+      difficulty: value.difficulty,
+      language: value.language ?? this.settings.language(),
+    };
+  }
+
+  private owner(): string | null {
+    try {
+      return (
+        JSON.parse(this.document.defaultView?.localStorage.getItem(this.key) ?? 'null')?.ownerId ??
+        null
+      );
+    } catch {
+      return null;
+    }
+  }
+
   private isValid(value: unknown): value is LearningPreference {
     if (!value || typeof value !== 'object') return false;
-    const record = value as Record<string, unknown>;
-    const domain = record['domain'];
-    return record['onboardingCompleted'] === true && (domain === 'frontend' || domain === 'backend' || domain === 'database') &&
-      STACKS[domain].some(option => option.id === record['stack'] && option.available);
+    const record = value as LearningPreference;
+    return (
+      record.onboardingCompleted === true &&
+      (record.language === undefined || record.language === 'ja' || record.language === 'en') &&
+      ['beginner', 'intermediate', 'advanced'].includes(record.difficulty) &&
+      Array.isArray(record.interests) &&
+      record.interests.length > 0 &&
+      record.interests.length <= 6 &&
+      record.interests.every((item) =>
+        LEARNING_CATALOG.interests.some((interest) => interest.id === item),
+      ) &&
+      Array.isArray(record.technologies) &&
+      record.technologies.length <= 40 &&
+      record.technologies.every(
+        (item) => typeof item === 'string' && item.trim().length > 0 && item.length <= 60,
+      )
+    );
   }
 }

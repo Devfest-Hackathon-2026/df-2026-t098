@@ -1,414 +1,557 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { Homepage } from './homepage';
-import { vi } from 'vitest';
 import { provideRouter } from '@angular/router';
-import { AuthSession } from '../auth/auth-session';
-import type { AuthUser } from '../auth/auth-session';
+import { Homepage } from './homepage';
+import { AuthSession, AuthUser, SessionStatus } from '../auth/auth-session';
+import { LearningApi, LearningError } from '../learning/learning-api';
+import { FeedStore, RELEARN_GAP } from '../learning/feed-store';
+import type { FeedBatch, Question, TapResult } from '../learning/learning.types';
 
-describe('Homepage feed', () => {
-  let fixture: ComponentFixture<Homepage>;
-  let authStatus = signal<'loading' | 'authenticated' | 'guest' | 'unavailable'>('guest');
-  let authUser = signal<AuthUser | null>(null);
-  const refreshSession = vi.fn().mockResolvedValue(true);
-  const logoutSession = vi.fn().mockResolvedValue(true);
-  const loggingOut = signal(false);
+describe('Personal learning feed', () => {
+  const user = signal<AuthUser | null>(null);
+  const status = signal<SessionStatus>('guest');
+  const send = vi.fn();
+  const get = vi.fn();
+  const question = (id: string): Question => ({
+    id,
+    title: 'JWT',
+    prompt: 'Why can a JWT be verified?',
+    code: null,
+    codeLanguage: null,
+    topics: ['general'],
+    difficulty: 'beginner',
+    language: 'ja',
+    source: 'ai',
+    author: null,
+    likes: 0,
+    liked: false,
+    saved: false,
+    createdAt: new Date().toISOString(),
+    format: 'choice',
+    options: ['Signature', 'Cookie', 'Cache'],
+    tap: null,
+  });
+  const batch = (prefix: string): FeedBatch => ({
+    requestId: prefix,
+    questions: Array.from({ length: 5 }, (_, index) => question(prefix + index)),
+    communityQuestion: null,
+  });
+  let poolCount = 0;
+  const pool = () => {
+    const prefix = 'pool' + poolCount++ + '-';
+    return {
+      questions: Array.from({ length: 5 }, (_, index) => question(prefix + index)),
+      reviewQuestions: [],
+    };
+  };
+  const tapResult = (questionId: string, correct: boolean): TapResult => ({
+    questionId,
+    choice: correct ? 0 : 1,
+    correct,
+    correctOption: 0,
+    quickExplanation: 'A signature proves integrity.',
+    xpAwarded: correct ? 5 : 0,
+    review: false,
+    combo: null,
+    progress: null,
+  });
 
-  beforeEach(async () => {
-    localStorage.removeItem('whylint-theme');
-    localStorage.removeItem('whylint-language');
-    localStorage.removeItem('whylint-preview-progress-v1');
-    localStorage.removeItem('whylint-saved-cards-v1');
-    authStatus = signal('guest');
-    authUser = signal<AuthUser | null>(null);
-    refreshSession.mockClear();
-    logoutSession.mockReset().mockResolvedValue(true);
-    loggingOut.set(false);
-    await TestBed.configureTestingModule({
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    poolCount = 0;
+    user.set({
+      id: 'learner',
+      email: 'learner@example.test',
+      name: 'Learner',
+      username: null,
+      avatarUrl: null,
+    });
+    status.set('authenticated');
+    send.mockReset().mockImplementation(async (path: string) => {
+      if (path === '/feed/batches') return batch('a');
+      throw new Error('Unexpected ' + path);
+    });
+    get.mockReset().mockImplementation(async (path: string) => {
+      if (path.startsWith('/feed/pool')) return pool();
+      if (path.startsWith('/daily'))
+        return {
+          day: '2026-11-08',
+          question: null,
+          answered: 0,
+          solved: 0,
+          solvers: [],
+          you: null,
+        };
+      if (path === '/progress') throw new LearningError(503, 'AI_UNAVAILABLE');
+      return { questions: [] };
+    });
+    TestBed.configureTestingModule({
       imports: [Homepage],
       providers: [
         provideRouter([]),
-        { provide: AuthSession, useValue: { status: authStatus.asReadonly(), user: authUser.asReadonly(), refresh: refreshSession, logout: logoutSession, loggingOut: loggingOut.asReadonly() } },
+        {
+          provide: AuthSession,
+          useValue: { user, status, loggingOut: signal(false), refresh: vi.fn(), logout: vi.fn() },
+        },
+        { provide: LearningApi, useValue: { send, get } },
       ],
-    }).compileComponents();
-    fixture = TestBed.createComponent(Homepage);
-    await fixture.whenStable();
+    });
+  });
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
   });
 
-  it('offers guest sign-in without implying that local progress is synced', () => {
+  /** The mocked API is not tracked by Angular stability, so flush its chained promises. */
+  async function settle(fixture: ComponentFixture<Homepage>) {
+    for (let round = 0; round < 6; round++) {
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+    fixture.detectChanges();
+  }
+  const cards = (root: HTMLElement) => root.querySelectorAll('.question-card');
+  const batchCalls = () => send.mock.calls.filter(([path]) => path === '/feed/batches');
+
+  it('shows instant pool questions, then appends a personalized Gemini batch', async () => {
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    expect(root.querySelector('.account-sign-in')?.getAttribute('href')).toBe('/login');
-    expect(root.querySelector('.account-section')?.textContent).toContain('Googleでログイン');
-    expect(root.querySelector('.progress-card')?.textContent).toContain('この端末にのみ保存');
+    expect(get.mock.calls.some(([path]) => path === '/feed/pool?language=ja')).toBe(true);
+    expect(batchCalls()).toHaveLength(1);
+    expect(cards(root)).toHaveLength(10);
+    expect(root.querySelector('.quiz-option')?.textContent).toContain('Signature');
+    expect(root.querySelector('.swipe-hint')).not.toBeNull();
   });
 
-  it('displays the authenticated user in the profile', () => {
-    authUser.set({ id: 'user-1', email: 'learner@example.com', name: 'Learner', avatarUrl: null, username: null });
-    authStatus.set('authenticated');
+  it('keeps cards ahead by loading more when the learner nears the end', async () => {
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const store = TestBed.inject(FeedStore);
+    send.mockImplementation(async () => batch('b'));
+    store.setActive(8);
+    await settle(fixture);
+    expect(batchCalls()).toHaveLength(2);
+    expect(cards(fixture.nativeElement)).toHaveLength(15);
+    expect(store.hasScrolled()).toBe(true);
+  });
+
+  it('shows an accessible skeleton while the first questions load', () => {
+    get.mockImplementation(() => new Promise(() => {}));
+    const fixture = TestBed.createComponent(Homepage);
+    fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    expect(root.querySelector('.account-identity')?.textContent).toContain('Learner');
-    expect(root.querySelector('.account-identity')?.textContent).toContain('learner@example.com');
-    expect(root.querySelector('.account-sign-in')).toBeNull();
+    expect(root.querySelector('app-loading-skeleton')).not.toBeNull();
+    expect(root.querySelector('[role="status"] .sr-only')?.textContent).toContain('読み込み');
+    expect(root.querySelector('.feed-state p')).toBeNull();
   });
 
-  it('separates a loading session and a connection error from a signed-out session', () => {
+  it('keeps learning with pool questions when Gemini fails, and retries with the same key', async () => {
+    send.mockRejectedValueOnce(new LearningError(503, 'AI_UNAVAILABLE'));
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
-    authStatus.set('loading');
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.account-section [role="status"]')?.textContent).toContain('確認しています');
-    expect(root.querySelector('.account-sign-in')).toBeNull();
-
-    authStatus.set('unavailable');
-    fixture.detectChanges();
-    expect(root.querySelector('.account-section [role="alert"]')?.textContent).toContain('取得できませんでした');
-    (root.querySelector('.account-retry') as HTMLButtonElement).click();
-    expect(refreshSession).toHaveBeenCalledOnce();
+    expect(cards(root).length).toBeGreaterThanOrEqual(5);
+    expect(root.querySelector('.feed-status')?.textContent).toContain('Gemini');
+    const requestId = batchCalls()[0][2].requestId;
+    root.querySelector<HTMLButtonElement>('.feed-status button')!.click();
+    await settle(fixture);
+    expect(batchCalls()[1][2].requestId).toBe(requestId);
+    expect(root.querySelector('.feed-status button')).toBeNull();
   });
 
-  it('renders a profile picture and falls back to the icon if the image fails', () => {
-    authUser.set({ id: 'user-1', email: 'learner@example.test', name: 'Learner', avatarUrl: 'https://example.test/avatar.png', username: null });
-    authStatus.set('authenticated');
-    const root = fixture.nativeElement as HTMLElement;
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
+  it('ignores a late private batch after logout and loads the public pool', async () => {
+    let complete!: (batch: FeedBatch) => void;
+    send.mockImplementationOnce(() => new Promise<FeedBatch>((resolve) => (complete = resolve)));
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    user.set(null);
+    status.set('guest');
     fixture.detectChanges();
-    const image = root.querySelector('.account-avatar img') as HTMLImageElement;
-    expect(image.getAttribute('src')).toBe('https://example.test/avatar.png');
-    expect(image.getAttribute('referrerpolicy')).toBe('no-referrer');
-    image.dispatchEvent(new Event('error'));
+    complete(batch('late'));
+    await settle(fixture);
     fixture.detectChanges();
-    expect(root.querySelector('.account-avatar img')).toBeNull();
-    expect(root.querySelector('.account-avatar svg')).not.toBeNull();
+    const ids = [...fixture.nativeElement.querySelectorAll('.question-card')].map(
+      (card: HTMLElement) => card.dataset['questionId'],
+    );
+    expect(ids.some((id) => id?.startsWith('late'))).toBe(false);
+    expect(ids.length).toBe(5);
   });
 
-  it('keeps an unfinished username through a foreground session check', () => {
-    authUser.set({ id: 'user-1', email: 'learner@example.test', name: 'Learner', avatarUrl: null, username: null });
-    authStatus.set('authenticated');
-    const root = fixture.nativeElement as HTMLElement;
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click(); fixture.detectChanges();
-    const input = root.querySelector<HTMLInputElement>('#account-username')!;
-    input.value = 'unfinished_name'; input.dispatchEvent(new Event('input'));
-    authStatus.set('loading'); fixture.detectChanges();
-    authStatus.set('authenticated'); fixture.detectChanges();
-    expect(root.querySelector<HTMLInputElement>('#account-username')?.value).toBe('unfinished_name');
+  it('uses a fresh batch key after saved preferences no longer match a pending request', async () => {
+    const staleId = crypto.randomUUID();
+    sessionStorage.setItem('whylint-pending-batch:learner:ja', staleId);
+    send.mockRejectedValueOnce(new LearningError(409, 'REQUEST_MISMATCH'));
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    expect(batchCalls()[0][2].requestId).toBe(staleId);
+    expect(batchCalls()[0][2]).not.toHaveProperty('excludeQuestionIds');
+    fixture.nativeElement.querySelector('.feed-status button').click();
+    await settle(fixture);
+    expect(batchCalls()[1][2].requestId).not.toBe(staleId);
   });
 
-  it('shows logout progress, prevents repeat activation and offers retry on failure', async () => {
-    authUser.set({ id: 'user-1', email: 'learner@example.test', name: 'Learner', avatarUrl: null, username: null });
-    authStatus.set('authenticated');
-    const root = fixture.nativeElement as HTMLElement;
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const button = root.querySelector('.account-sign-out') as HTMLButtonElement;
-    loggingOut.set(true);
-    fixture.detectChanges();
-    expect(button.disabled).toBe(true);
-    expect(button.textContent).toContain('ログアウト中');
-    button.click();
-    expect(logoutSession).not.toHaveBeenCalled();
-    loggingOut.set(false);
-    logoutSession.mockResolvedValueOnce(false);
-    fixture.detectChanges();
-    button.click();
-    await fixture.whenStable();
-    expect(logoutSession).toHaveBeenCalledOnce();
-    expect(root.querySelector('.account-error')?.textContent).toContain('ログアウトできませんでした');
-    expect(root.querySelector('.account-identity')?.textContent).toContain('Learner');
+  it('replaces a corrupted saved request key before making a request', async () => {
+    sessionStorage.setItem('whylint-pending-batch:learner:ja', 'invalid');
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    expect(batchCalls()[0][2].requestId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('keeps the choice and explanation when switching sections and shows both on reveal', async () => {
-    const card = fixture.nativeElement.querySelector('#card-0') as HTMLElement;
-    const radio = card.querySelector('input[type="radio"]') as HTMLInputElement;
-    radio.click();
-    fixture.detectChanges();
-    (card.querySelectorAll('.answer-switch button')[1] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const reason = card.querySelector('textarea') as HTMLTextAreaElement;
-    reason.value = 'The function retains its scope.';
-    reason.dispatchEvent(new Event('input'));
-    await fixture.whenStable();
-    (card.querySelectorAll('.answer-switch button')[0] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect((card.querySelector('input[type="radio"]') as HTMLInputElement).checked).toBe(true);
-    (card.querySelector('.solution-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(card.textContent).toContain('選択肢は正解です。');
-    expect(card.textContent).toContain('返された関数が、外側のスコープを覚えているから。');
-    expect(card.textContent).toContain('The function retains its scope.');
-    expect(card.textContent).toContain('説明は採点されません。');
+  it('keeps the original seen-question snapshot when retrying after more pool cards arrive', async () => {
+    const firstId = crypto.randomUUID();
+    const laterId = crypto.randomUUID();
+    let pools = 0;
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith('/feed/pool')) {
+        return { questions: [question(pools++ === 0 ? firstId : laterId)], reviewQuestions: [] };
+      }
+      if (path.startsWith('/daily')) return { question: null };
+      return { questions: [] };
+    });
+    send.mockRejectedValueOnce(new LearningError(503, 'AI_UNAVAILABLE'));
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const original = batchCalls()[0][2];
+    expect(original.excludeQuestionIds).toEqual([firstId]);
+    const store = TestBed.inject(FeedStore);
+    await store.loadPool();
+    await store.loadBatch();
+    expect(batchCalls()[1][2]).toEqual(original);
+    await store.loadBatch();
+    expect(batchCalls()[2][2].requestId).not.toBe(original.requestId);
+    expect(batchCalls()[2][2].excludeQuestionIds).toEqual([firstId, laterId]);
   });
 
-  it('labels a solution opened without an answer as peeked and allows self-rating', () => {
-    const card = fixture.nativeElement.querySelector('#card-0') as HTMLElement;
-    (card.querySelector('.solution-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(card.querySelector('.solution-heading')?.textContent).toContain('解答を見た');
-    const rating = card.querySelector('.rating button') as HTMLButtonElement;
-    rating.click();
-    fixture.detectChanges();
-    expect(rating.getAttribute('aria-pressed')).toBe('true');
+  it('restores a pending request and its original exclusion snapshot', async () => {
+    const requestId = crypto.randomUUID();
+    const excludeQuestionIds = [crypto.randomUUID(), crypto.randomUUID()];
+    const key = 'whylint-pending-batch:learner:ja';
+    sessionStorage.setItem(key, JSON.stringify({ requestId, excludeQuestionIds }));
+    send.mockRejectedValueOnce(new LearningError(503, 'AI_UNAVAILABLE'));
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    expect(batchCalls()[0][2]).toEqual({ requestId, excludeQuestionIds, language: 'ja' });
+    await TestBed.inject(FeedStore).loadBatch();
+    expect(batchCalls()[1][2]).toEqual(batchCalls()[0][2]);
+    expect(sessionStorage.getItem(key)).toBeNull();
   });
 
-  it('starts in Japanese and keeps the answer when switching to English and back', () => {
-    const root = fixture.nativeElement as HTMLElement;
-    const card = root.querySelector('#card-0') as HTMLElement;
-    expect(card.querySelector('h2')?.textContent).toContain('なぜ');
-    const radio = card.querySelector('input[type="radio"]') as HTMLInputElement;
-    radio.click();
-    fixture.detectChanges();
-    const language = root.querySelector('.language-toggle') as HTMLButtonElement;
-    language.click();
-    fixture.detectChanges();
-    expect(document.documentElement.lang).toBe('en');
-    expect(card.querySelector('h2')?.textContent).toContain('Why does count');
-    expect((card.querySelector('input[type="radio"]') as HTMLInputElement).checked).toBe(true);
-    language.click();
-    fixture.detectChanges();
-    expect(document.documentElement.lang).toBe('ja');
-    expect(card.querySelector('h2')?.textContent).toContain('なぜ');
-    expect((card.querySelector('input[type="radio"]') as HTMLInputElement).checked).toBe(true);
+  it('rejects a malformed stored exclusion list without reusing its request ID', async () => {
+    const requestId = crypto.randomUUID();
+    sessionStorage.setItem(
+      'whylint-pending-batch:learner:ja',
+      JSON.stringify({ requestId, excludeQuestionIds: ['not-a-question-uuid'] }),
+    );
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    expect(batchCalls()[0][2].requestId).not.toBe(requestId);
   });
 
-  it('switches and remembers the theme without losing the current answer', async () => {
-    const root = fixture.nativeElement as HTMLElement;
-    const card = root.querySelector('#card-0') as HTMLElement;
-    (card.querySelector('input[type="radio"]') as HTMLInputElement).click();
-    fixture.detectChanges();
-    const original = document.documentElement.dataset['theme'];
-    const expected = original === 'dark' ? 'light' : 'dark';
-    (root.querySelector('.theme-toggle') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(document.documentElement.dataset['theme']).toBe(expected);
-    expect(localStorage.getItem('whylint-theme')).toBe(expected);
-    expect((card.querySelector('input[type="radio"]') as HTMLInputElement).checked).toBe(true);
-    fixture.destroy();
-    fixture = TestBed.createComponent(Homepage);
-    await fixture.whenStable();
-    expect(document.documentElement.dataset['theme']).toBe(expected);
-    localStorage.removeItem('whylint-theme');
-  });
-
-  it('saves a peek and its sample review card, then can clear local history', async () => {
-    let root = fixture.nativeElement as HTMLElement;
-    let card = root.querySelector('#card-0') as HTMLElement;
-    (card.querySelector('.solution-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('#card-3')).not.toBeNull();
-    expect(root.querySelector('#card-3')?.textContent).toContain('復習用のサンプル');
-    fixture.destroy();
-    fixture = TestBed.createComponent(Homepage);
-    await fixture.whenStable();
-    root = fixture.nativeElement as HTMLElement;
-    card = root.querySelector('#card-0') as HTMLElement;
-    expect(card.querySelector('.solution-heading')?.textContent).toContain('解答を見た');
-    expect(root.querySelector('#card-3')).not.toBeNull();
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.progress-list')?.textContent).toContain('解答を見た');
-    const action = Array.from(root.querySelectorAll('.progress-actions button')).find((button) => button.textContent?.includes('学習履歴を消去')) as HTMLButtonElement;
-    action.click();
-    fixture.detectChanges();
-    const confirm = Array.from(root.querySelectorAll('.progress-actions button')).find((button) => button.textContent?.includes('本当に消去する')) as HTMLButtonElement;
-    confirm.click();
-    fixture.detectChanges();
-    expect(localStorage.getItem('whylint-preview-progress-v1')).toBeNull();
-    expect(root.querySelectorAll('.progress-list li')).toHaveLength(3);
-    expect(root.querySelector('.progress-list')?.textContent).not.toContain('解答を見た');
-  });
-
-  it('moves keyboard focus to the next question without animating', async () => {
-    const root = fixture.nativeElement as HTMLElement;
-    const feed = root.querySelector('.feed-content') as HTMLElement;
-    const heading = root.querySelector('.feed-heading h2') as HTMLElement;
-    const focus = vi.spyOn(heading, 'focus');
-    const scroll = vi.fn();
-    feed.scrollTo = scroll;
-    const next = root.querySelector('.feed-navigation button') as HTMLButtonElement;
-    next.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
-    fixture.detectChanges();
-    await fixture.whenStable();
-    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'instant' }));
-    expect(heading.textContent).toContain('second');
-    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-  });
-
-  it('keeps the desktop controls in sync with the feed and saved state', async () => {
-    const root = fixture.nativeElement as HTMLElement;
-    const feed = root.querySelector('.feed-content') as HTMLElement;
-    feed.scrollTo = vi.fn();
-    const buttons = root.querySelectorAll<HTMLButtonElement>('.desktop-step-controls button');
-    expect(buttons[0].disabled).toBe(true);
-    expect(buttons[1].disabled).toBe(false);
-
-    buttons[1].dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
-    fixture.detectChanges();
-    await fixture.whenStable();
-    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('second');
-    expect(buttons[0].disabled).toBe(false);
-
-    (root.querySelector('.desktop-save') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.desktop-save')?.getAttribute('aria-pressed')).toBe('true');
-    expect(root.querySelector('#card-1 .save-button')?.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('updates the fixed question bar when another card reaches the top', () => {
-    const root = fixture.nativeElement as HTMLElement;
-    const feed = root.querySelector('.feed-content') as HTMLElement;
-    const slides = root.querySelectorAll<HTMLElement>('.feed-slide');
-    vi.spyOn(feed, 'getBoundingClientRect').mockReturnValue({ top: 100 } as DOMRect);
-    vi.spyOn(slides[0], 'getBoundingClientRect').mockReturnValue({ top: -400 } as DOMRect);
-    vi.spyOn(slides[1], 'getBoundingClientRect').mockReturnValue({ top: 100 } as DOMRect);
-    vi.spyOn(slides[2], 'getBoundingClientRect').mockReturnValue({ top: 900 } as DOMRect);
-    feed.dispatchEvent(new Event('scroll'));
-    fixture.detectChanges();
-    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('second');
-    expect(root.querySelector('.card-count')?.textContent).toContain('2 / 3');
-  });
-
-  it('restores review cards in the order they were peeked', async () => {
-    let root = fixture.nativeElement as HTMLElement;
-    (root.querySelector('#card-1 .solution-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelector('#card-0 .solution-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('#card-3')?.textContent).toContain('同期処理の後で');
-    expect(root.querySelector('#card-4')?.textContent).toContain('合計を覚える');
-    fixture.destroy();
-    fixture = TestBed.createComponent(Homepage);
-    await fixture.whenStable();
-    root = fixture.nativeElement as HTMLElement;
-    expect(root.querySelector('#card-3')?.textContent).toContain('同期処理の後で');
-    expect(root.querySelector('#card-4')?.textContent).toContain('合計を覚える');
-  });
-
-  it('restores a draft explanation without presenting it as graded', async () => {
-    let root = fixture.nativeElement as HTMLElement;
-    let card = root.querySelector('#card-0') as HTMLElement;
-    (card.querySelectorAll('.answer-switch button')[1] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const reason = card.querySelector('textarea') as HTMLTextAreaElement;
-    reason.value = '同じ変数を参照するから';
-    reason.dispatchEvent(new Event('input'));
-    await fixture.whenStable();
-    fixture.destroy();
-    fixture = TestBed.createComponent(Homepage);
-    await fixture.whenStable();
-    root = fixture.nativeElement as HTMLElement;
-    card = root.querySelector('#card-0') as HTMLElement;
-    expect((card.querySelector('textarea') as HTMLTextAreaElement).value).toBe('同じ変数を参照するから');
-    expect(card.textContent).toContain('説明は採点されません');
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.progress-list')?.textContent).toContain('入力中');
-  });
-
-  it('continues in session when device storage is unavailable', () => {
-    const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('Storage unavailable');
+  it('continues without wedging generation when browser storage reads or writes fail', async () => {
+    const originalGet = Storage.prototype.getItem;
+    const read = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
+      this: Storage,
+      key,
+    ) {
+      if (key.startsWith('whylint-pending-batch:')) throw new Error('Storage unavailable');
+      return originalGet.call(this, key);
+    });
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Storage full');
     });
     try {
-      const root = fixture.nativeElement as HTMLElement;
-      const card = root.querySelector('#card-0') as HTMLElement;
-      (card.querySelector('input[type="radio"]') as HTMLInputElement).click();
-      fixture.detectChanges();
-      expect((card.querySelector('input[type="radio"]') as HTMLInputElement).checked).toBe(true);
-      (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-      fixture.detectChanges();
-      expect(root.querySelector('.progress-card')?.textContent).toContain('この画面を開いている間のみ');
+      send.mockRejectedValueOnce(new LearningError(503, 'AI_UNAVAILABLE'));
+      const fixture = TestBed.createComponent(Homepage);
+      await settle(fixture);
+      const original = batchCalls()[0][2];
+      const store = TestBed.inject(FeedStore);
+      expect(store.generating()).toBe(false);
+      await store.loadBatch();
+      expect(batchCalls()[1][2]).toEqual(original);
+      expect(store.generating()).toBe(false);
+      expect(store.notice()).toBeNull();
     } finally {
-      blocked.mockRestore();
+      read.mockRestore();
+      write.mockRestore();
     }
   });
 
-  it('saves a question, restores it in profile, opens it, and removes it', async () => {
-    let root = fixture.nativeElement as HTMLElement;
-    (root.querySelector('#card-1 .save-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('#card-1 .save-button')?.getAttribute('aria-pressed')).toBe('true');
-    fixture.destroy();
-    fixture = TestBed.createComponent(Homepage);
-    await fixture.whenStable();
-    root = fixture.nativeElement as HTMLElement;
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.saved-list')?.textContent).toContain('second');
-    (root.querySelector('.saved-card-link') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('second');
-    expect(root.querySelector('#card-1 .save-button')?.getAttribute('aria-pressed')).toBe('true');
-    (root.querySelector('#card-1 .save-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.saved-empty')).not.toBeNull();
+  it('does not restore a completed stale request when clearing storage fails', async () => {
+    const requestId = crypto.randomUUID();
+    sessionStorage.setItem('whylint-pending-batch:learner:ja', requestId);
+    const remove = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('Storage unavailable');
+    });
+    try {
+      const fixture = TestBed.createComponent(Homepage);
+      await settle(fixture);
+      await TestBed.inject(FeedStore).loadBatch();
+      expect(batchCalls()[0][2].requestId).toBe(requestId);
+      expect(batchCalls()[1][2].requestId).not.toBe(requestId);
+      expect(TestBed.inject(FeedStore).generating()).toBe(false);
+    } finally {
+      remove.mockRestore();
+    }
   });
 
-  it('keeps saved review cards when practice history is cleared', async () => {
-    let root = fixture.nativeElement as HTMLElement;
-    (root.querySelector('#card-0 .solution-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelector('#card-3 .save-button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelector('.progress-actions button:nth-child(2)') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelector('.progress-actions button:nth-child(2)') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    fixture.destroy();
-    fixture = TestBed.createComponent(Homepage);
-    await fixture.whenStable();
-    root = fixture.nativeElement as HTMLElement;
-    (root.querySelectorAll('.bottom-nav button')[2] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.saved-list')?.textContent).toContain('なぜ2回目');
-    (root.querySelector('.saved-card-link') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('なぜ2回目');
+  it('filters a late Gemini paraphrase of an already appended pool card', async () => {
+    const initialId = crypto.randomUUID();
+    const originalId = crypto.randomUUID();
+    const paraphraseId = crypto.randomUUID();
+    const distinctId = crypto.randomUUID();
+    const firstCodeId = crypto.randomUUID();
+    const secondCodeId = crypto.randomUUID();
+    const hint = (tokens: string[], exact: string, codeKey: string | null = null) => ({
+      version: 1 as const,
+      exact: exact.repeat(64),
+      tokens,
+      codeKey,
+    });
+    const terms = ['https', 'http', 'encrypt', 'personal', 'data'];
+    const original = { ...question(originalId), novelty: hint(terms, 'a') };
+    const paraphrase = {
+      ...question(paraphraseId),
+      novelty: hint([...terms, 'transmit'], 'b'),
+    };
+    const distinct = {
+      ...question(distinctId),
+      novelty: hint(['https', 'certificate', 'identity', 'verify'], 'c'),
+    };
+    const codeTerms = ['predict', 'output', 'return', 'value'];
+    const firstCode = {
+      ...question(firstCodeId),
+      code: 'console.log(1);',
+      novelty: hint(codeTerms, 'd', 'e'.repeat(64)),
+    };
+    const secondCode = {
+      ...question(secondCodeId),
+      code: 'console.log(2);',
+      novelty: hint(codeTerms, 'd', 'f'.repeat(64)),
+    };
+    let pools = 0;
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith('/feed/pool'))
+        return {
+          questions: pools++ === 0 ? [question(initialId)] : [original],
+          reviewQuestions: [],
+        };
+      if (path.startsWith('/daily')) return { question: null };
+      return { questions: [] };
+    });
+    let complete!: (batch: FeedBatch) => void;
+    send.mockImplementationOnce(() => new Promise<FeedBatch>((resolve) => (complete = resolve)));
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const store = TestBed.inject(FeedStore);
+    await store.loadPool();
+    complete({
+      requestId: 'pending',
+      questions: [paraphrase, distinct, firstCode, secondCode],
+      communityQuestion: null,
+    });
+    await settle(fixture);
+    const ids = store
+      .items()
+      .flatMap((item) => (item.kind === 'question' ? [item.question.id] : []));
+    expect(ids).toEqual([initialId, originalId, distinctId, firstCodeId, secondCodeId]);
+    await store.loadPool();
+    const poolCall = get.mock.calls
+      .filter(([path]) => String(path).startsWith('/feed/pool'))
+      .at(-1)!;
+    const excluded = new URLSearchParams(String(poolCall[0]).split('?')[1]).get('exclude')!;
+    expect(excluded).toContain(originalId);
+    expect(excluded).not.toContain(paraphraseId);
   });
 
-  it('filters the feed by a selected concept without losing the original answer state', () => {
+  it('allows an intentional due review of a recently seen concept', async () => {
+    const terms = ['https', 'http', 'encrypt', 'personal', 'data'];
+    const original = {
+      ...question(crypto.randomUUID()),
+      novelty: {
+        version: 1 as const,
+        exact: 'a'.repeat(64),
+        tokens: terms,
+        codeKey: null,
+      },
+    };
+    const review = {
+      ...question(crypto.randomUUID()),
+      novelty: {
+        version: 1 as const,
+        exact: 'b'.repeat(64),
+        tokens: [...terms, 'transmit'],
+        codeKey: null,
+      },
+      review: { box: 2, missedAt: null },
+    };
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith('/feed/pool')) return { questions: [original], reviewQuestions: [] };
+      if (path.startsWith('/daily')) return { question: null };
+      return { questions: [] };
+    });
+    send.mockResolvedValueOnce({
+      requestId: 'review',
+      questions: [],
+      communityQuestion: null,
+      reviewQuestions: [review],
+    });
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const items = TestBed.inject(FeedStore).items();
+    expect(items).toHaveLength(2);
+    expect(items[1].kind === 'question' && items[1].question.review?.box).toBe(2);
+  });
+
+  it('shows the 09:00 review of a card already seen this session as its own card', async () => {
+    const seenCard = question(crypto.randomUUID());
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith('/feed/pool')) return { questions: [seenCard], reviewQuestions: [] };
+      if (path.startsWith('/daily')) return { question: null };
+      return { questions: [] };
+    });
+    send.mockResolvedValueOnce({
+      requestId: 'morning',
+      questions: [],
+      communityQuestion: null,
+      reviewQuestions: [{ ...seenCard, review: { box: 1, missedAt: null } }],
+    });
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const items = TestBed.inject(FeedStore).items();
+    expect(items.map((item) => item.key)).toEqual([seenCard.id, 'review-' + seenCard.id]);
+  });
+
+  it.each([true, false])(
+    'bounds the pool refill after a fully filtered late batch (recovers=%s)',
+    async (recovers) => {
+      const original = {
+        ...question(crypto.randomUUID()),
+        novelty: {
+          version: 1 as const,
+          exact: 'a'.repeat(64),
+          tokens: ['https', 'http', 'encrypt', 'personal', 'data'],
+          codeKey: null,
+        },
+      };
+      const replacement = {
+        ...question(crypto.randomUUID()),
+        novelty: {
+          ...original.novelty,
+          exact: 'b'.repeat(64),
+          tokens: recovers
+            ? ['https', 'certificate', 'identity', 'verify']
+            : original.novelty.tokens,
+        },
+      };
+      let pools = 0;
+      get.mockImplementation(async (path: string) => {
+        if (path.startsWith('/feed/pool')) {
+          return { questions: [pools++ === 0 ? original : replacement], reviewQuestions: [] };
+        }
+        if (path.startsWith('/daily')) return { question: null };
+        return { questions: [] };
+      });
+      let complete!: (value: FeedBatch) => void;
+      send.mockImplementationOnce(() => new Promise<FeedBatch>((resolve) => (complete = resolve)));
+      const fixture = TestBed.createComponent(Homepage);
+      await settle(fixture);
+      complete({
+        requestId: 'late',
+        questions: [{ ...original, id: crypto.randomUUID() }],
+        communityQuestion: null,
+      });
+      await settle(fixture);
+      const store = TestBed.inject(FeedStore);
+      expect(pools).toBe(recovers ? 2 : 3);
+      expect(store.items()).toHaveLength(recovers ? 2 : 1);
+      expect(store.loading()).toBe(false);
+      expect(store.generating()).toBe(false);
+      expect(batchCalls()).toHaveLength(1);
+    },
+  );
+
+  it('brings a missed card back a few cards later', async () => {
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const store = TestBed.inject(FeedStore);
+    const first = store.items()[0];
+    store.tapped(first, tapResult('pool0-0', false));
+    fixture.detectChanges();
+    const relearn = store.items()[1 + RELEARN_GAP];
+    expect(relearn.kind === 'question' && relearn.relearn).toBe(true);
+    expect(relearn.kind === 'question' && relearn.question.id).toBe('pool0-0');
+    store.tapped(first, tapResult('pool0-0', false));
+    expect(store.items().filter((item) => item.kind === 'question' && item.relearn)).toHaveLength(
+      1,
+    );
+  });
+
+  it('lets guests answer immediately and invites them to sign in after a few taps', async () => {
+    user.set(null);
+    status.set('guest');
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    expect(batchCalls()).toHaveLength(0);
+    const store = TestBed.inject(FeedStore);
+    for (let index = 0; index < 3; index++)
+      store.tapped(store.items()[index], tapResult('pool0-' + index, true));
+    fixture.detectChanges();
+    expect(store.items()[3].kind).toBe('signin');
+    expect(fixture.nativeElement.querySelector('.signin-card a')?.getAttribute('href')).toBe(
+      '/login',
+    );
+  });
+
+  it('keeps the feed when switching tabs and loads the practice collection', async () => {
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
-    (root.querySelector('#card-1 input[type="radio"]') as HTMLInputElement).click();
-    fixture.detectChanges();
-    (root.querySelector('.menu-toggle') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelectorAll('.main-menu button')[1] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelectorAll('.concept-list button')[1] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelector('.apply-filters') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelectorAll('.feed-slide')).toHaveLength(1);
-    expect(root.querySelector('.feed-heading h2')?.textContent).toContain('second');
-    expect((root.querySelector('#card-1 input[type="radio"]') as HTMLInputElement).checked).toBe(true);
+    const tab = (label: string) =>
+      [...root.querySelectorAll<HTMLButtonElement>('.main-nav button')].find((button) =>
+        button.textContent?.includes(label),
+      )!;
+    tab('復習').click();
+    await settle(fixture);
+    expect(get).toHaveBeenCalledWith('/reviews', expect.any(AbortSignal));
+    expect(root.textContent).toContain('毎朝9時');
+    const requests = get.mock.calls.length + send.mock.calls.length;
+    tab('フィード').click();
+    await settle(fixture);
+    expect(cards(root)).toHaveLength(10);
+    expect(get.mock.calls.length + send.mock.calls.length).toBe(requests);
   });
 
-  it('shows an empty state for unavailable filters and allows changing them', () => {
+  it('retains each instance’s tap after switching tabs and clears it on account changes', async () => {
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
-    (root.querySelector('.menu-toggle') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    (root.querySelectorAll('.main-menu button')[1] as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const python = Array.from(root.querySelectorAll('.filter-options button')).find((button) => button.textContent?.trim() === 'Python') as HTMLButtonElement;
-    python.click();
-    fixture.detectChanges();
-    expect(root.querySelector('.concept-list')?.textContent).toContain('条件に合うトピックがありません');
-    (root.querySelector('.apply-filters') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.filter-empty')?.textContent).toContain('条件に合う問題がありません');
-    (root.querySelector('.filter-empty button') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(root.querySelector('.discover-page')).not.toBeNull();
+    const store = TestBed.inject(FeedStore);
+    const original = store.items()[0];
+    store.tapped(original, tapResult('pool0-0', false));
+    await settle(fixture);
+    const repeated = store.items().find((item) => item.kind === 'question' && item.relearn)!;
+    store.tapped(repeated, tapResult('pool0-0', true));
+    await settle(fixture);
+    const tab = (label: string) =>
+      [...root.querySelectorAll<HTMLButtonElement>('.main-nav button')].find((button) =>
+        button.textContent?.includes(label),
+      )!;
+    tab('復習').click();
+    await settle(fixture);
+    tab('フィード').click();
+    await settle(fixture);
+    const instances = root.querySelectorAll('[data-question-id="pool0-0"]');
+    expect(instances).toHaveLength(2);
+    expect(instances[0].querySelector('.reveal')?.textContent).toContain('おしい');
+    expect(instances[1].querySelector('.reveal')?.textContent).toContain('正解');
+    expect(root.querySelectorAll('#discussion-pool0-0')).toHaveLength(1);
+    expect(root.querySelectorAll('#discussion-' + repeated.key)).toHaveLength(1);
+    user.set(null);
+    status.set('guest');
+    await settle(fixture);
+    expect(store.items().every((item) => item.kind !== 'question' || !item.tap)).toBe(true);
+    expect(root.querySelector('.reveal')).toBeNull();
   });
-
 });

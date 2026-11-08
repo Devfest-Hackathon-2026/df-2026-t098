@@ -1,4 +1,19 @@
-# Google sign-in frontend
+# WhyLint frontend
+
+## Core learning feed extension
+
+Implement the root `specs.md` contract on the user-created core-learning branch.
+Replace the static question preview with authenticated five-question generation,
+third-card prefetch, written assessment, failed-question practice, progress and
+weekly rankings. Expand onboarding to multiple interests, languages/frameworks,
+and starting difficulty, with backward-compatible local preference migration and
+authenticated server persistence. Add community publishing, likes, comments,
+saved questions, and share routes. Preserve existing authentication, optional
+username setup, themes, Japanese defaults and English support. No Git commands.
+
+Network failures preserve answer/form drafts, request IDs survive retries, and
+account/language changes invalidate stale responses. Guest readers see published
+questions and sign-in affordances. No production fixture questions or fake scores.
 
 ## Optional usernames and email signup
 

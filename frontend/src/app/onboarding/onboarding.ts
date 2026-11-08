@@ -1,87 +1,154 @@
-import { DOCUMENT } from '@angular/common';
 import { Component, DestroyRef, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Domain, OnboardingState, STACKS } from './onboarding-state';
+import { OnboardingState } from './onboarding-state';
 import { UsernameSetup } from '../auth/username-setup';
 import { AuthSession } from '../auth/auth-session';
+import { DisplaySettings } from '../learning/display-settings';
+import { LearningApi, learningError } from '../learning/learning-api';
+import { LEARNING_CATALOG } from '../learning/learning-catalog';
+import { LanguagePicker } from '../learning/language-picker';
+import type { Catalog, Difficulty, Preferences } from '../learning/learning.types';
 
-const COPY = {
-  ja: { step: 'STEP', title1: '何を学びたいですか？', intro1: 'まずは、学習する分野を選びましょう。', frontend: 'フロントエンド', frontendDesc: 'ユーザーが操作する画面やUIの仕組みを学ぶ。', backend: 'バックエンド', backendDesc: 'APIやサーバー側の処理を学ぶ。', database: 'データベース', databaseDesc: 'データの保存や取得、SQLを学ぶ。', categorySearch: 'カテゴリ・技術を検索', results: '技術の検索結果', cancel: '変更をキャンセル', next: '次へ', title2: 'スタックを選びましょう', intro2: '学習したい言語・技術を1つ選んでください。', search: '言語・技術を検索', placeholder: '名前で検索', clear: 'クリア', empty: '一致する候補がありません。', soon: '準備中', back: '戻る', start: '学習を始める', note: '現在のプレビューはJavaScriptのサンプル問題のみです。', unavailable: 'この分野の問題は準備中です。戻ってフロントエンドを選択できます。', storage: '設定を保存できませんでした。保存設定を確認してもう一度お試しください。', light: 'ライトテーマに切り替え', dark: 'ダークテーマに切り替え' },
-  en: { step: 'STEP', title1: 'What would you like to learn?', intro1: 'First, choose an area to explore.', frontend: 'Frontend', frontendDesc: 'Learn how interfaces and the screens people use work.', backend: 'Backend', backendDesc: 'Learn about APIs and server-side logic.', database: 'Database', databaseDesc: 'Learn about storing and querying data with SQL.', categorySearch: 'Search categories and technologies', results: 'Technology results', cancel: 'Cancel changes', next: 'Continue', title2: 'Choose your stack', intro2: 'Choose one language or technology to practice.', search: 'Search languages and technologies', placeholder: 'Search by name', clear: 'Clear', empty: 'No matching options found.', soon: 'Coming soon', back: 'Back', start: 'Start learning', note: 'The current preview contains JavaScript sample questions only.', unavailable: 'Questions for this area are coming soon. Go back to choose frontend.', storage: 'Your selection could not be saved. Check your storage settings and try again.', light: 'Switch to light theme', dark: 'Switch to dark theme' },
-} as const;
-
-@Component({ selector: 'app-onboarding', imports: [FormsModule, UsernameSetup], templateUrl: './onboarding.html', styleUrl: './onboarding.css' })
+@Component({
+  selector: 'app-onboarding',
+  imports: [FormsModule, UsernameSetup, LanguagePicker],
+  templateUrl: './onboarding.html',
+  styleUrl: './onboarding.css',
+})
 export class Onboarding {
-  private readonly document = inject(DOCUMENT);
+  protected readonly settings = inject(DisplaySettings);
+  protected readonly session = inject(AuthSession);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly state = inject(OnboardingState);
-  private readonly session = inject(AuthSession);
+  private readonly api = inject(LearningApi);
   private readonly usernameSetup = viewChild(UsernameSetup);
-  protected readonly starting = signal(false);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly systemTheme = this.document.defaultView?.matchMedia?.('(prefers-color-scheme: light)');
-  private hasThemePreference = false;
-  protected readonly step = signal<1 | 2>(1);
-  protected readonly domain = signal<Domain | null>(null);
-  protected readonly stack = signal<string | null>(null);
+  private readonly controller = new AbortController();
+  protected readonly editing = this.route.snapshot.queryParamMap.get('edit') === '1';
+  private readonly initialLanguage = this.settings.language();
+  protected readonly catalog = signal<Catalog>(LEARNING_CATALOG);
+  protected readonly step = signal(1);
+  protected readonly interests = signal<string[]>([]);
+  protected readonly technologies = signal<string[]>([]);
+  protected readonly difficulty = signal<Difficulty>('beginner');
   protected readonly query = signal('');
-  protected readonly categoryQuery = signal('');
-  protected readonly editing = this.route.snapshot.queryParamMap.get('edit') === '1' && !!this.state.read();
-  protected readonly domains: Domain[] = ['frontend', 'backend', 'database'];
-  protected readonly storageError = signal(false);
-  protected readonly language = signal<'ja' | 'en'>(this.readSetting('whylint-language') === 'en' ? 'en' : 'ja');
-  protected readonly theme = signal<'light' | 'dark'>('dark');
-  protected get ui() { return COPY[this.language()]; }
-  protected get options() { const domain = this.domain(); return domain ? STACKS[domain].filter(o => o.label.toLowerCase().includes(this.query().trim().toLowerCase())) : []; }
-  protected get matchingDomains(): Domain[] {
-    const query = this.categoryQuery().trim().toLowerCase();
-    const names: Record<Domain, string> = { frontend: 'frontend フロントエンド', backend: 'backend バックエンド', database: 'database db データベース' };
-    return this.domains.filter(domain => names[domain].includes(query));
+  protected readonly starting = signal(false);
+  protected readonly error = signal('');
+  protected readonly levels: Difficulty[] = ['beginner', 'intermediate', 'advanced'];
+  protected get language() {
+    return this.settings.language();
   }
-  protected get matchingStacks() {
-    const query = this.categoryQuery().trim().toLowerCase();
-    return query ? this.domains.flatMap(domain => STACKS[domain].filter(option => option.label.toLowerCase().includes(query)).map(option => ({ ...option, domain }))) : [];
+  protected get options() {
+    return this.catalog().technologies.filter((value) =>
+      value.toLowerCase().includes(this.query().trim().toLowerCase()),
+    );
+  }
+  protected get canAdd() {
+    const query = this.query().trim();
+    return (
+      !!query &&
+      query.length <= 60 &&
+      !this.technologies().some((value) => value.toLowerCase() === query.toLowerCase()) &&
+      !this.catalog().technologies.some((value) => value.toLowerCase() === query.toLowerCase())
+    );
   }
 
   constructor() {
-    const stored = this.readSetting('whylint-theme');
-    this.hasThemePreference = stored === 'light' || stored === 'dark';
-    this.theme.set(stored === 'light' || stored === 'dark' ? stored : this.systemTheme?.matches ? 'light' : 'dark');
-    this.applyTheme(); this.applyLanguage();
-    const saved = this.editing ? this.state.read() : null;
-    if (saved) { this.domain.set(saved.domain); this.stack.set(saved.stack); }
-    const onChange = (event: MediaQueryListEvent) => { if (!this.hasThemePreference) { this.theme.set(event.matches ? 'light' : 'dark'); this.applyTheme(); } };
-    this.systemTheme?.addEventListener?.('change', onChange);
-    this.destroyRef.onDestroy(() => this.systemTheme?.removeEventListener?.('change', onChange));
+    inject(DestroyRef).onDestroy(() => this.controller.abort());
+    const saved = this.state.read();
+    if (saved) {
+      this.interests.set(saved.interests);
+      this.technologies.set(saved.technologies);
+      this.difficulty.set(saved.difficulty);
+    }
+    void this.api
+      .get<Catalog>('/catalog', this.controller.signal)
+      .then((catalog) => {
+        if (
+          !this.controller.signal.aborted &&
+          Array.isArray(catalog.interests) &&
+          Array.isArray(catalog.technologies)
+        )
+          this.catalog.set(catalog);
+      })
+      .catch(() => {
+        /* The bundled selectable catalog remains available offline. */
+      });
   }
-  private readSetting(key: string): string | null { try { return this.document.defaultView?.localStorage.getItem(key) ?? null; } catch { return null; } }
-  private writeSetting(key: string, value: string): void { try { this.document.defaultView?.localStorage.setItem(key, value); } catch { /* Keep settings for this session. */ } }
-  private applyTheme(): void { this.document.documentElement.dataset['theme'] = this.theme(); this.document.querySelector('meta[name="theme-color"]')?.setAttribute('content', this.theme() === 'light' ? '#f3f5f0' : '#080808'); }
-  private applyLanguage(): void { this.document.documentElement.lang = this.language(); this.document.title = this.language() === 'ja' ? 'WhyLint — コードの「なぜ」を学ぼう' : 'WhyLint — Understand what you ship'; }
-  protected toggleLanguage(): void { this.language.set(this.language() === 'ja' ? 'en' : 'ja'); this.applyLanguage(); this.writeSetting('whylint-language', this.language()); }
-  protected toggleTheme(): void { this.theme.set(this.theme() === 'dark' ? 'light' : 'dark'); this.hasThemePreference = true; this.applyTheme(); this.writeSetting('whylint-theme', this.theme()); }
-  protected selectDomain(domain: Domain): void { if (this.domain() !== domain) { this.stack.set(null); this.query.set(''); } this.domain.set(domain); }
-  protected selectResult(domain: Domain, stack: string): void {
-    this.selectDomain(domain); this.stack.set(stack);
-    if (this.session.status() === 'authenticated' && !this.session.user()?.username) this.step.set(2);
-    else this.complete();
+
+  protected text(ja: string, en: string): string {
+    return this.language === 'ja' ? ja : en;
   }
-  protected cancel(): void { void this.router.navigateByUrl('/'); }
-  protected complete(): void {
-    const domain = this.domain(); const stack = this.stack();
-    if (!domain || !stack || this.starting()) return;
-    const username = this.usernameSetup();
-    if (username?.hasInputToSave()) {
-      this.starting.set(true);
-      void username.saveIfEntered().then((saved) => {
-        if (saved) this.finish(domain, stack);
-      }).finally(() => this.starting.set(false));
-    } else this.finish(domain, stack);
+  protected levelLabel(level: Difficulty): string {
+    return {
+      beginner: this.text('初級', 'Beginner'),
+      intermediate: this.text('中級', 'Intermediate'),
+      advanced: this.text('上級', 'Advanced'),
+    }[level];
   }
-  private finish(domain: Domain, stack: string): void {
-    if (!this.state.save(domain, stack)) { this.storageError.set(true); return; }
-    void this.router.navigateByUrl('/');
+  protected toggleInterest(id: string): void {
+    this.interests.update((items) =>
+      items.includes(id) ? items.filter((item) => item !== id) : [...items, id],
+    );
+  }
+  protected toggleTechnology(value: string): void {
+    if (this.technologies().includes(value))
+      this.technologies.update((items) => items.filter((item) => item !== value));
+    else if (this.technologies().length < 40)
+      this.technologies.update((items) => [...items, value]);
+  }
+  protected addTechnology(): void {
+    if (this.canAdd) {
+      this.toggleTechnology(this.query().trim());
+      this.query.set('');
+    }
+  }
+  protected cancel(): void {
+    this.settings.setLanguage(this.initialLanguage);
+    // Replace the entry: Back from the feed should leave the app, not reopen setup.
+    void this.router.navigateByUrl('/', { replaceUrl: true });
+  }
+
+  /** Skip setup and start tapping right away with every area at beginner level. */
+  protected quickStart(): void {
+    if (!this.interests().length)
+      this.interests.set(this.catalog().interests.map((interest) => interest.id));
+    void this.complete();
+  }
+
+  protected async complete(): Promise<void> {
+    if (!this.interests().length || this.starting()) return;
+    this.starting.set(true);
+    this.error.set('');
+    const ownerId = this.session.user()?.id ?? null;
+    try {
+      const username = this.usernameSetup();
+      if (username && !(await username.saveIfEntered())) return;
+      if ((this.session.user()?.id ?? null) !== ownerId) return;
+      const preferences: Preferences = {
+        interests: this.interests(),
+        technologies: this.technologies(),
+        difficulty: this.difficulty(),
+        language: this.settings.language(),
+      };
+      if (ownerId) await this.api.send('/preferences', 'PUT', preferences, this.controller.signal);
+      if (this.controller.signal.aborted || (this.session.user()?.id ?? null) !== ownerId) return;
+      if (!this.state.save(preferences, ownerId)) {
+        this.error.set(
+          this.text(
+            '設定を保存できませんでした。端末の保存設定を確認してください。',
+            'Could not save preferences. Check this device’s storage settings.',
+          ),
+        );
+        return;
+      }
+      // Replace the setup entry so Back from the feed does not return to it.
+      await this.router.navigateByUrl('/', { replaceUrl: true });
+    } catch (error) {
+      if (!this.controller.signal.aborted) this.error.set(learningError(error, this.language));
+    } finally {
+      this.starting.set(false);
+    }
   }
 }

@@ -12,14 +12,22 @@ export function extractToken(request: Request): string | undefined {
   return header?.match(/^Bearer[ \t]+([^\s]+)$/i)?.[1];
 }
 
-export async function verifyToken(jwtService: JwtService, token: string): Promise<JwtPayload | null> {
+export async function verifyToken(
+  jwtService: JwtService,
+  token: string,
+): Promise<JwtPayload | null> {
   try {
     const payload: unknown = await jwtService.verifyAsync(token, { algorithms: ['HS256'] });
     if (!payload || typeof payload !== 'object') return null;
     const claims = payload as Record<string, unknown>;
-    if (typeof claims['sub'] !== 'string' || !UUID_PATTERN.test(claims['sub']) ||
-        typeof claims['sid'] !== 'string' || !UUID_PATTERN.test(claims['sid']) ||
-        typeof claims['exp'] !== 'number' || !Number.isFinite(claims['exp'])) {
+    if (
+      typeof claims['sub'] !== 'string' ||
+      !UUID_PATTERN.test(claims['sub']) ||
+      typeof claims['sid'] !== 'string' ||
+      !UUID_PATTERN.test(claims['sid']) ||
+      typeof claims['exp'] !== 'number' ||
+      !Number.isFinite(claims['exp'])
+    ) {
       return null;
     }
     return claims as unknown as JwtPayload;
