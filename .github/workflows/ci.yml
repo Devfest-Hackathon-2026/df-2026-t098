@@ -171,6 +171,13 @@ jobs:
         env:
           WHYLINT_API_URL: https://api.ci.example.test
       - run: npx cap sync android
+      - name: Configure verified Gradle download
+        working-directory: frontend/android
+        run: |
+          properties=gradle/wrapper/gradle-wrapper.properties
+          grep -q 'services.gradle.org/distributions/gradle-8.14.3-all.zip' "$properties"
+          sed -i 's@services.gradle.org/distributions/gradle-8.14.3-all.zip@repo.huaweicloud.com/gradle/gradle-8.14.3-bin.zip@' "$properties"
+          echo 'distributionSha256Sum=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531' >> "$properties"
       - name: Build
         run: ./gradlew assembleDebug --no-daemon
         working-directory: frontend/android
