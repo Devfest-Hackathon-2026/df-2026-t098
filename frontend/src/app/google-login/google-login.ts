@@ -9,6 +9,8 @@ import { authError } from '../auth/auth-copy';
 import { CALLBACK_PATH, createAuthorizationUrl, readCallback, STATE_KEY } from './oauth-flow';
 import { questionReturnTo, saveQuestionReturn, takeQuestionReturn } from '../auth/auth-return';
 
+declare const __IOS_GOOGLE_CLIENT_ID__: string | undefined;
+
 // Google OAuth client IDs are public. Never put a client secret in the frontend.
 const GOOGLE_WEB_CLIENT_ID =
   '8715935974-egdfj9tf8e1p71jjr2befadf47cne86l.apps.googleusercontent.com';
@@ -251,10 +253,22 @@ export class GoogleLogin implements OnInit {
   }
 
   protected startSignIn(): void {
-    if (!this.win || this.session.status() !== 'guest' || this.passwordBusy()) return;
+    if (
+      !this.win ||
+      this.session.status() !== 'guest' ||
+      this.passwordBusy() ||
+      this.phase() === 'working'
+    ) {
+      return;
+    }
     this.error.set(null);
     if (this.isNativeApp()) {
-      this.showError('native');
+      const capacitor = this.win as Window & { Capacitor?: { getPlatform?: () => string } };
+      if (capacitor.Capacitor?.getPlatform?.() !== 'ios') {
+        this.showError('native');
+        return;
+      }
+      void this.startNativeGoogleSignIn();
       return;
     }
     if (!this.isSupportedOrigin()) {
@@ -272,6 +286,43 @@ export class GoogleLogin implements OnInit {
       );
     } catch {
       this.showError('storage');
+    }
+  }
+
+  private async startNativeGoogleSignIn(): Promise<void> {
+    const iosClientId =
+      typeof __IOS_GOOGLE_CLIENT_ID__ === 'string' ? __IOS_GOOGLE_CLIENT_ID__ : '';
+    if (!iosClientId) {
+      this.showError('native');
+      return;
+    }
+    this.phase.set('working');
+    try {
+      const { SocialLogin } = await import('@capgo/capacitor-social-login');
+      await SocialLogin.initialize({
+        google: {
+          iOSClientId: iosClientId,
+          iOSServerClientId: GOOGLE_WEB_CLIENT_ID,
+          webClientId: GOOGLE_WEB_CLIENT_ID,
+          mode: 'online',
+        },
+      });
+      const login = await SocialLogin.login({ provider: 'google', options: {} });
+      if (login.result.responseType !== 'online' || !login.result.idToken) {
+        this.showError('invalid');
+        return;
+      }
+      const result = await this.api.nativeGoogleLogin(login.result.idToken);
+      if (this.destroyed) return;
+      if (!result.ok) {
+        this.showError('api');
+        return;
+      }
+      this.phase.set('signed-in');
+    } catch (error) {
+      if (this.destroyed) return;
+      const cancelled = (error as { code?: string } | null)?.code === 'USER_CANCELLED';
+      this.showError(cancelled ? 'cancelled' : 'api');
     }
   }
 

@@ -998,3 +998,30 @@ source/visual review, and update the audit findings with verified resolution sta
 - Cloud Run needs its matching Google OAuth client ID and client secret. Register the
   deployed callback with Google and verify a real login separately after deployment.
 
+# iOS native Google sign-in — 2026-11-08
+
+- Add native Google sign-in for the existing iOS bundle identifier, using an iOS
+  OAuth client and the existing web server OAuth client. Configure client IDs without
+  committing credentials or storing them in app-visible configuration forms.
+- Present Google's native sign-in flow, verify the resulting ID token on the backend
+  for the expected server audience, and identify accounts by verified Google subject.
+  Reuse the existing account, JWT, revocable database session, native bearer transport,
+  secure token storage, onboarding redirect, and logout behavior.
+- Preserve the existing website flow and Android behavior. Handle cancellation,
+  missing configuration, invalid tokens, network errors, and repeated attempts.
+- Verify backend, frontend and iOS builds with isolated provider fixtures. A real
+  Google account and physical-device sign-in remain user-verified end to end.
+
+Implementation: the iOS-only action uses the Google provider of the Capacitor social
+login plugin. The native build reads an ignored local client ID and generates an ignored
+Xcode callback configuration. The native ID-token exchange uses the existing configured
+web OAuth audience and the existing Google-subject account and revocable-session logic.
+Other social providers are disabled in the Capacitor plugin configuration.
+
+Verification: frontend unit tests (273), backend unit tests (281), and disposable
+PostgreSQL integration tests (49) passed. Signed iOS Simulator Debug and unsigned
+Release compilation succeeded, and the generated callback schemes matched the local
+iOS client configuration. Android debug compilation passed with dependencies online.
+Google identity responses were mocked in tests. Real Google sign-in and session
+persistence on the physical iPhone require verification after backend deployment.
+

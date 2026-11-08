@@ -103,6 +103,7 @@ describe('createNativeFetch', () => {
     ['/api/v1/auth/signup', 201],
     ['/api/v1/auth/password/login', 200],
     ['/api/v1/auth/login', 200],
+    ['/api/v1/auth/google/native', 200],
   ])(
     'stores the token a sign-in at %s returns, and still lets the caller read the body',
     async (path, status) => {

@@ -336,6 +336,23 @@ describe('AuthService', () => {
     await expectIssuedSession(result, 'Login successful!');
   });
 
+  it('verifies a native Google ID token before issuing an existing account session', async () => {
+    mockGoogleIdentity();
+    users.findByGoogleId.mockResolvedValueOnce({ id: userId });
+    const result = await service.loginNative('test-id-token');
+    expect(verifyGoogle).toHaveBeenCalledWith({ idToken: 'test-id-token', audience: 'test-client-id' });
+    expect(exchange).not.toHaveBeenCalled();
+    expect(users.findByGoogleId).toHaveBeenCalledWith('google-subject');
+    await expectIssuedSession(result, 'Login successful!');
+  });
+
+  it('rejects a native Google ID token that fails verification', async () => {
+    verifyGoogle.mockRejectedValueOnce(new Error('invalid token'));
+    await expect(service.loginNative('invalid-id-token')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(users.findByGoogleId).not.toHaveBeenCalled();
+    expect(sessions.create).not.toHaveBeenCalled();
+  });
+
   it('creates a new Google account using the verified profile', async () => {
     mockGoogleIdentity();
     users.findByGoogleId.mockResolvedValueOnce(null);
