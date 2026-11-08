@@ -782,6 +782,16 @@ describe('Google sign-in initiation', () => {
     expect(destination.searchParams.get('state')).toBe(stored.get(STATE_KEY));
   });
 
+  it('starts Google sign-in with the deployed callback on Cloud Run', () => {
+    const origin = 'https://whylint-8715935974.asia-northeast1.run.app';
+    const { component, assign, stored } = setup(origin, false);
+    component.startSignIn();
+    expect(assign).toHaveBeenCalledOnce();
+    const destination = new URL(assign.mock.calls[0][0]);
+    expect(destination.searchParams.get('redirect_uri')).toBe(`${origin}/auth/google/callback`);
+    expect(destination.searchParams.get('state')).toBe(stored.get(STATE_KEY));
+  });
+
   it('does not initiate the incomplete flow on an unconfigured origin', () => {
     const { component, assign, stored } = setup('https://example.com', false);
     component.startSignIn();
