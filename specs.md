@@ -988,3 +988,13 @@ source/visual review, and update the audit findings with verified resolution sta
   fixes. Evidence is in frontend/.impeccable/review/mobile-fixes-2026-11-08/.
 - Physical devices, VoiceOver/TalkBack, native text-size gestures, detailed IME/
   landscape behavior, and additional Android versions require follow-up checks.
+# Cloud Run web Google sign-in — 2026-11-08
+
+- Allow Google sign-in and callback on the existing localhost origin and the deployed
+  WhyLint Cloud Run origin. Keep other origins and native webview sign-in blocked.
+- Use the existing OAuth state handling, callback, and server-side session flow.
+- Verify the deployed origin starts the flow with its exact callback, while existing
+  local, native, and unconfigured-origin checks continue to pass.
+- Cloud Run needs its matching Google OAuth client ID and client secret. Register the
+  deployed callback with Google and verify a real login separately after deployment.
+
