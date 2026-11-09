@@ -49,9 +49,6 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
-            },
-            "native": {
-              "outputPath": "dist/native"
             }
           },
           "defaultConfiguration": "production"

@@ -60,10 +60,6 @@ jobs:
         run: npx ng test --watch=false
       - name: Production build
         run: npx ng build --configuration production
-      - name: Native bundle for the iOS/Android shell
-        run: npm run native:build -- --no-sync
-        env:
-          WHYLINT_API_URL: https://api.ci.example.test
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
@@ -145,67 +141,3 @@ jobs:
         run: docker build -t whylint:ci .
       - name: Smoke test (release job, then the app on one origin)
         run: e2e/scripts/container-smoke.sh whylint:ci
-
-  android:
-    name: Android app (debug build)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      # Capacitor 8's Gradle cannot run on newer JDKs.
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - run: npm ci
-      - name: Native bundle
-        run: npm run native:build -- --no-sync
-        env:
-          WHYLINT_API_URL: https://api.ci.example.test
-      - run: npx cap sync android
-      - name: Configure verified Gradle download
-        working-directory: frontend/android
-        run: |
-          properties=gradle/wrapper/gradle-wrapper.properties
-          grep -q 'services.gradle.org/distributions/gradle-8.14.3-all.zip' "$properties"
-          sed -i 's@services.gradle.org/distributions/gradle-8.14.3-all.zip@repo.huaweicloud.com/gradle/gradle-8.14.3-bin.zip@' "$properties"
-          echo 'distributionSha256Sum=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531' >> "$properties"
-      - name: Build
-        run: ./gradlew assembleDebug --no-daemon
-        working-directory: frontend/android
-
-  ios:
-    name: iOS app (simulator build)
-    # macOS minutes cost ten times as much as Linux ones, so pull requests skip this job.
-    if: github.event_name != 'pull_request'
-    runs-on: macos-latest
-    timeout-minutes: 40
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - name: Native bundle
-        run: npm run native:build -- --no-sync
-        env:
-          WHYLINT_API_URL: https://api.ci.example.test
-      - run: npx cap sync ios
-      # Compile check only. Signing is off here; a build you launch must be signed (docs/mobile.md).
-      - name: Build
-        run: >
-          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug
-          -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

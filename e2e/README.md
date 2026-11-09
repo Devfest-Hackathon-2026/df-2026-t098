@@ -91,8 +91,7 @@ the disposable database URL, and has no application HTTP endpoint.
   provider and backend tests for missing configuration and upstream failures.
 
 The share test substitutes the browser clipboard API to check the copied URL.
-Gemini outputs are fixtures. Live Gemini quality/latency and native device sharing
-need separate verification after credentials and a device are available.
+Gemini outputs are fixtures. Live Gemini quality and latency need separate verification.
 
 ## What the suite proves
 
@@ -121,11 +120,10 @@ RSA key; the real `google-auth-library` verifier still checks the fixture token
 before the real Nest service creates a PostgreSQL session. No real Google
 authorization request, account, secret, callback code or token is used. This
 does **not** verify real Google OAuth, consent, deployed redirect configuration,
-backend-bound state/PKCE, or native Google sign-in.
+or backend-bound state/PKCE.
 
-Mobile emulation checks a browser viewport. An actual Android/iOS Capacitor app,
-WebView cookie compatibility, device keyboard, safe areas and system-browser
-handoff still need device testing. The endless five-question/prefetch behavior is
+Mobile emulation checks a browser viewport. Device keyboard, safe areas and
+physical touch behavior still need testing on devices. The endless five-question/prefetch behavior is
 outside this auth suite. Cloud Run deployment and the hackathon platform
 requirement remain unverified by these local tests.
 

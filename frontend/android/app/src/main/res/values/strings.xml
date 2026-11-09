@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">WhyLint</string>
-    <string name="title_activity_main">WhyLint</string>
-    <string name="package_name">app.whylint.mobile</string>
-    <string name="custom_url_scheme">app.whylint.mobile</string>
-</resources>

@@ -50,7 +50,7 @@ Google display names and pictures are saved separately from the chosen username.
 
 JWT verification and its guard live in `src/auth/jwt/`; the session entity and service live in `src/auth/sessions/`. `JwtService.verifyAsync` checks the signature and expiry, and the guard also checks the database session so logout can revoke a token immediately, before its seven-day expiry.
 
-Email ownership is not verified yet. Do not automatically link password and Google identities by email. Email verification and recovery, Google OAuth PKCE/state, distributed rate limiting, native app sign-in, and deployed cookie/CORS settings are not production-ready.
+Email ownership is not verified yet. Do not automatically link password and Google identities by email. Email verification and recovery, Google OAuth PKCE/state, distributed rate limiting, and deployed cookie/CORS settings are not production-ready.
 
 The PostgreSQL integration test needs an empty local `whylint_auth_e2e_*` test database through `TEST_DATABASE_URL`; it skips when this variable is absent and refuses other database names or non-local hosts. Never point tests at your development database.
 

@@ -1,7 +1,4 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
-import { createNativeFetch } from '../native/native-fetch';
-import { isNativePlatform, nativeApiBaseUrl } from '../native/platform';
-import { NATIVE_TOKEN_STORE } from '../native/token-store';
 
 export interface AuthUser {
   id: string;
@@ -18,14 +15,7 @@ const SESSION_TIMEOUT_MS = 10_000;
 
 export const AUTH_FETCH = new InjectionToken<typeof fetch>('AUTH_FETCH', {
   providedIn: 'root',
-  factory: () => {
-    const browserFetch = globalThis.fetch.bind(globalThis);
-    // Browsers call the relative /api on their own origin. The native shell calls the configured API.
-    if (!isNativePlatform()) return browserFetch;
-    const baseUrl = nativeApiBaseUrl();
-    if (!baseUrl) console.error('This native build has no API address. Build it with npm run native:build.');
-    return createNativeFetch({ fetchImpl: browserFetch, baseUrl, tokens: inject(NATIVE_TOKEN_STORE) });
-  },
+  factory: () => globalThis.fetch.bind(globalThis),
 });
 
 @Injectable({ providedIn: 'root' })

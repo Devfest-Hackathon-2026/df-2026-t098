@@ -25,7 +25,6 @@ What is verified and what is not is listed at the end of this page.
 | `FRONTEND_URL` | yes | The public origin of the service, for example `https://learn.example.com`. **Exactly one origin**: writes carrying any other `Origin` get 403. Use the custom domain, not a second `*.run.app` URL. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in | See "Known gaps". |
 | `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_THINKING_LEVEL` | for AI grading and generation | The pool and tap grading work without them. |
-| `NATIVE_APP_ORIGINS` | for the mobile app | `capacitor://localhost,https://localhost`. Empty (default) accepts no app origin. See [mobile.md](mobile.md). |
 | `TRUST_PROXY` | on Cloud Run: `1` | Hops of trusted proxy. Without it every learner shares one rate-limit bucket. |
 | `PORT` | no | Defaults to 8080 in the image; Cloud Run sets it. |
 | `FRONTEND_DIST` | set by the image | `/app/public`. Unset means API only (local development). A wrong path stops startup. |
@@ -94,14 +93,6 @@ gcloud run deploy whylint \
 
 Also: point the startup and uptime checks at `/api/v1/health/ready`, map the custom domain, and keep
 `--max-instances` small until rate limits move to a shared store (they are in memory per instance).
-
-## Mobile apps
-
-The iOS and Android apps call this same service from `capacitor://localhost` / `https://localhost`.
-Set `NATIVE_APP_ORIGINS=capacitor://localhost,https://localhost` on the service and build the app with
-`WHYLINT_API_URL` set to the service's public origin; see [mobile.md](mobile.md). Requests from those
-origins receive the session token in the response body (kept in the device keystore) instead of a
-cookie. Leave the variable empty for a web-only deployment.
 
 ## Known gaps before real traffic
 

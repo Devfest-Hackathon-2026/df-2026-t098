@@ -22,8 +22,6 @@ import { SyntaxHighlightPipe } from '../homepage/syntax-highlight.pipe';
 import { Icon } from './icon';
 import { QuestionDiscussion } from './question-discussion';
 import { LearningApi, LearningError, learningError } from './learning-api';
-import { HapticFeedback } from '../native/haptics';
-import { nativeShare, shareBaseUrl } from '../native/share';
 import { ProgressStore } from './progress-store';
 import { topicLabel } from './topic-label';
 import type {
@@ -77,7 +75,6 @@ export class QuestionCard {
   private readonly api = inject(LearningApi);
   private readonly router = inject(Router);
   private readonly progressStore = inject(ProgressStore);
-  private readonly haptics = inject(HapticFeedback);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
   private readonly detailPanel = viewChild<ElementRef<HTMLDialogElement>>('detailPanel');
@@ -495,7 +492,11 @@ export class QuestionCard {
   }
 
   private vibrate(correct: boolean): void {
-    this.haptics.answer(correct);
+    try {
+      navigator.vibrate?.(correct ? 18 : [30, 40, 30]);
+    } catch {
+      /* Vibration is optional. */
+    }
   }
 
   protected openExplain(): void {
@@ -753,7 +754,7 @@ export class QuestionCard {
   }
 
   protected async share(): Promise<void> {
-    const url = new URL('/questions/' + this.question().id, shareBaseUrl(location.origin)).href;
+    const url = new URL('/questions/' + this.question().id, location.origin).href;
     this.shareMessage.set('');
     const tap = this.tap();
     const result = tap
@@ -765,8 +766,6 @@ export class QuestionCard {
       ? this.text('WhyLint 今日のバグ', 'WhyLint Bug of the Day') + result
       : this.question().title;
     try {
-      const shared = await nativeShare({ title, text: title, url });
-      if (shared === 'shared' || shared === 'cancelled') return;
       if (navigator.share) await navigator.share({ title, text: title, url });
       else if (navigator.clipboard) {
         await navigator.clipboard.writeText(this.daily() ? `${title}\n${url}` : url);

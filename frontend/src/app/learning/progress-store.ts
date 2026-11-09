@@ -1,6 +1,5 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { AuthSession } from '../auth/auth-session';
-import { HapticFeedback } from '../native/haptics';
 import { LearningApi } from './learning-api';
 import type { Progress, TapResult } from './learning.types';
 
@@ -23,7 +22,6 @@ const COMBO_MILESTONES = new Set([3, 5, 10, 15, 20, 30, 50]);
 export class ProgressStore {
   private readonly api = inject(LearningApi);
   private readonly session = inject(AuthSession);
-  private readonly haptics = inject(HapticFeedback);
   private owner: string | null | undefined;
   private controller = new AbortController();
   private nextToast = 1;
@@ -98,7 +96,6 @@ export class ProgressStore {
   }
 
   toast(toast: ToastInput): void {
-    if (toast.kind !== 'difficulty') this.haptics.celebrate();
     const id = this.nextToast++;
     this.toasts.update((toasts) => [...toasts.slice(-2), { ...toast, id } as Toast]);
     setTimeout(() => this.dismiss(id), 3200);

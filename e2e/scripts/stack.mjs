@@ -21,10 +21,6 @@ const backendPort = Number(process.env.WHYLINT_E2E_BACKEND_PORT ?? 3101);
 // Google sign-in tests need 4200; other suites can use a free port beside a running dev server.
 const frontendPort = Number(process.env.WHYLINT_E2E_FRONTEND_PORT ?? 4200);
 const frontendOrigin = `http://localhost:${frontendPort}`;
-// A stand-in for the Capacitor shell: the native build served from its own origin, calling the API
-// across origins with a Bearer token. The backend allows this origin through NATIVE_APP_ORIGINS.
-const nativePort = Number(process.env.WHYLINT_E2E_NATIVE_PORT ?? 4400);
-const nativeOrigin = `http://localhost:${nativePort}`;
 const children = [];
 let runtime;
 let postgresStarted = false;
@@ -187,7 +183,6 @@ async function main() {
       );
     }
     await assertPortFree(frontendPort);
-    await assertPortFree(nativePort);
     await assertPortFree(backendPort);
   }
 
@@ -213,8 +208,6 @@ async function main() {
     GEMINI_API_KEY: "whylint-fixture-gemini-key",
     GEMINI_MODEL: "fixture-gemini",
     FRONTEND_URL: frontendOrigin,
-    // The browser stand-in, plus the real Capacitor origins so an iOS/Android build can use this stack.
-    NATIVE_APP_ORIGINS: [nativeOrigin, 'capacitor://localhost', 'https://localhost'].join(','),
     PORT: String(backendPort),
     WHYLINT_E2E: "1",
     PGCONNECT_TIMEOUT: "5",
@@ -285,34 +278,6 @@ async function main() {
   );
   await waitFor(`http://127.0.0.1:${backendPort}/api/v1/auth/me`, api);
 
-  // The native stand-in starts first: Playwright begins as soon as the web port answers, so the web
-  // server must be the last one to become ready.
-  // The native build bakes in the API origin, exactly as `npm run native:build` does for a device.
-  const nativeDirectory = path.join(runtime, "native");
-  await run(
-    process.execPath,
-    [
-      path.join(frontend, "node_modules/@angular/cli/bin/ng.js"),
-      "build",
-      "--configuration",
-      "development,native",
-      "--define",
-      `__API_BASE_URL__=${JSON.stringify(`http://localhost:${backendPort}`)}`,
-      "--output-path",
-      nativeDirectory,
-    ],
-    { cwd: frontend },
-  );
-  const nativeWeb = startLogged(
-    process.execPath,
-    [
-      path.join(directory, "scripts/static-server.mjs"),
-      path.join(nativeDirectory, "browser"),
-      String(nativePort),
-    ],
-    "native-web",
-  );
-  await waitFor(`${nativeOrigin}/login`, nativeWeb);
   const proxy = path.join(runtime, "proxy.json");
   await writeFile(
     proxy,
@@ -341,10 +306,10 @@ async function main() {
   await waitFor(`${frontendOrigin}/login`, web);
 
   console.log(
-    `WhyLint test stack ready at ${frontendOrigin} (backend ${backendPort}; native shell stand-in ${nativeOrigin}; disposable PostgreSQL; Google and Gemini isolated).`,
+    `WhyLint test stack ready at ${frontendOrigin} (backend ${backendPort}; disposable PostgreSQL; Google and Gemini isolated).`,
   );
   console.log(`Fixture-only server logs: ${runtime}`);
-  for (const child of [api, web, nativeWeb])
+  for (const child of [api, web])
     child.once("close", () => {
       if (!cleanupPromise) {
         console.error("An owned test server stopped unexpectedly.");
@@ -358,7 +323,7 @@ main().catch(async (error) => {
   if (runtime) {
     const diagnostics = path.join(directory, "test-results/stack");
     await mkdir(diagnostics, { recursive: true });
-    for (const name of ["backend", "frontend", "native-web", "postgres"]) {
+    for (const name of ["backend", "frontend", "postgres"]) {
       const source = path.join(runtime, `${name}.log`);
       if (existsSync(source))
         await copyFile(source, path.join(diagnostics, `${name}.log`));

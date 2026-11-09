@@ -51,7 +51,6 @@ Eight blockers below need to be closed first; most are configuration and process
 - **Synchronous generation.** A personalized batch is generated inside the HTTP request (60 s budget, 75 s client timeout). The pool hides it today; at scale, move generation to a background job.
 - **Reminders.** The 09:00 Practice review appears only when the learner opens the app. Add web push or email reminders.
 - **Share previews.** Shared `/questions/:id` links have no Open Graph metadata (client-rendered), so previews are blank.
-- **Mobile apps.** Capacitor 8 is set up (iOS and Android projects, secure token session, status bar, back button, haptics, share sheet); see [mobile.md](mobile.md). Still open: native Google sign-in, push reminders, universal/app links, store assets and signing, and a build on a device.
 - **Lint debt.** ESLint reports hundreds of `no-unsafe-*` errors from untyped raw SQL results. Add typed row interfaces and make lint part of CI.
 - **Google sign-in E2E** requires port 4200; run it in CI where that port is free.
 

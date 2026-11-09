@@ -76,7 +76,7 @@ questions and sign-in affordances. No production fixture questions or fake score
   independent-session survival, and display a locally served fixture avatar.
 - Build and run frontend tests, check mobile/desktop browser viewports using only
   disposable accounts, and restore the normal dev frontend after integration
-  testing. Real-device/Capacitor verification remains separate.
+  testing. Physical device verification remains separate.
 
 ## Scope and isolation
 
@@ -120,7 +120,7 @@ questions and sign-in affordances. No production fixture questions or fake score
 - Keep the OAuth callback accessible until it has removed the code from the address and consumed/validated state. Check the server session before exchanging a valid code: redirect an already-authenticated user without exchanging it, exchange only for a confirmed guest, and require a fresh sign-in if the check is unavailable. After a successful exchange navigate to `/` with replacement history. A failed or invalid callback must not send an unverified code.
 - Bound session-check duration and surface a retryable unavailable state on timeout. The client guard is navigation UX only; backend authorization remains mandatory.
 - During an initial guarded navigation, show a localized account-checking state rather than leaving a blank screen while the router awaits the server.
-- The current flow targets web browsers, not Capacitor WebView. Google sign-in must use approved native or system-browser flows on mobile, and cookie compatibility must be evaluated on actual devices.
+- Verify web Google sign-in and cookie compatibility in mobile browsers on physical devices.
 
 ## Acceptance checks
 

@@ -4,7 +4,6 @@ import { AuthOriginGuard } from './origin.guard';
 describe('AuthOriginGuard', () => {
   const guard = new AuthOriginGuard();
   const originalFrontendUrl = process.env.FRONTEND_URL;
-  const originalNativeOrigins = process.env.NATIVE_APP_ORIGINS;
 
   function contextFor(origin?: string, request: Record<string, unknown> = {}): ExecutionContext {
     return {
@@ -16,12 +15,9 @@ describe('AuthOriginGuard', () => {
 
   beforeEach(() => {
     process.env.FRONTEND_URL = 'http://localhost:4200';
-    delete process.env.NATIVE_APP_ORIGINS;
   });
 
   afterAll(() => {
-    if (originalNativeOrigins === undefined) delete process.env.NATIVE_APP_ORIGINS;
-    else process.env.NATIVE_APP_ORIGINS = originalNativeOrigins;
     if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
     else process.env.FRONTEND_URL = originalFrontendUrl;
   });
@@ -43,35 +39,6 @@ describe('AuthOriginGuard', () => {
     'http://localhost:4200.evil.test',
   ])('rejects an absent or untrusted origin', (origin) => {
     expect(() => guard.canActivate(contextFor(origin))).toThrow(ForbiddenException);
-  });
-
-  it('rejects Capacitor origins unless they are listed in NATIVE_APP_ORIGINS', () => {
-    expect(() => guard.canActivate(contextFor('capacitor://localhost'))).toThrow(
-      ForbiddenException,
-    );
-    expect(() => guard.canActivate(contextFor('https://localhost'))).toThrow(ForbiddenException);
-  });
-
-  it('allows exactly the listed native app origins', () => {
-    process.env.NATIVE_APP_ORIGINS = 'capacitor://localhost,https://localhost';
-    expect(guard.canActivate(contextFor('capacitor://localhost'))).toBe(true);
-    expect(guard.canActivate(contextFor('https://localhost'))).toBe(true);
-    expect(guard.canActivate(contextFor('http://localhost:4200'))).toBe(true);
-    for (const origin of [
-      'http://localhost',
-      'capacitor://localhost.evil.test',
-      'https://localhost:8443',
-      'null',
-    ])
-      expect(() => guard.canActivate(contextFor(origin))).toThrow(ForbiddenException);
-  });
-
-  it('still fails closed without FRONTEND_URL even when native origins are listed', () => {
-    process.env.NATIVE_APP_ORIGINS = 'capacitor://localhost';
-    delete process.env.FRONTEND_URL;
-    expect(() => guard.canActivate(contextFor('capacitor://localhost'))).toThrow(
-      ForbiddenException,
-    );
   });
 
   it.each([undefined, '', 'not-a-url', 'data:text/plain,hello'])(

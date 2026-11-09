@@ -14,7 +14,7 @@ Once the server is running, open your browser and navigate to `http://localhost:
 
 The development server forwards `/api` requests to the backend on `127.0.0.1:3000`. Start the backend separately to use Google sign-in and account restoration. The sign-in page is `/login`; the local Google OAuth redirect must be registered as `http://localhost:4200/auth/google/callback`.
 
-In a browser, the backend's HttpOnly cookie maintains the session; the frontend reloads the profile from `/api/v1/auth/me` and does not save tokens in browser storage. In the iOS/Android app the session token is kept in the Keychain/Keystore and sent as a Bearer header (see [../docs/mobile.md](../docs/mobile.md)). The current Google flow is enabled only on `http://localhost:4200` and is not available in the app. Native Google sign-in, backend-bound OAuth state and PKCE, and a per-environment origin allowlist still need to be completed and tested before release.
+The backend's HttpOnly cookie maintains the session. The frontend reloads the profile from `/api/v1/auth/me` and does not save tokens in browser storage. Google sign-in uses the configured localhost and Cloud Run web origins. Backend-bound OAuth state, PKCE, and a per-environment origin allowlist remain release work.
 
 The Profile account section displays the returned `avatarUrl`, with an icon
 fallback for a missing or failed image. Its Sign out / ログアウト button calls
@@ -55,20 +55,7 @@ and the question action row supports likes, flat comments, sharing and bookmarks
 
 Guests can read published community questions. Sign-in enables personal generation,
 assessment, publishing and social writes. Controls adapt to phone, tablet and desktop
-widths. Browser mobile emulation and actual Capacitor device testing are separate.
-
-### Mobile apps (Capacitor)
-
-`ios/` and `android/` hold the Capacitor projects. Build the app bundle and sync it with:
-
-```bash
-npm run native:build:dev   # http://localhost:3000 (or WHYLINT_API_URL), syncs both platforms
-npm run native:ios         # same, then opens Xcode
-WHYLINT_API_URL=https://learn.example.com npm run native:build   # production bundle
-```
-
-The backend must list the app's origins in `NATIVE_APP_ORIGINS`. Requirements, what was verified in
-the iOS Simulator, and what is still open are in [../docs/mobile.md](../docs/mobile.md).
+widths.
 
 `/login` rechecks the session and redirects authenticated users to `/` (or onboarding when required). If the session cannot be checked, the page offers a retry rather than assuming the user is signed out. The Google callback remains accessible long enough to validate and consume its one-time state and code. This frontend guard controls navigation only; protected backend endpoints must still verify the session.
 

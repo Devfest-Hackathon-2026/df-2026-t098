@@ -249,47 +249,6 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
     };
   });
 
-  it('uses the same Google account for a native session and revokes it on logout', async () => {
-    const previous = process.env.NATIVE_APP_ORIGINS;
-    process.env.NATIVE_APP_ORIGINS = 'capacitor://localhost';
-    try {
-      const webProfile = await request(server())
-        .get('/api/v1/auth/me')
-        .set('Cookie', googleCookie)
-        .expect(200);
-      const nativeLogin = await request(server())
-        .post('/api/v1/auth/google/native')
-        .set('Origin', 'capacitor://localhost')
-        .send({ idToken: 'fixture-google-id-token' })
-        .expect(200);
-      expect(nativeLogin.headers['set-cookie']).toBeUndefined();
-      expect(typeof nativeLogin.body.token).toBe('string');
-      const authorization = `Bearer ${nativeLogin.body.token as string}`;
-      const nativeProfile = await request(server())
-        .get('/api/v1/auth/me')
-        .set('Authorization', authorization)
-        .expect(200);
-      expect(nativeProfile.body.id).toBe(webProfile.body.id);
-      await request(server())
-        .post('/api/v1/auth/google/native')
-        .set('Origin', origin)
-        .send({ idToken: 'fixture-google-id-token' })
-        .expect(403);
-      await request(server())
-        .post('/api/v1/auth/logout')
-        .set('Origin', 'capacitor://localhost')
-        .set('Authorization', authorization)
-        .expect(204);
-      await request(server())
-        .get('/api/v1/auth/me')
-        .set('Authorization', authorization)
-        .expect(401);
-    } finally {
-      if (previous === undefined) delete process.env.NATIVE_APP_ORIGINS;
-      else process.env.NATIVE_APP_ORIGINS = previous;
-    }
-  });
-
   it('backfills an existing NULL Google avatar and preserves it when a later claim omits the picture', async () => {
     const original = await database
       .getRepository(UserEntity)
@@ -670,89 +629,6 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
     } finally {
       await database.query(`DROP TRIGGER "${trigger}" ON "sessions"`);
       await database.query(`DROP FUNCTION "${trigger}"()`);
-    }
-  });
-
-  it('gives a native app origin a Bearer token instead of a cookie, and never gives it to the web origin', async () => {
-    const nativeOrigin = 'capacitor://localhost';
-    const nativeEmail = `native-${suffix}@example.test`;
-    const nativeUsername = `native_${suffix}`;
-    const previous = process.env.NATIVE_APP_ORIGINS;
-    try {
-      // Off by default: a Capacitor origin is as untrusted as any other.
-      delete process.env.NATIVE_APP_ORIGINS;
-      await request(server())
-        .post('/api/v1/auth/signup')
-        .set('Origin', nativeOrigin)
-        .send({ email: nativeEmail, username: nativeUsername, password })
-        .expect(403);
-
-      process.env.NATIVE_APP_ORIGINS = 'capacitor://localhost,https://localhost';
-      const signup = await request(server())
-        .post('/api/v1/auth/signup')
-        .set('Origin', nativeOrigin)
-        .send({ email: nativeEmail, username: nativeUsername, password })
-        .expect(201);
-      expect(signup.headers['set-cookie']).toBeUndefined();
-      expect(signup.headers['cache-control']).toContain('no-store');
-      const token: unknown = signup.body.token;
-      expect(typeof token).toBe('string');
-      expect(JSON.stringify(signup.body).includes(password)).toBe(false);
-
-      const me = await request(server())
-        .get('/api/v1/auth/me')
-        .set('Authorization', `Bearer ${token as string}`)
-        .expect(200);
-      expect(me.body.email).toBe(nativeEmail);
-
-      // A guarded write passes the Origin and Bearer checks and reaches the service, which answers
-      // 409 because a password account already has its username.
-      await request(server())
-        .patch('/api/v1/auth/me/username')
-        .set('Authorization', `Bearer ${token as string}`)
-        .set('Origin', nativeOrigin)
-        .send({ username: `${nativeUsername}_2` })
-        .expect(409);
-
-      // Password sign-in from the same origin: token in the body, no cookie.
-      const login = await request(server())
-        .post('/api/v1/auth/password/login')
-        .set('Origin', 'https://localhost')
-        .send({ identifier: nativeEmail, password })
-        .expect(200);
-      expect(login.headers['set-cookie']).toBeUndefined();
-      expect(typeof login.body.token).toBe('string');
-
-      // The web origin keeps the HttpOnly cookie and never sees the token.
-      const webLogin = await request(server())
-        .post('/api/v1/auth/password/login')
-        .set('Origin', origin)
-        .send({ identifier: nativeEmail, password })
-        .expect(200);
-      cookieFrom(webLogin);
-      expect(webLogin.body.token).toBeUndefined();
-      expectNoCredentials(webLogin.body);
-
-      // Origins that are not listed stay refused.
-      await request(server())
-        .post('/api/v1/auth/password/login')
-        .set('Origin', 'capacitor://localhost.evil.test')
-        .send({ identifier: nativeEmail, password })
-        .expect(403);
-
-      // Logging out from the app revokes the server-side session behind the token.
-      await request(server())
-        .post('/api/v1/auth/logout')
-        .set('Origin', nativeOrigin)
-        .set('Authorization', `Bearer ${token as string}`)
-        .expect(204);
-      await request(server())
-        .get('/api/v1/auth/me')
-        .set('Authorization', `Bearer ${token as string}`)
-        .expect(401);
-    } finally {
-      if (previous === undefined) delete process.env.NATIVE_APP_ORIGINS;
-      else process.env.NATIVE_APP_ORIGINS = previous;
     }
   });
 

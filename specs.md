@@ -56,8 +56,8 @@
   desktop browser tests. Playwright MCP inspected 20 captures covering narrow phone,
   phone, tablet, desktop, landscape, both languages/themes, and skeleton/error states.
   The independent UI reviewer returned `ship` for this refinement and the
-  documentation consistency check required no further changes. Physical Capacitor
-  device verification remains a separate check.
+  documentation consistency check required no further changes. Physical device
+  verification remains a separate check.
 
 ## Incomplete JavaScript snippets
 
@@ -276,8 +276,8 @@ production HTTP. Unit tests override transport; integration harness supplies loc
 4. Verification: backend and frontend builds/unit checks, real disposable PostgreSQL
    integration tests, mobile and desktop Playwright suite, MCP exploration of actual
    rendered screens. Explicitly verify no credential/reference leaks, duplicate replay,
-   failure recovery, privacy and lifecycle races. Real Gemini and Capacitor hardware
-   verification remain pending credentials/device access and must be reported accurately.
+   failure recovery, privacy and lifecycle races. Live Gemini and physical device
+   verification remain pending credentials and device access.
 
 ## Work allocation
 
@@ -308,7 +308,7 @@ production HTTP. Unit tests override transport; integration harness supplies loc
   design context matches this extension.
 - Homepage CSS is 4.59 kB, above its 4 kB warning threshold and below its 8 kB error
   limit. The frontend build succeeds. Initial bundle is 492.11 kB.
-- Real Gemini generation/scoring, actual Capacitor hardware, and Cloud Run deployment
+- Real Gemini generation/scoring, physical device behavior, and Cloud Run deployment
   still require separate verification. Gemini key/model configuration is intentionally
   absent from production runtime until the user supplies it locally.
 - Development follow-up: at the user's explicit request, applied
@@ -363,8 +363,7 @@ production HTTP. Unit tests override transport; integration harness supplies loc
 - Check full-width desktop geometry, mobile overflow, and the existing learning
   and authentication flows using Playwright Test against the real backend and a
   disposable PostgreSQL database with isolated Google/Gemini responses. Inspect
-  the rendered UI with Playwright MCP. Actual Capacitor hardware remains a
-  separate device check.
+  the rendered UI with Playwright MCP. Physical device testing remains separate.
 
 ### Verified results
 
@@ -380,8 +379,8 @@ production HTTP. Unit tests override transport; integration harness supplies loc
   isolated, then stopped and removed its temporary cluster.
 - Playwright MCP checked 320px, 390px, 768px, 1280px, and 1920px widths. Comments
   headings stayed visible, content stayed within the viewport, and the desktop
-  card used the available width. Live Gemini question difficulty and actual
-  Capacitor-device behavior remain manual verification tasks.
+  card used the available width. Live Gemini question difficulty and physical
+  device behavior remain manual verification tasks.
 
 ## Centered desktop feed and comments panel — 2026-11-07
 
@@ -428,8 +427,8 @@ content and use the bottom-sheet comments presentation selected by the user.
   transitions. Keep authentication and learning-flow coverage.
 - Run builds and existing unit/integration/browser suites with disposable database
   data and isolated external services. Inspect rendered mobile, tablet, wide,
-  localized, themed, and long-content states through Playwright MCP. Actual
-  Capacitor keyboard/device behavior requires a separate hardware check.
+  localized, themed, and long-content states through Playwright MCP. Check keyboard
+  behavior on physical devices separately.
 
 ### Verified results
 
@@ -451,7 +450,7 @@ content and use the bottom-sheet comments presentation selected by the user.
 - Independent source/capture finish review returned a ship verdict. Documentation
   review updated the existing core-learning surface brief. A file-scoped design
   detector exception records the Angular avatar binding false positive, and its
-  verification scan is clear. Real Capacitor keyboard/touch checks remain pending.
+  verification scan is clear. Physical keyboard and touch checks remain pending.
 
 ## Tap-first quiz feed and learning loop — 2026-11-08
 
@@ -627,8 +626,8 @@ dev servers after tests, and report actual results and device/provider limits.
   SocialLearningCommunity1794200000000 to the normal configured dev database.
   Existing users/sessions/questions/comments/attempts/taps counts were preserved,
   and no migrations remain pending. Automated tests used disposable data.
-- Report moderation uses the stored private report queue in this MVP. Actual
-  Capacitor-device and live-provider verification are separate from this run.
+- Report moderation uses the stored private report queue in this MVP. Physical
+  device and live provider verification are separate from this run.
 
 ## Fresh-question variety — 2026-11-08
 
@@ -804,97 +803,9 @@ hints use the same formatted public code representation as the initial response.
 - Cloud Build, Cloud Run, Cloud SQL (socket or TLS against a managed database).
 - Google sign-in on a deployed origin: the frontend still allowlists only `http://localhost:4200`.
 
-## Capacitor mobile apps (iOS and Android) — 2026-11-08
-
-### Requirements
-
-- The product is mobile-first, so the Angular app ships inside a Capacitor 8 shell (`frontend/ios`,
-  `frontend/android`, `frontend/capacitor.config.ts`). The shell bundles its files and loads them from
-  `capacitor://localhost` (iOS) or `https://localhost` (Android); loading the deployed site instead was
-  rejected (no offline start, and store review rejects thin website wrappers).
-- The bundle bakes in the API origin: `npm run native:build` (`WHYLINT_API_URL`, https only) and
-  `native:build:dev` (http allowed, default `http://localhost:3000`) build `ng build --configuration
-  production,native` or `development,native` into `dist/native`, with `--define __API_BASE_URL__`, then
-  run `cap sync`. Web builds are unchanged and still use the relative `/api`.
-- Session: a SameSite cookie does not follow the shell's cross-origin requests, so a request whose
-  `Origin` is listed in the new `NATIVE_APP_ORIGINS` (default empty; invalid entries stop startup) gets
-  `{ message, token }` and no cookie from sign-up, password login and Google login. Every other
-  origin, including the web origin, still gets only the HttpOnly cookie. `AuthOriginGuard` and CORS
-  accept the web origin plus the listed native origins; nothing is trusted without a valid
-  `FRONTEND_URL`. The backend already accepted `Authorization: Bearer`.
-- The app keeps the token in the iOS Keychain / Android Keystore (`@aparajita/capacitor-secure-storage`,
-  this-device-only, no iCloud sync), attaches it to relative `/api` calls only, stores the token a
-  sign-in returns before the caller sees the response, and forgets it on logout or on a 401 for that
-  token (unless a newer sign-in replaced it). A failing keystore falls back to memory. A Capacitor plugin is
-  a Proxy that answers `then`, so it is never the value of a promise (this broke storage until a test
-  against the real plugin exposed it).
-- Shell behaviour (`src/app/native`): detection through the injected `window.Capacitor` (the web bundle
-  does not import `@capacitor/core`; plugins load on demand), status bar style that follows
-  `data-theme` from every screen, a page-colour strip behind the status bar, Android back button
-  (open sheet, then history, then exit), haptics, the share sheet, and share links that use the
-  deployed origin.
-- Google sign-in is not available in the app (the existing "coming soon" message): Google rejects
-  OAuth in embedded web views. Password sign-in works.
-- CI builds the native bundle in the frontend job, the Android debug app on Linux, and the iOS
-  simulator app on macOS (skipped for pull requests). `docs/mobile.md` is the operator and developer guide.
-
-### Verified results
-
-- Backend: 277 unit tests (26 new), 48 integration tests on disposable PostgreSQL (one new: token in
-  the body only for listed origins, cookie for the web origin, unlisted origins refused, logout revokes).
-- Frontend: 233 unit tests (59 new). Web production bundle 281.92 kB initial (277.93 before);
-  the native production bundle is 281.89 kB with the API address baked in.
-- Playwright on port 4300: learning, variety, social and the new native-shell suite, 24 passed. The
-  native-shell tests serve the native build from its own origin and check cross-origin sign-up (Bearer
-  token, no cookie, `Access-Control-Allow-Origin`), reload, a graded answer and logout. Auth: 16 passed;
-  the 10 Google runs still need port 4200. The stack runner now starts the native stand-in first so the
-  web port answers last (Playwright starts as soon as it does).
-- iOS Simulator (iPhone 16 Pro Max, iOS 26.5, Xcode 27.2), against the disposable stack: builds with all
-  seven plugins; feed loads from the API across origins; a bug-of-the-day answer is graded; sign-up and
-  password login work; the session survives killing and relaunching the app and is gone after logout;
-  the unreachable-API state recovers on retry; the status bar is readable in both themes (a bug found
-  and fixed: screens that switch the theme themselves left dark text on a dark page) and no longer
-  runs through a scrolled page.
-- Found and fixed along the way: the Keychain write fails with `-34018` in a build made with
-  `CODE_SIGNING_ALLOWED=NO` (no entitlements), so the session was lost on restart; run signed builds
-  (documented) and the keystore step that fails is now logged. The `multer` override from the
-  deployment work is unaffected.
-
-### Android verification (JDK 21 installed with Homebrew)
-
-- `openjdk@21` (keg-only, 21.0.13) was installed with Homebrew at the user's request; PATH and the
-  system Java wrappers were not changed (`JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
-  is set per command). `./gradlew assembleDebug` succeeds: a 5.8 MB debug APK, package
-  `app.whylint.mobile`, compile and target SDK 36.
-- A headless AVD, `whylint_api37` (Pixel 8 profile, the installed arm64 Android 37 Google Play image),
-  was written by hand under `~/.android/avd` because `avdmanager` is not installed. It boots in about
-  15 s; the app reached the throwaway backend through `adb reverse tcp:3101 tcp:3101` and cleartext
-  http (`WHYLINT_NATIVE_DEV=1`).
-- Verified on it: first launch and onboarding; feed loaded across origins; a bug-of-the-day answer
-  graded; sign-up with the soft keyboard (the page resizes and keeps the focused field and the submit
-  button visible); the session survives `am force-stop` and a relaunch (Android Keystore) and is gone
-  after logout; edge-to-edge layout (header and bottom bar clear the system bars); the Back button
-  closes the comments sheet first and leaves the app on the next press.
-- Bugs found and fixed there: (1) a race in the status bar style. Capacitor does not guarantee that
-  native plugin calls land in order, so an early "dark" call could override the later "light" one on
-  a cold start (about one start in four). Updates are now applied one at a time and always end on the
-  latest theme (unit tested; 8 of 8 cold starts correct afterwards). (2) A history trap: the onboarding
-  screen stayed in history after sending the learner to the feed, so Back from the feed needed an extra
-  press through a redirect. Onboarding now replaces its entry (`replaceUrl`), which also fixes the
-  browser Back button.
-- iOS was rebuilt and smoke-tested again after those two changes.
-
-### Not verified
-
-- Physical devices of either platform, the share sheet, the feel of the haptics, Back from routes other
-  than the feed and the comments sheet, Android on an API level below 37, and the CI Android and iOS
-  jobs on GitHub.
-- The app id `app.whylint.mobile` is a placeholder; signing, icons, store assets, universal links,
-  push reminders and native Google sign-in are open (see `docs/mobile.md`).
-
 ## Mobile audit implementation — 2026-11-08
 
-Implement the ten findings in docs/mobile-ui-ux-audit-2026-11-08.md, preserving the
+Implement the web UI findings in docs/mobile-ui-ux-audit-2026-11-08.md, preserving the
 current branch, uncommitted work, Japanese/English, themes, and existing learning,
 auth, social, review, and XP behavior. No Git commands are authorized.
 
@@ -915,15 +826,15 @@ auth, social, review, and XP behavior. No Git commands are authorized.
   recovery. A failure does not create a wrong grade. Repeated taps stay guarded.
 - Interactive code rows and secondary actions have at least 48px touch targets.
 
-### Native accessibility and navigation
+### Mobile web accessibility and navigation
 
 - Offer persisted Standard/Large/Larger reading-size settings through Profile.
   Use --reading-scale on the root (1/1.15/1.3) and scalable rem-based reading text
   on learning, comments and related settings. Keep inputs at least16px and layout
-  usable at larger size. Enable supported native pinch zoom as an additional path.
+  usable at larger size. Preserve browser pinch zoom.
 - Apply safe-area left/right padding inside fixed discussion/detail overlays and
-  safe-top protection for expanded native drawers. Preserve bottom keyboard/home
-  indicator padding, focus, dismissal, and native Back behavior.
+  safe-top protection for expanded drawers. Preserve bottom keyboard and home
+  indicator padding, focus, and dismissal.
 - Replace low-contrast hot-combo treatment with an accessible token-based palette.
 - A guest choosing Explain why carries a validated local returnTo destination
   `/questions/<uuid>?explain=1` through password/signup and web Google flows.
@@ -931,33 +842,17 @@ auth, social, review, and XP behavior. No Git commands are authorized.
   authenticated. Reject external/ambiguous return targets and preserve normal
   auth/onboarding redirects for callers without an intent.
 
-### Installed native app and data alignment
-
-- Build/sync a development native bundle for localhost3000 and configure exactly
-  the two local native origins on the dev backend using the user's authorized
-  native-setup fix. Preserve other environment values without printing them.
-  Restart only the verified backend process when required for startup CORS config.
-- Keep production HTTPS validation and the placeholder app identity until the user
-  chooses the real identity. Native bridge logging is explicitly disabled before
-  running token-bearing builds. A401 for a caller-supplied Authorization header
-  must not clear a different stored session token.
-- Rebuild/install a signed iOS Simulator build using existing signing settings and
-  verify the installed API target. Reuse JDK21 per command if Android verification
-  is available. Never read/print actual tokens or use real OAuth/Gemini credentials.
-- The current SQL seed already contains the intended WHER typo. Align the installed
-  app to the current dev API and add a curated fixture regression for that content.
-  Preserve historical attempt meaning. A future repair of answered seed lessons
-  requires explicit versioned-content handling, not silent rewrites.
+- Keep the curated SQL fixture regression for the intentional `WHER` typo.
+  Preserve historical attempt meaning when changing answered seed lessons.
 
 ### Verification
 
 Run current builds/unit suites, disposable PostgreSQL integration, and browser
 flows using isolated external responses. Add regression coverage for compact
-mobile layout, detail actions, retry selection, reading size, safe insets, auth
-return intent, and native config/header handling. Explore320/390/430, landscape,
-Japanese/English and both themes. Capture signed native Simulator evidence when
-possible, distinguish browser/native/physical-device proof, repeat independent
-source/visual review, and update the audit findings with verified resolution status.
+mobile layout, detail actions, retry selection, reading size, safe insets, and auth
+return intent. Explore 320/390/430px, landscape, Japanese/English and both themes.
+Repeat independent source and visual review, and update the audit findings with
+verified resolution status.
 
 ### Verified results — mobile audit implementation
 
@@ -972,56 +867,21 @@ source/visual review, and update the audit findings with verified resolution sta
 - Larger reading size produced a 20.8px root. At 320/390/430px and 844x390, no
   horizontal overflow was observed. At 320px the navigation grew to 91px and left
   546px for learning content. Long/larger cards use natural mobile scrolling.
-- The configured dev backend now permits the two local native origins. Other
-  parsed environment settings were preserved, and the verified watcher was
-  restarted to load CORS. Signed iOS and Android debug artifacts now target
-  localhost:3000, have bridge logging disabled, and enable native zoom.
-- The signed iPhone 16 Pro Max Simulator app was installed, launched and captured
-  against the normal dev API. The rebuilt Android debug APK (5,918,900 bytes) was
-  installed and launched on the owned API37 headless emulator with adb reverse.
-  Both portrait captures show the full compact task and clear system-bar areas.
 - End-to-end tests use isolated synthetic client actors in the disposable harness.
   A quota regression confirms repeated submissions still hit the normal signup
   quota and an independent actor has separate accounting. Production guards and
   quotas are unchanged. The helper awaits card rendering before opening details.
 - Independent source and visual reviews returned a ship verdict for the scoped
   fixes. Evidence is in frontend/.impeccable/review/mobile-fixes-2026-11-08/.
-- Physical devices, VoiceOver/TalkBack, native text-size gestures, detailed IME/
-  landscape behavior, and additional Android versions require follow-up checks.
+- Physical devices, VoiceOver/TalkBack, pinch zoom and keyboard behavior in
+  landscape require follow-up checks.
 # Cloud Run web Google sign-in — 2026-11-08
 
 - Allow Google sign-in and callback on the existing localhost origin and the deployed
-  WhyLint Cloud Run origin. Keep other origins and native webview sign-in blocked.
+  WhyLint Cloud Run origin. Keep other origins blocked.
 - Use the existing OAuth state handling, callback, and server-side session flow.
 - Verify the deployed origin starts the flow with its exact callback, while existing
-  local, native, and unconfigured-origin checks continue to pass.
+  local and unconfigured-origin checks continue to pass.
 - Cloud Run needs its matching Google OAuth client ID and client secret. Register the
   deployed callback with Google and verify a real login separately after deployment.
-
-# iOS native Google sign-in — 2026-11-08
-
-- Add native Google sign-in for the existing iOS bundle identifier, using an iOS
-  OAuth client and the existing web server OAuth client. Configure client IDs without
-  committing credentials or storing them in app-visible configuration forms.
-- Present Google's native sign-in flow, verify the resulting ID token on the backend
-  for the expected server audience, and identify accounts by verified Google subject.
-  Reuse the existing account, JWT, revocable database session, native bearer transport,
-  secure token storage, onboarding redirect, and logout behavior.
-- Preserve the existing website flow and Android behavior. Handle cancellation,
-  missing configuration, invalid tokens, network errors, and repeated attempts.
-- Verify backend, frontend and iOS builds with isolated provider fixtures. A real
-  Google account and physical-device sign-in remain user-verified end to end.
-
-Implementation: the iOS-only action uses the Google provider of the Capacitor social
-login plugin. The native build reads an ignored local client ID and generates an ignored
-Xcode callback configuration. The native ID-token exchange uses the existing configured
-web OAuth audience and the existing Google-subject account and revocable-session logic.
-Other social providers are disabled in the Capacitor plugin configuration.
-
-Verification: frontend unit tests (273), backend unit tests (281), and disposable
-PostgreSQL integration tests (49) passed. Signed iOS Simulator Debug and unsigned
-Release compilation succeeded, and the generated callback schemes matched the local
-iOS client configuration. Android debug compilation passed with dependencies online.
-Google identity responses were mocked in tests. Real Google sign-in and session
-persistence on the physical iPhone require verification after backend deployment.
 

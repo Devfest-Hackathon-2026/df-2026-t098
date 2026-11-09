@@ -60,8 +60,8 @@
   optional username setup/skip. Reuse existing account-creation scenarios to stay
   within real per-route limits; do not disable rate limits or Google isolation.
 - Restore the normal dev servers after fixture testing. Never read or print real
-  credentials, cookies, Google tokens or callback codes. Device/Capacitor and
-  deployed Cloud Run behavior remain separate verification.
+  credentials, cookies, Google tokens or callback codes. Physical device and
+  deployed Cloud Run behavior require separate verification.
 
 ## Google avatar refresh and frontend logout follow-up
 
@@ -125,4 +125,4 @@ Add email-or-username signup and password login plus real current-session logout
 - Keep existing `.env` and uncommitted work; use the existing JWT secret without printing it. Use Argon2id at least 19 MiB memory, 2 iterations, parallelism 1.
 - Validate request shapes and limits without rejecting Unicode passphrases or altering password bytes. Use a generic conflict response and do not log sensitive input.
 - Test signup, case-insensitive lookup, Google-account coexistence, generic invalid credentials, session issue/expiry/revocation, cookie/bearer behavior, CSRF origin and rate limiting. Test migrations with a disposable PostgreSQL database; do not drop or replace the user's database. Run the backend build and focused tests, and report pre-existing test failures honestly.
-- Distinguish prototype constraints from production readiness: email verification, account recovery, production OAuth PKCE/state, multi-instance rate limiting, native Google sign-in and deployed cookie/CORS settings remain unfinished. A signup conflict still reveals that an account or username is unavailable; generic wording does not fully prevent enumeration.
+- Distinguish prototype constraints from production readiness: email verification, account recovery, production OAuth PKCE/state, multi-instance rate limiting and deployed cookie/CORS settings remain unfinished. A signup conflict still reveals that an account or username is unavailable; generic wording does not fully prevent enumeration.
