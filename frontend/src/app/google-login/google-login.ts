@@ -16,6 +16,7 @@ const GOOGLE_WEB_CLIENT_ID =
   '8715935974-egdfj9tf8e1p71jjr2befadf47cne86l.apps.googleusercontent.com';
 const GOOGLE_LOGIN_ALLOWED_ORIGINS: readonly string[] = [
   'http://localhost:4200',
+  'https://whylint.com',
   'https://whylint-8715935974.asia-northeast1.run.app',
 ];
 const GOOGLE_EXCHANGE_TIMEOUT_MS = 10_000;
