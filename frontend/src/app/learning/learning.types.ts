@@ -31,7 +31,6 @@ export interface QuestionNovelty {
   exact: string;
   tokens: string[];
   codeKey: string | null;
-  /** Canonical key for the idea tested; a shared concept means a repeat. */
   concept?: string;
 }
 export interface Question {

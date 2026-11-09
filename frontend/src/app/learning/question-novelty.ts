@@ -3,7 +3,6 @@ import type { QuestionNovelty } from './learning.types';
 const HASH = /^[a-f0-9]{64}$/;
 const CONCEPT = /^[a-z0-9]+(?:-[a-z0-9]+){0,7}$/;
 
-/** Unknown hint versions keep the older ID-only behavior. */
 export function validQuestionNovelty(value: unknown): value is QuestionNovelty {
   if (!value || typeof value !== 'object') return false;
   const hint = value as Partial<QuestionNovelty>;
@@ -20,9 +19,7 @@ export function validQuestionNovelty(value: unknown): value is QuestionNovelty {
   );
 }
 
-/** Matches the backend's v1 comparison of normalized, public-content hints. */
 export function similarQuestionNovelty(left: QuestionNovelty, right: QuestionNovelty): boolean {
-  // Reworded or reformatted questions about the same idea still feel like a repeat.
   if (left.concept && left.concept === right.concept) return true;
   if (left.codeKey !== right.codeKey) return false;
   if (left.exact === right.exact) return true;

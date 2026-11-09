@@ -25,7 +25,7 @@ async function seedLearningAccounts(database) {
     throw new Error('Learning fixture accounts require the disposable browser database');
   }
   for (const project of ['mobile-chromium', 'desktop-chromium']) {
-    for (const scenario of ['learning', 'community', 'recovery', 'social', 'regressions', 'variety', 'mobileui']) {
+    for (const scenario of ['learning', 'community', 'recovery', 'social', 'regressions', 'variety', 'mobileui', 'paging', 'paging-long', 'paging-arcs', 'uiaudit', 'safety']) {
       for (const role of ['learner', 'reader']) {
         const account = accountFor(project, scenario, role);
         await database.query(

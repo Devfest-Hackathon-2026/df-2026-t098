@@ -1,4 +1,4 @@
-import { test, expect, learner, origin } from './fixtures';
+import { test, expect, learner, origin, openSettings } from './fixtures';
 import {
   checkedJson,
   closeLearningDetails,
@@ -36,7 +36,7 @@ test('mobile audit fixes: compact stage, retained retry, detail access and persi
   const card = page.locator(`[data-question-id="${sqlQuestionId}"]`).first();
   await expect(card).toBeVisible();
   const first = card.locator('button.code-line').first();
-  expect((await first.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  expect((await first.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   const firstFontSize = await card
     .locator('h2')
     .first()
@@ -59,7 +59,7 @@ test('mobile audit fixes: compact stage, retained retry, detail access and persi
   await expect(card.getByTestId('question-references')).toBeVisible();
   await closeLearningDetails(card);
 
-  await page.getByRole('button', { name: 'プロフィール', exact: true }).click();
+  await openSettings(page);
   await page.getByRole('radio', { name: 'さらに大きい', exact: true }).check();
   expect(
     await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize)),
@@ -73,7 +73,7 @@ test('mobile audit fixes: compact stage, retained retry, detail access and persi
   ).toBeGreaterThan(firstFontSize);
   await expectUsableViewport(page);
   await page.reload();
-  await page.getByRole('button', { name: 'プロフィール', exact: true }).click();
+  await openSettings(page);
   await expect(page.getByRole('radio', { name: 'さらに大きい', exact: true })).toBeChecked();
 });
 

@@ -17,6 +17,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthSession } from '../auth/auth-session';
+import { BlockStore } from './block-store';
 import { Icon } from './icon';
 import { LearningApi, learningError } from './learning-api';
 import { LoadingSkeleton } from './loading-skeleton';
@@ -35,12 +36,12 @@ export class QuestionDiscussion {
   readonly refreshKey = input(0);
   readonly language = input<Language>('ja');
   readonly open = input(false);
-  /** Until the viewer answers, explanations and corrections are hidden as spoilers. */
   readonly answered = input(true);
   protected readonly revealedSpoilers = signal<ReadonlySet<string>>(new Set());
   readonly closed = output<void>();
   protected readonly session = inject(AuthSession);
   private readonly api = inject(LearningApi);
+  private readonly blockStore = inject(BlockStore);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
   private readonly panel = viewChild<ElementRef<HTMLDialogElement>>('panel');
@@ -76,6 +77,15 @@ export class QuestionDiscussion {
     'correction',
   ];
   protected readonly replyingTo = signal<QuestionComment | null>(null);
+  protected readonly reportingId = signal<string | null>(null);
+  protected readonly reportReason = signal<'spam' | 'harassment' | 'inappropriate' | 'other'>(
+    'spam',
+  );
+  protected readonly reportDetails = signal('');
+  protected readonly reporting = signal(false);
+  protected readonly blockingId = signal<string | null>(null);
+  protected readonly blocking = signal(false);
+  protected readonly notice = signal('');
   protected readonly controlId = computed(() => this.viewId() || this.questionId());
   protected readonly roots = computed(() => this.comments().filter((comment) => !comment.parentId));
 
@@ -113,6 +123,9 @@ export class QuestionDiscussion {
           this.helping.set(null);
           this.kind.set('comment');
           this.replyingTo.set(null);
+          this.reportingId.set(null);
+          this.blockingId.set(null);
+          this.notice.set('');
           this.refreshPending = false;
           this.requestId = '';
           this.submittedPayload = '';
@@ -149,7 +162,7 @@ export class QuestionDiscussion {
     });
   }
 
-  /** Explanations and corrections give the answer away before the viewer has tried. */
+  // Hide explanations and corrections until the learner has answered.
   protected isSpoiler(comment: { id: string; kind?: string | null }): boolean {
     return (
       !this.answered() &&
@@ -171,7 +184,13 @@ export class QuestionDiscussion {
   }
 
   protected get mutating(): boolean {
-    return this.commenting() || this.deleting() !== null || this.helping() !== null;
+    return (
+      this.commenting() ||
+      this.deleting() !== null ||
+      this.helping() !== null ||
+      this.reporting() ||
+      this.blocking()
+    );
   }
 
   protected kindLabel(kind: ContributionKind = 'comment'): string {
@@ -226,11 +245,6 @@ export class QuestionDiscussion {
     }
   }
 
-  /**
-   * Swipe the bottom sheet down to dismiss it. A flick (release speed above 0.5px/ms after at
-   * least 30px) or a drag past a quarter of its height closes it; otherwise it springs back.
-   * Pulling up meets rising resistance.
-   */
   protected onDragStart(event: PointerEvent): void {
     const panel = this.panel()?.nativeElement;
     if (this.desktop() || !panel || (event.target as HTMLElement).closest('button')) return;
@@ -243,7 +257,6 @@ export class QuestionDiscussion {
     try {
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     } catch {
-      /* Capture is best effort; moves still arrive while the finger stays on the header. */
     }
     panel.style.transition = 'none';
   }
@@ -262,14 +275,12 @@ export class QuestionDiscussion {
     if (!this.drag || !panel || event.pointerId !== this.drag.id) return;
     const { dy, samples } = this.drag;
     this.drag = null;
-    // Release speed over the last ~100ms; a finger that rested before lifting has no flick.
     const recent = samples.filter((sample) => event.timeStamp - sample.t <= 100);
     const first = recent[0];
     const velocity =
       first && recent.length > 1
         ? (event.clientY - first.y) / Math.max(1, event.timeStamp - first.t)
         : 0;
-    // Hand motion back to the CSS drawer transition, which continues from the current position.
     panel.style.transition = '';
     panel.style.transform = '';
     const flicked = velocity > 0.5 && dy > 30;
@@ -429,6 +440,86 @@ export class QuestionDiscussion {
     } finally {
       if (!signal.aborted) {
         this.helping.set(null);
+        this.refreshIfNeeded();
+      }
+    }
+  }
+
+  protected openReport(comment: QuestionComment): void {
+    this.blockingId.set(null);
+    this.notice.set('');
+    this.reportReason.set('spam');
+    this.reportDetails.set('');
+    this.reportingId.set(this.reportingId() === comment.id ? null : comment.id);
+  }
+
+  protected async submitReport(comment: QuestionComment): Promise<void> {
+    if (!this.authenticated || this.mutating || this.loading()) return;
+    const signal = this.controller.signal;
+    this.reporting.set(true);
+    this.error.set('');
+    try {
+      await this.api.send(
+        '/questions/' + this.questionId() + '/comments/' + comment.id + '/reports',
+        'POST',
+        { reason: this.reportReason(), details: this.reportDetails().trim() },
+        signal,
+      );
+      if (signal.aborted) return;
+      // The server hides a reported comment (and its replies) from the reporter.
+      this.comments.update((items) =>
+        items.filter((item) => item.id !== comment.id && item.parentId !== comment.id),
+      );
+      if (this.replyingTo()?.id === comment.id) this.replyingTo.set(null);
+      this.reportingId.set(null);
+      this.notice.set(
+        this.text(
+          '報告を受け付けました。このコメントは非表示になりました。',
+          'Report received. This comment is now hidden for you.',
+        ),
+      );
+    } catch (error) {
+      if (!signal.aborted) this.error.set(learningError(error, this.language()));
+    } finally {
+      if (!signal.aborted) {
+        this.reporting.set(false);
+        this.refreshIfNeeded();
+      }
+    }
+  }
+
+  protected askBlock(comment: QuestionComment): void {
+    this.reportingId.set(null);
+    this.notice.set('');
+    this.blockingId.set(this.blockingId() === comment.id ? null : comment.id);
+  }
+
+  protected async confirmBlock(comment: QuestionComment): Promise<void> {
+    if (!this.authenticated || this.mutating || this.loading()) return;
+    const signal = this.controller.signal;
+    this.blocking.set(true);
+    this.error.set('');
+    try {
+      await this.blockStore.block(comment.author);
+      if (signal.aborted) return;
+      this.comments.update((items) => {
+        const hidden = new Set(
+          items.filter((item) => item.author.id === comment.author.id).map((item) => item.id),
+        );
+        return items.filter((item) => !hidden.has(item.id) && !hidden.has(item.parentId ?? ''));
+      });
+      this.blockingId.set(null);
+      this.notice.set(
+        this.text(
+          comment.author.displayName + 'さんをブロックしました。',
+          'You blocked ' + comment.author.displayName + '.',
+        ),
+      );
+    } catch (error) {
+      if (!signal.aborted) this.error.set(learningError(error, this.language()));
+    } finally {
+      if (!signal.aborted) {
+        this.blocking.set(false);
         this.refreshIfNeeded();
       }
     }

@@ -4,23 +4,19 @@ export interface NoveltyQuestion {
   prompt: string;
   code?: string | null;
   codeLanguage?: string | null;
-  /** Canonical key for the single idea a question tests, e.g. "https-encryption". */
   concept?: string | null;
 }
 
-/** Public-content hints used by both feed selection and the browser's final race check. */
 export interface QuestionNovelty {
   version: 1;
   exact: string;
   tokens: string[];
   codeKey: string | null;
-  /** Present when the question has a concept key. Same concept = same learning point. */
   concept?: string;
 }
 
 const CONCEPT = /^[a-z0-9]+(?:-[a-z0-9]+){0,7}$/;
 
-/** Normalizes a model-supplied concept key, or returns null when it is unusable. */
 export function normalizeConcept(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const key = value
@@ -146,7 +142,6 @@ export function questionNovelty(question: NoveltyQuestion): QuestionNovelty {
   const words =
     content.match(/[a-z][a-z0-9_+#]*(?:\.[a-z0-9_+#]+)*|\d+(?:\.\d+)?/g) ?? [];
   const tokens = words.filter((word) => !STOP_WORDS.has(word));
-  // Named cookie flags are separate mechanisms even inside otherwise identical stems.
   if (/\bcookies?\b|クッキー/.test(prompt)) {
     for (const flag of ['secure', 'httponly', 'samesite']) {
       if (new RegExp(`\\b${flag}\\b`, 'i').test(prompt))
@@ -181,9 +176,7 @@ export function similarQuestionHints(
   left: QuestionNovelty,
   right: QuestionNovelty,
 ): boolean {
-  // Reworded or reformatted questions about the same idea still feel like a repeat.
   if (left.concept && left.concept === right.concept) return true;
-  // A changed code example can test a different behavior despite the same short prompt.
   if (left.codeKey !== right.codeKey) return false;
   if (left.exact === right.exact) return true;
   const leftAnchors = left.tokens.filter((token) =>

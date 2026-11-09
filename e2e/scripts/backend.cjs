@@ -15,7 +15,6 @@ const { seedLearningAccounts } = require('./learning-accounts.cjs');
 const backend = path.resolve(__dirname, '../../backend');
 const { AppDataSource } = require(path.join(backend, 'dist/src/datasource.js'));
 
-/** Isolate synthetic browser actors while keeping the real throttler and quotas. */
 function installBrowserActorTracking() {
   const { NestFactory } = require(require.resolve('@nestjs/core', { paths: [backend] }));
   const create = NestFactory.create.bind(NestFactory);

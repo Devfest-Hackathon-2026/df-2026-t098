@@ -1,5 +1,5 @@
 export const LEARNING_TIMEZONE = 'Asia/Tokyo';
-/** Japan has no daylight saving time, so its UTC offset is constant. */
+// Tokyo uses the same UTC offset all year.
 export const LEARNING_UTC_OFFSET = '+09:00';
 
 export function learningDay(now = new Date()): string {

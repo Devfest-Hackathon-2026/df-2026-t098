@@ -41,7 +41,6 @@ export async function prepareLearningAccount(
   )
     .update(content)
     .digest("base64url");
-  // This session exists only in the disposable database. Keep its cookie in memory.
   await context.addCookies([
     {
       name: "access_token",
@@ -114,7 +113,6 @@ export async function expectUsableViewport(page: Page) {
   ).toBe(true);
 }
 
-/** Opens the optional "Explain why" box on a tap-quiz card and returns its textarea. */
 export async function explanationField(card: Locator) {
   const open = card.getByRole("button", {
     name: /なぜ？を説明する|Explain why/,
@@ -125,7 +123,6 @@ export async function explanationField(card: Locator) {
   return field;
 }
 
-/** Mobile supporting material lives in the question's focused detail sheet. */
 export async function openQuestionDetails(card: Locator) {
   await card.waitFor({ state: "visible" });
   const button = card.getByRole("button", { name: /問題の詳細|Question details/, exact: true });
@@ -137,7 +134,6 @@ export async function closeLearningDetails(card: Locator) {
   if (await close.count()) await close.click();
 }
 
-/** Bounding box once a transition has finished (two equal readings 50ms apart). */
 export async function settledBox(locator: Locator) {
   let previous = await locator.boundingBox();
   for (let attempt = 0; attempt < 40; attempt++) {

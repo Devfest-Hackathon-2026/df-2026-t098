@@ -21,30 +21,8 @@
 }
 .brand {
   font-weight: 700;
-  font-size: 20px;
+  font-size: 1.25rem;
   letter-spacing: -0.03em;
-}
-.mark {
-  font-family: 'DM Mono', monospace;
-  color: var(--accent);
-}
-.mark span {
-  color: var(--text);
-}
-.dot {
-  color: var(--accent);
-}
-.settings {
-  display: flex;
-  gap: 8px;
-}
-.settings button {
-  min-height: 44px;
-  padding: 0 12px;
-  background: var(--control);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
 }
 .body {
   max-width: 720px;
@@ -52,11 +30,11 @@
 }
 .progress {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-bottom: 20px;
 }
 h1 {
-  font-size: clamp(26px, 4vw, 36px);
+  font-size: clamp(1.625rem, 4vw, 2.25rem);
   letter-spacing: -0.03em;
   line-height: 1.25;
   margin: 0;
@@ -71,7 +49,7 @@ h1 {
   margin: 16px 0 28px;
 }
 .note {
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 18px 0;
 }
 .choices {
@@ -109,7 +87,7 @@ h1 {
 }
 .search-label {
   display: block;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 10px;
 }
@@ -120,7 +98,7 @@ h1 {
   border: 1px solid var(--input-border);
   border-radius: 8px;
   font: inherit;
-  font-size: 16px;
+  font-size: max(16px, 1rem);
   background: var(--input-bg);
   color: var(--text);
 }
@@ -131,20 +109,21 @@ h1 {
   max-height: 240px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px 2px;
+  padding: 4px 2px 20px;
   margin: 16px 0;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
 .stack-list button,
 .selected-technologies button,
 .custom-add,
 .difficulty button {
-  min-height: 44px;
+  min-height: 48px;
   padding: 8px 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--control);
   color: var(--text);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .stack-list .selected,
 .difficulty button[aria-pressed='true'] {
@@ -231,17 +210,31 @@ button:disabled {
 }
 .progress {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 .quick-start {
-  min-height: 44px;
+  min-height: 48px;
   padding: 8px 14px;
   border: 1px solid var(--accent);
   border-radius: 999px;
   background: transparent;
   color: var(--accent);
   font-weight: 600;
-  font-size: 13px;
+  font-size: 0.8125rem;
+}
+
+.preference-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.stack-list button,
+.selected-technologies button {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }

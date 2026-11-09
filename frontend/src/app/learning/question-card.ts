@@ -19,6 +19,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthSession } from '../auth/auth-session';
 import { SyntaxHighlightPipe } from '../homepage/syntax-highlight.pipe';
+import { BlockStore } from './block-store';
 import { Icon } from './icon';
 import { QuestionDiscussion } from './question-discussion';
 import { LearningApi, LearningError, learningError } from './learning-api';
@@ -26,6 +27,7 @@ import { ProgressStore } from './progress-store';
 import { topicLabel } from './topic-label';
 import type {
   Assessment,
+  Author,
   FollowUp,
   Language,
   Question,
@@ -34,6 +36,8 @@ import type {
 } from './learning.types';
 
 const LETTERS = ['A', 'B', 'C', 'D'];
+const FIT_MIN = 0.72;
+const FIT_MAX = 1.2;
 
 @Component({
   selector: 'app-question-card',
@@ -46,6 +50,10 @@ const LETTERS = ['A', 'B', 'C', 'D'];
     NgTemplateOutlet,
   ],
   templateUrl: './question-card.html',
+  host: {
+    '[class.paged]': 'paged()',
+    '[attr.data-fit-overflow]': 'fitOverflow() ? "true" : null',
+  },
   styleUrls: [
     './question-card.css',
     './question-card-quiz.css',
@@ -62,28 +70,38 @@ export class QuestionCard {
   readonly viewId = input('');
   readonly cachedTap = input<QuestionTap | null>(null);
   protected readonly controlId = computed(() => this.viewId() || this.question().id);
-  /** A missed card shown again later in the same session. */
   readonly relearn = input(false);
-  /** Today's shared Bug of the Day. */
   readonly daily = input(false);
-  /** Shows a "Next" button after the reveal (feed only). */
   readonly nextable = input(false);
+  readonly paged = input(false);
   readonly next = output<void>();
   readonly assessed = output<Assessment>();
   readonly tapped = output<TapResult>();
   protected readonly session = inject(AuthSession);
   private readonly api = inject(LearningApi);
+  private readonly blockStore = inject(BlockStore);
   private readonly router = inject(Router);
   private readonly progressStore = inject(ProgressStore);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
   private readonly detailPanel = viewChild<ElementRef<HTMLDialogElement>>('detailPanel');
   private readonly detailHeading = viewChild<ElementRef<HTMLHeadingElement>>('detailHeading');
+  private readonly stageViewport = viewChild<ElementRef<HTMLElement>>('stageViewport');
+  private readonly stageMeasure = viewChild<ElementRef<HTMLElement>>('stageMeasure');
   private detailTrigger: HTMLElement | null = null;
   private explainedIntent = false;
   protected readonly compact = signal(false);
+  protected readonly pagedCompact = computed(() => this.paged() && this.compact());
+  protected readonly density = signal(FIT_MAX);
+  protected readonly fitOverflow = signal(false);
+  private fitFrame = 0;
+  private fitPasses = 0;
+  private fitLower = FIT_MIN;
+  private fitUpper = FIT_MAX;
+  private fitComplete = false;
+  private fitViewport = { width: 0, height: 0, font: '' };
   protected readonly detailsOpen = signal(false);
-  protected readonly detailMode = signal<'explain' | 'ask' | 'info'>('info');
+  protected readonly detailMode = signal<'explain' | 'ask' | 'info' | 'question'>('info');
   private readonly commentsButton = viewChild<ElementRef<HTMLButtonElement>>('commentsButton');
   private readonly explainField = viewChild<ElementRef<HTMLTextAreaElement>>('explainField');
   private controller = new AbortController();
@@ -127,7 +145,12 @@ export class QuestionCard {
   protected readonly sharingError = signal('');
   protected readonly explanationPublished = signal(false);
   protected readonly discussionRefresh = signal(0);
-  protected readonly reportReason = signal<'incorrect' | 'unclear' | 'outdated'>('incorrect');
+  protected readonly reportReason = signal<
+    'incorrect' | 'unclear' | 'outdated' | 'inappropriate'
+  >('incorrect');
+  protected readonly blockConfirm = signal(false);
+  protected readonly blocking = signal(false);
+  protected readonly blockError = signal('');
   protected readonly reportDetails = signal('');
   protected readonly reporting = signal(false);
   protected readonly reportSent = signal(false);
@@ -135,6 +158,7 @@ export class QuestionCard {
   protected readonly heartBurst = signal(0);
   protected readonly heartAt = signal<{ x: number; y: number; tilt: number } | null>(null);
   private lastTap = { time: 0, x: 0, y: 0 };
+  private contentPointer: { id: number; x: number; y: number; moved: boolean } | null = null;
   private lastPointer = 'mouse';
   readonly discussion = model(false);
 
@@ -143,7 +167,15 @@ export class QuestionCard {
     return question.format !== 'explain' && !!question.options?.length;
   });
   protected readonly revealed = computed(() => this.tap() !== null);
-  /** Spot-the-bug renders the code itself as the answer buttons. */
+  protected readonly twoColumnChoices = computed(() => {
+    const question = this.question();
+    const limit = question.format === 'predict_output' ? 24 : question.code ? 60 : 0;
+    return (
+      this.pagedCompact() &&
+      limit > 0 &&
+      question.options?.every((option) => option.length <= limit && !option.includes('\n'))
+    );
+  });
   protected readonly codeLines = computed(() => {
     const question = this.question();
     if (question.format !== 'spot_bug' || !question.code) return null;
@@ -163,8 +195,31 @@ export class QuestionCard {
       if (!this.compact()) this.closeDetails(false);
     };
     media?.addEventListener('change', resize);
+    afterNextRender(() => {
+      const viewport = this.stageViewport()?.nativeElement;
+      const natural = this.stageMeasure()?.nativeElement;
+      if (!viewport || !natural || typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(() => this.measureStage());
+      observer.observe(viewport);
+      observer.observe(natural);
+      destroy.onDestroy(() => observer.disconnect());
+      this.measureStage(true);
+    });
+    effect(() => {
+      this.pagedCompact();
+      this.question();
+      this.language();
+      afterNextRender(() => this.measureStage(true), { injector: this.injector });
+    });
+    // Refit only if new content no longer fits.
+    effect(() => {
+      this.tap();
+      this.tapError();
+      afterNextRender(() => this.measureStage(), { injector: this.injector });
+    });
     destroy.onDestroy(() => {
       this.controller.abort();
+      cancelAnimationFrame(this.fitFrame);
       media?.removeEventListener('change', resize);
     });
     effect(() => {
@@ -221,7 +276,6 @@ export class QuestionCard {
         this.liked.set(identity ? question.liked : false);
         this.likes.set(question.likes);
         this.saved.set(identity ? question.saved : false);
-        // Reviews and relearning cards start unanswered; otherwise restore the learner's tap.
         const restore =
           this.cachedTap() ?? (identity && !relearn && !question.review ? question.tap : null);
         this.tap.set(restore);
@@ -248,6 +302,9 @@ export class QuestionCard {
         this.reporting.set(false);
         this.reportSent.set(false);
         this.reportError.set('');
+        this.blockConfirm.set(false);
+        this.blocking.set(false);
+        this.blockError.set('');
       });
     });
     effect(() => {
@@ -295,7 +352,6 @@ export class QuestionCard {
       .map((topic) => this.topic(topic))
       .join(' · ');
   }
-  /** "Why this card" chip, e.g. "Because you missed JWT". */
   protected get reasonChip(): { icon: string; label: string } | null {
     if (this.daily()) return { icon: 'bug', label: this.text('今日のバグ', 'Bug of the Day') };
     if (this.relearn())
@@ -350,7 +406,13 @@ export class QuestionCard {
     return 'dim';
   }
 
-  /** Instant tap answer, graded from stored data with no AI wait. */
+  protected answerLabel(index: number): string {
+    const answer = this.question().options?.[index] ?? '';
+    return this.question().format === 'spot_bug'
+      ? this.text(answer + '行目', 'Line ' + answer)
+      : answer;
+  }
+
   protected async choose(choice: number): Promise<void> {
     if (this.tapping() || this.revealed()) return;
     const signal = this.controller.signal;
@@ -412,7 +474,78 @@ export class QuestionCard {
     );
   }
 
-  protected openDetails(mode: 'explain' | 'ask' | 'info', event?: Event): void {
+  private measureStage(reset = false): void {
+    const viewport = this.stageViewport()?.nativeElement;
+    const natural = this.stageMeasure()?.nativeElement;
+    if (!viewport || !natural) return;
+    const font =
+      this.document.defaultView?.getComputedStyle(this.document.documentElement).fontSize ?? '';
+    const size = { width: viewport.clientWidth, height: viewport.clientHeight, font };
+    if (
+      reset ||
+      size.width !== this.fitViewport.width ||
+      size.height !== this.fitViewport.height ||
+      font !== this.fitViewport.font
+    ) {
+      this.fitViewport = size;
+      this.fitPasses = 0;
+      this.fitLower = FIT_MIN;
+      this.fitUpper = FIT_MAX;
+      this.fitComplete = false;
+      this.density.set(FIT_MAX);
+      this.fitOverflow.set(false);
+    }
+    cancelAnimationFrame(this.fitFrame);
+    this.fitFrame = requestAnimationFrame(() => {
+      if (!this.pagedCompact() || viewport.clientHeight <= 0) {
+        this.density.set(1);
+        this.fitOverflow.set(false);
+        return;
+      }
+      const available = viewport.clientHeight;
+      const required = natural.getBoundingClientRect().height;
+      // Keep larger code within the card width.
+      const wide =
+        this.density() > 1 &&
+        [...natural.querySelectorAll<HTMLElement>('pre, .code-lines')].some(
+          (code) => code.scrollWidth > code.clientWidth + 1,
+        );
+      const overflow = required > available + 1 || wide;
+      if (this.fitComplete) {
+        if (!overflow || this.density() <= FIT_MIN + 0.001) {
+          this.fitOverflow.set(overflow);
+          return;
+        }
+        this.fitComplete = false;
+        this.fitPasses = 0;
+        this.fitLower = FIT_MIN;
+        this.fitUpper = this.density();
+      }
+      if (this.fitPasses === 0 && !overflow) {
+        this.fitComplete = true;
+        this.fitOverflow.set(false);
+        return;
+      }
+      if (overflow) this.fitUpper = this.density();
+      else this.fitLower = this.density();
+      if (this.fitPasses >= 8 || this.fitUpper - this.fitLower < 0.01) {
+        this.fitComplete = true;
+        this.density.set(this.fitLower);
+        afterNextRender(() => this.measureStage(), { injector: this.injector });
+        return;
+      }
+      this.fitPasses++;
+      this.density.set((this.fitLower + this.fitUpper) / 2);
+      afterNextRender(() => this.measureStage(), { injector: this.injector });
+    });
+  }
+
+  protected nextQuestion(): void {
+    this.closeDetails(false);
+    this.next.emit();
+  }
+
+  protected openDetails(mode: 'explain' | 'ask' | 'info' | 'question', event?: Event): void {
     this.detailTrigger =
       event?.currentTarget instanceof HTMLElement
         ? event.currentTarget
@@ -477,6 +610,7 @@ export class QuestionCard {
   }
 
   protected get detailTitle(): string {
+    if (this.detailMode() === 'question') return this.text('問題全体', 'Full question');
     if (this.detailMode() === 'explain') return this.text('なぜ？を説明する', 'Explain why');
     if (this.detailMode() === 'ask') return this.text('Geminiに質問', 'Ask Gemini');
     return this.text('問題の詳細', 'Question details');
@@ -495,7 +629,6 @@ export class QuestionCard {
     try {
       navigator.vibrate?.(correct ? 18 : [30, 40, 30]);
     } catch {
-      /* Vibration is optional. */
     }
   }
 
@@ -597,6 +730,34 @@ export class QuestionCard {
     }
   }
 
+  /** The published question's author, unless it is the signed-in learner. */
+  protected get blockableAuthor(): Author | null {
+    const author = this.question().author;
+    return this.question().source === 'community' &&
+      author &&
+      author.id !== this.session.user()?.id &&
+      !this.blockStore.isBlocked(author.id)
+      ? author
+      : null;
+  }
+
+  protected async blockAuthor(author: Author): Promise<void> {
+    if (!this.authenticated || this.blocking()) return;
+    const signal = this.controller.signal;
+    this.blocking.set(true);
+    this.blockError.set('');
+    try {
+      await this.blockStore.block(author);
+    } catch (error) {
+      if (!signal.aborted) this.blockError.set(learningError(error, this.language()));
+    } finally {
+      if (!signal.aborted) {
+        this.blocking.set(false);
+        this.blockConfirm.set(false);
+      }
+    }
+  }
+
   protected async reportQuestion(): Promise<void> {
     if (!this.authenticated || this.reporting() || this.reportSent()) return;
     const signal = this.controller.signal;
@@ -617,7 +778,6 @@ export class QuestionCard {
     }
   }
 
-  /** "Still confused? Ask Gemini" — a short follow-up answered from the question context. */
   protected async ask(): Promise<void> {
     if (!this.authenticated || this.asking()) return;
     const question = this.followUpDraft().trim();
@@ -660,25 +820,49 @@ export class QuestionCard {
     ];
   }
 
-  /** Mouse double-click likes. Touch uses its own double-tap detection below. */
   protected doubleClickLike(event: MouseEvent): void {
     if (this.lastPointer !== 'mouse') return;
     this.likeAt(event);
   }
 
-  /**
-   * Touch double-tap: two taps within 300ms and 30px. iOS Safari does not reliably fire
-   * dblclick, so detect it from pointer events instead.
-   */
   protected onContentPointerUp(event: PointerEvent): void {
+    const start = this.contentPointer;
+    this.contentPointer = null;
     this.lastPointer = event.pointerType;
     if (event.pointerType === 'mouse' || this.isControl(event.target)) return;
+    if (
+      !start ||
+      start.id !== event.pointerId ||
+      start.moved ||
+      Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10
+    ) {
+      this.lastTap = { time: 0, x: 0, y: 0 };
+      return;
+    }
     const last = this.lastTap;
     const close = Math.hypot(event.clientX - last.x, event.clientY - last.y) < 30;
     if (event.timeStamp - last.time < 300 && close) {
       this.lastTap = { time: 0, x: 0, y: 0 };
       this.likeAt(event);
     } else this.lastTap = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+  }
+
+  protected onContentPointerDown(event: PointerEvent): void {
+    this.contentPointer = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+  }
+
+  protected onContentPointerMove(event: PointerEvent): void {
+    const start = this.contentPointer;
+    if (
+      start?.id === event.pointerId &&
+      Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10
+    )
+      start.moved = true;
+  }
+
+  protected cancelContentPointer(): void {
+    this.contentPointer = null;
+    this.lastTap = { time: 0, x: 0, y: 0 };
   }
 
   private likeAt(event: MouseEvent): void {
@@ -692,7 +876,6 @@ export class QuestionCard {
         tilt: Math.round(Math.random() * 24 - 12),
       });
     this.heartBurst.update((value) => value + 1);
-    // Guests see the heart; signing in happens from the Like button, not mid-scroll.
     if (this.authenticated && !this.liked()) void this.toggleLike();
   }
 

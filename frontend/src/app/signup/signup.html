@@ -1,29 +1,6 @@
 <div class="auth-shell">
   <header class="header">
-    <a class="brand" routerLink="/" aria-label="WhyLint"
-      ><span class="brand-mark" aria-hidden="true">w<span>_</span></span>
-      <span>whylint<span class="brand-dot">.</span></span></a
-    >
-    <div class="settings">
-      <button
-        type="button"
-        (click)="toggleTheme()"
-        [attr.aria-label]="theme() === 'dark' ? ui.light : ui.dark"
-      >
-        @if (theme() === 'dark') {
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="4" />
-            <path
-              d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41m0-14.14-1.41 1.41M6.34 17.66l-1.41 1.41"
-            />
-          </svg>
-        } @else {
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M20 14.4A8.5 8.5 0 0 1 9.6 4a8.5 8.5 0 1 0 10.4 10.4Z" />
-          </svg>
-        }
-      </button>
-    </div>
+    <a class="brand" routerLink="/" aria-label="WhyLint"><app-brand /></a>
   </header>
   <main class="content">
     <a routerLink="/" class="back"><span aria-hidden="true">←</span>{{ ui.back }}</a>
@@ -133,5 +110,6 @@
         ui.signIn
       }}</a>
     }
+    <app-legal-links />
   </main>
 </div>

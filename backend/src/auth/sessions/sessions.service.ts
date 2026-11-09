@@ -34,6 +34,12 @@ export class SessionsService {
     return session !== null;
   }
 
+  /** Ends every active session of a user, on every device. */
+  async revokeAll(userId: string, manager?: EntityManager): Promise<void> {
+    const repository = manager ? manager.getRepository(SessionEntity) : this.sessionsRepository;
+    await repository.update({ user_id: userId, revoked_at: IsNull() }, { revoked_at: new Date() });
+  }
+
   async revoke(sessionId: string, userId: string): Promise<void> {
     await this.sessionsRepository.update(
       { id: sessionId, user_id: userId, revoked_at: IsNull() },

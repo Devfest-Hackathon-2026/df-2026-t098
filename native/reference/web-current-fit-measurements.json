@@ -1,0 +1,248 @@
+[
+  {
+    "viewport": {
+      "width": 914,
+      "height": 411
+    },
+    "prompt": "次のNode.jsコードには文法エラーがあります。誤りがある行番号はどれですか？なぜエラーになるかも説明してください。",
+    "cardHeight": 346,
+    "elements": [
+      {
+        "selector": "question-content",
+        "height": 237,
+        "scrollHeight": 302,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "auto",
+        "transform": "none"
+      },
+      {
+        "selector": "question-stage-natural",
+        "height": 274,
+        "scrollHeight": 274,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "H2",
+        "height": 16,
+        "scrollHeight": 16,
+        "font": "700 13px / 16.25px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-window bug-hunt",
+        "height": 185,
+        "scrollHeight": 185,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "hidden",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "H2",
+        "height": 0,
+        "scrollHeight": 0,
+        "font": "700 20px / 28px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 874,
+      "height": 402
+    },
+    "prompt": "次のNode.jsコードには文法エラーがあります。誤りがある行番号はどれですか？なぜエラーになるかも説明してください。",
+    "cardHeight": 337,
+    "elements": [
+      {
+        "selector": "question-content",
+        "height": 228,
+        "scrollHeight": 302,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "auto",
+        "transform": "none"
+      },
+      {
+        "selector": "question-stage-natural",
+        "height": 274,
+        "scrollHeight": 274,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "H2",
+        "height": 16,
+        "scrollHeight": 16,
+        "font": "700 13px / 16.25px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-window bug-hunt",
+        "height": 185,
+        "scrollHeight": 185,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "hidden",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "11px / 14.3px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "H2",
+        "height": 0,
+        "scrollHeight": 0,
+        "font": "700 20px / 28px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "prompt": "次のNode.jsコードには文法エラーがあります。誤りがある行番号はどれですか？なぜエラーになるかも説明してください。",
+    "cardHeight": 722,
+    "elements": [
+      {
+        "selector": "question-content",
+        "height": 613,
+        "scrollHeight": 613,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "hidden",
+        "transform": "none"
+      },
+      {
+        "selector": "question-stage-natural",
+        "height": 371,
+        "scrollHeight": 371,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "H2",
+        "height": 103,
+        "scrollHeight": 103,
+        "font": "700 20.655px / 25.8188px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-window bug-hunt",
+        "height": 190,
+        "scrollHeight": 190,
+        "font": "16px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "hidden",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "16.065px / 20.8845px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "16.065px / 20.8845px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "16.065px / 20.8845px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "code-line state-idle",
+        "height": 44,
+        "scrollHeight": 44,
+        "font": "16.065px / 20.8845px \"DM Mono\", monospace",
+        "overflow": "visible",
+        "transform": "none"
+      },
+      {
+        "selector": "H2",
+        "height": 0,
+        "scrollHeight": 0,
+        "font": "700 20px / 28px \"DM Sans\", system-ui, sans-serif",
+        "overflow": "visible",
+        "transform": "none"
+      }
+    ]
+  }
+]

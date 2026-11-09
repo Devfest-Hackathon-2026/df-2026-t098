@@ -4,6 +4,7 @@ import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { AuthApi } from '../auth/auth-api';
+import { DisplaySettings } from '../learning/display-settings';
 import { GoogleLogin } from './google-login';
 import { AUTH_FETCH, AuthSession } from '../auth/auth-session';
 import type { AuthUser, SessionStatus } from '../auth/auth-session';
@@ -40,6 +41,19 @@ describe('Google sign-in screen', () => {
   });
 
   afterEach(() => vi.restoreAllMocks());
+
+  it('keeps the login theme in sync with the shared app setting', async () => {
+    const settings = TestBed.inject(DisplaySettings);
+    const fixture = TestBed.createComponent(GoogleLogin);
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.header .settings')).toBeNull();
+    settings.setTheme('light');
+    fixture.detectChanges();
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    settings.setTheme('dark');
+    fixture.detectChanges();
+    expect(document.documentElement.dataset['theme']).toBe('dark');
+  });
 
   it('shows identifier and password fields alongside the Google action', async () => {
     const fixture = TestBed.createComponent(GoogleLogin);
@@ -340,7 +354,7 @@ describe('Google sign-in callback', () => {
     const router = { navigateByUrl: vi.fn().mockResolvedValue(true) };
     const replaceState = vi.fn();
     const fakeDocument = {
-      documentElement: { dataset: {}, lang: '' },
+      documentElement: { dataset: {}, lang: '', style: { setProperty: vi.fn() } },
       querySelector: () => null,
       defaultView: {
         location: {
@@ -731,7 +745,7 @@ describe('Google sign-in initiation', () => {
     const assign = vi.fn();
     const stored = new Map<string, string>();
     const fakeDocument = {
-      documentElement: { dataset: {}, lang: '' },
+      documentElement: { dataset: {}, lang: '', style: { setProperty: vi.fn() } },
       querySelector: () => null,
       defaultView: {
         location: { origin, pathname: '/login', assign },
@@ -782,15 +796,17 @@ describe('Google sign-in initiation', () => {
     expect(destination.searchParams.get('state')).toBe(stored.get(STATE_KEY));
   });
 
-  it('starts Google sign-in with the deployed callback on Cloud Run', () => {
-    const origin = 'https://whylint-8715935974.asia-northeast1.run.app';
-    const { component, assign, stored } = setup(origin);
-    component.startSignIn();
-    expect(assign).toHaveBeenCalledOnce();
-    const destination = new URL(assign.mock.calls[0][0]);
-    expect(destination.searchParams.get('redirect_uri')).toBe(`${origin}/auth/google/callback`);
-    expect(destination.searchParams.get('state')).toBe(stored.get(STATE_KEY));
-  });
+  it.each(['https://whylint.com', 'https://whylint-8715935974.asia-northeast1.run.app'])(
+    'starts Google sign-in with the deployed callback on %s',
+    (origin) => {
+      const { component, assign, stored } = setup(origin);
+      component.startSignIn();
+      expect(assign).toHaveBeenCalledOnce();
+      const destination = new URL(assign.mock.calls[0][0]);
+      expect(destination.searchParams.get('redirect_uri')).toBe(`${origin}/auth/google/callback`);
+      expect(destination.searchParams.get('state')).toBe(stored.get(STATE_KEY));
+    },
+  );
 
   it('does not initiate the incomplete flow on an unconfigured origin', () => {
     const { component, assign, stored } = setup('https://example.com');

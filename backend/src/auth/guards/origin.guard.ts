@@ -1,16 +1,23 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import { webOrigin } from '../allowed-origins';
+import type { AuthenticatedRequest } from '../jwt/jwt.dto';
 
 @Injectable()
 export class AuthOriginGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const origin = request.headers.origin;
     const expectedOrigin = webOrigin();
     if (!expectedOrigin) throw new ForbiddenException('Request origin is not allowed');
 
     if (origin === undefined && isBearerOnlyLogout(request)) return true;
+    // The JWT guard has already verified the bearer session.
+    if (
+      origin === undefined && request.user && request.headers.cookie === undefined &&
+      Object.keys(request.cookies ?? {}).length === 0 &&
+      /^Bearer[ \t]+[^\s]+$/i.test(request.headers.authorization ?? '')
+    ) return true;
 
     if (origin !== expectedOrigin) {
       throw new ForbiddenException('Request origin is not allowed');

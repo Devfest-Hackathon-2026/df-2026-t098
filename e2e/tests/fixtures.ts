@@ -7,15 +7,12 @@ export const avatarUrl = 'https://lh3.googleusercontent.com/whylint-fixture-avat
 
 export const test = base.extend<{ isolateBrowser: void }>({
   extraHTTPHeaders: async ({ extraHTTPHeaders }, use) => {
-    // Additional contexts inherit these test options unless they explicitly override them.
-    // All requests within one test share the actor and therefore retain its rate limits.
     await use({ ...extraHTTPHeaders, 'X-WhyLint-TestActor': randomUUID() });
   },
   isolateBrowser: [
     async ({ context, page }, use) => {
       const pageErrors: string[] = [];
       page.on('pageerror', (error) => pageErrors.push(error.name));
-      // Later, specific Google authorization routes can replace this deny rule.
       await context.route('**/*', (route) =>
         new URL(route.request().url()).origin === origin
           ? route.continue()
@@ -87,6 +84,27 @@ export async function openProfile(page: Page) {
   await expect(page.getByRole('heading', { name: 'アカウント', exact: true })).toBeVisible();
 }
 
+export async function openSettings(page: Page, language = 'ja') {
+  const name = language === 'en' ? 'Settings' : '設定';
+  const heading = page.getByRole('heading', { name, exact: true });
+  if (await heading.isVisible()) return;
+  const sidebar = page.locator('.main-nav').getByRole('button', { name, exact: true });
+  if (await sidebar.isVisible()) {
+    await sidebar.click();
+  } else {
+    const profile = language === 'en' ? 'Profile' : 'プロフィール';
+    await page.locator('.main-nav').getByRole('button', { name: profile, exact: true }).click();
+    await page.getByRole('button', { name, exact: true }).click();
+  }
+  await expect(heading).toBeFocused();
+}
+
+export async function openAccountSettings(page: Page) {
+  await openSettings(page);
+  await page.getByRole('button', { name: 'アカウント設定', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'アカウント設定', exact: true })).toBeVisible();
+}
+
 export async function mockGoogleAuthorization(
   page: Page,
   outcome: 'success' | 'invalid-state' | 'rejected' = 'success',
@@ -118,7 +136,6 @@ export async function mockGoogleAuthorization(
         outcome === 'invalid-state' ? 'fixture-mismatched-state' : state!,
       );
       callback.searchParams.set('code', code);
-      // The authorization page is entirely local; no request is sent to Google.
       await route.fulfill({
         status: 302,
         headers: { location: callback.toString(), 'cache-control': 'no-store' },

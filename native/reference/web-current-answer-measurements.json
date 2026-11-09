@@ -1,0 +1,32 @@
+{
+  "text": "次のNode.jsコードには文法エラーがあります。誤りがある行番号はどれですか？なぜエラーになるかも説明してください。\n1\nconst greeting = \"Hello\";\n2\nconst name = \"Alice\";\n3\nconst message = greeting + , + name;\n4\nconsole.log(message);\n正解！\n次へ ↓\n解説を見る\n0\nコメント\n共有\n保存\nなぜ？\n質問する\n詳細",
+  "reveal": [
+    {
+      "selector": "reveal correct",
+      "text": "正解！ 次へ ↓ 解説を見る ",
+      "display": "flex",
+      "rect": {
+        "height": 56,
+        "width": 342
+      }
+    },
+    {
+      "selector": "next-button",
+      "text": " 次へ ↓",
+      "display": "block",
+      "rect": {
+        "height": 44,
+        "width": 59.8125
+      }
+    },
+    {
+      "selector": "review-question",
+      "text": " 解説を見る ",
+      "display": "block",
+      "rect": {
+        "height": 44,
+        "width": 73
+      }
+    }
+  ]
+}

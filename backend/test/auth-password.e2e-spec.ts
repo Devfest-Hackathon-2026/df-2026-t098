@@ -249,6 +249,27 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
     };
   });
 
+  it('loads the existing Google account after native sign-in', async () => {
+    const web = await request(server())
+      .get('/api/v1/auth/me')
+      .set('Cookie', googleCookie)
+      .expect(200);
+
+    const native = await request(server())
+      .post('/api/v1/auth/mobile/google')
+      .send({ idToken: 'fixture-ios-id-token' })
+      .expect(200);
+    expect(native.headers['set-cookie']).toBeUndefined();
+    expect(native.headers['cache-control']).toBe('no-store');
+    expect(typeof native.body.token).toBe('string');
+
+    const account = await request(server())
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${native.body.token as string}`)
+      .expect(200);
+    expect(account.body).toEqual(web.body);
+  });
+
   it('backfills an existing NULL Google avatar and preserves it when a later claim omits the picture', async () => {
     const original = await database
       .getRepository(UserEntity)
@@ -630,6 +651,31 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
       await database.query(`DROP TRIGGER "${trigger}" ON "sessions"`);
       await database.query(`DROP FUNCTION "${trigger}"()`);
     }
+  });
+
+  it('serves revocable mobile sessions without cookies and keeps browser token delivery blocked', async () => {
+    const data = { email: `mobile-${suffix}@example.test`, username: `mob_${suffix}`, password };
+    const signup = await request(server()).post('/api/v1/auth/mobile/signup').send(data).expect(201);
+    expect(signup.headers['set-cookie']).toBeUndefined();
+    expect(signup.headers['cache-control']).toBe('no-store');
+    expect(typeof signup.body.token).toBe('string');
+    const auth = `Bearer ${signup.body.token as string}`;
+    await request(server()).get('/api/v1/auth/me').set('Authorization', auth).expect(200);
+    await request(server()).patch('/api/v1/auth/me/username').set('Authorization', auth)
+      .send({ username: `next_${suffix}` }).expect(409);
+    const login = await request(server()).post('/api/v1/auth/mobile/password/login')
+      .send({ identifier: data.email, password }).expect(200);
+    expect(login.headers['set-cookie']).toBeUndefined();
+    for (const header of [{ Origin: origin }, { Cookie: signupCookie }]) {
+      await request(server()).post('/api/v1/auth/mobile/password/login').set(header)
+        .send({ identifier: data.email, password }).expect(403);
+    }
+    await request(server()).post('/api/v1/auth/mobile/password/login')
+      .send({ identifier: data.email, password: 'incorrect-password' }).expect(401);
+    await request(server()).post('/api/v1/auth/logout').set('Authorization', auth).expect(204);
+    await request(server()).get('/api/v1/auth/me').set('Authorization', auth).expect(401);
+    await request(server()).get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${login.body.token as string}`).expect(200);
   });
 
   it('rate limits repeated password attempts', async () => {

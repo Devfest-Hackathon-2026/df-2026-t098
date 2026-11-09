@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { inject, Injectable, signal } from '@angular/core';
+import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import type { Language } from './learning.types';
 
 export type ReadingSize = 'standard' | 'large' | 'larger';
@@ -13,6 +13,10 @@ const READING_SCALE: Record<ReadingSize, number> = {
 @Injectable({ providedIn: 'root' })
 export class DisplaySettings {
   private readonly document = inject(DOCUMENT);
+  private readonly systemTheme = this.document.defaultView?.matchMedia?.(
+    '(prefers-color-scheme: light)',
+  );
+  private hasThemePreference = ['light', 'dark'].includes(this.read('whylint-theme') ?? '');
   readonly language = signal<Language>(this.read('whylint-language') === 'en' ? 'en' : 'ja');
   readonly theme = signal<'light' | 'dark'>(
     this.read('whylint-theme') === 'light' ? 'light' : 'dark',
@@ -22,11 +26,16 @@ export class DisplaySettings {
   constructor() {
     const readingSize = this.read('whylint-reading-size');
     if (readingSize === 'large' || readingSize === 'larger') this.readingSize.set(readingSize);
-    if (
-      !this.read('whylint-theme') &&
-      this.document.defaultView?.matchMedia?.('(prefers-color-scheme: light)').matches
-    )
-      this.theme.set('light');
+    if (!this.hasThemePreference && this.systemTheme?.matches) this.theme.set('light');
+    const onSystemThemeChange = (event: MediaQueryListEvent) => {
+      if (this.hasThemePreference) return;
+      this.theme.set(event.matches ? 'light' : 'dark');
+      this.switchTheme();
+    };
+    this.systemTheme?.addEventListener?.('change', onSystemThemeChange);
+    inject(DestroyRef).onDestroy(() =>
+      this.systemTheme?.removeEventListener?.('change', onSystemThemeChange),
+    );
     this.apply();
   }
 
@@ -36,9 +45,13 @@ export class DisplaySettings {
     this.apply();
   }
   toggleTheme(): void {
-    this.theme.set(this.theme() === 'light' ? 'dark' : 'light');
+    this.setTheme(this.theme() === 'light' ? 'dark' : 'light');
+  }
+  setTheme(theme: 'light' | 'dark'): void {
+    this.hasThemePreference = true;
+    this.theme.set(theme);
     this.save('whylint-theme', this.theme());
-    this.apply();
+    this.switchTheme();
   }
   setReadingSize(size: ReadingSize): void {
     this.readingSize.set(size);
@@ -56,8 +69,20 @@ export class DisplaySettings {
     try {
       this.document.defaultView?.localStorage.setItem(key, value);
     } catch {
-      /* Keep the active session usable. */
     }
+  }
+  private switchTheme(): void {
+    const root = this.document.documentElement;
+    const view = this.document.defaultView;
+    root.classList.add('theme-switching');
+    this.apply();
+    if (!view?.requestAnimationFrame) {
+      root.classList.remove('theme-switching');
+      return;
+    }
+    view.requestAnimationFrame(() =>
+      view.requestAnimationFrame(() => root.classList.remove('theme-switching')),
+    );
   }
   private apply(): void {
     this.document.documentElement.style.setProperty(

@@ -4059,8 +4059,8 @@
     },
     {
       "id": "48a72346-5684-4d6d-b79d-502bb9579f67",
-      "title": "Invalid Character in IPv4 Address",
-      "prompt": "Which line contains an invalid character that causes this IPv4 address check to fail? Select the buggy line number and explain why.",
+      "title": "IPv4 Octet Range",
+      "prompt": "Which octet is outside the valid IPv4 range? Choose its position from left to right.",
       "code": "const octet1 = \"192\";\nconst octet2 = \"168\";\nconst octet3 = \"1\";\nconst octet4 = \"300\";\nconst ip = `${octet1}.${octet2}.${octet3}.${octet4}`;\nconst isValid = octet4 <= 255;\nconsole.log(isValid);",
       "codeLanguage": "javascript",
       "topics": [
@@ -4069,12 +4069,12 @@
       ],
       "difficulty": "beginner",
       "language": "en",
-      "referenceAnswer": "Line 4 contains the bug because an IPv4 address octet cannot exceed the value of 255.",
+      "referenceAnswer": "An IPv4 octet must be between 0 and 255. The fourth octet is 300, so the comparison with 255 returns false as expected. A full validator would check both bounds on all four octets.",
       "rubric": [
-        "Identifies line 4 as containing an out-of-range value.",
-        "Explains that IPv4 address octets only range from 0 to 255."
+        "Identifies 300 as the out-of-range input.",
+        "Explains the 0 to 255 octet range and why the check returns false."
       ],
-      "format": "spot_bug",
+      "format": "choice",
       "options": [
         "1",
         "2",
@@ -4082,7 +4082,7 @@
         "4"
       ],
       "correctOption": 3,
-      "quickExplanation": "Each number in an IPv4 address must be between 0 and 255, so 300 is invalid.",
+      "quickExplanation": "300 is above the IPv4 octet maximum of 255. The comparison returns false and correctly rejects that input.",
       "concept": "ipv4-address-validation"
     },
     {

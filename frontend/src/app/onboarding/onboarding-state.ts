@@ -65,6 +65,17 @@ export class OnboardingState {
     }
   }
 
+  /** Forgets the saved preferences on this device, e.g. after the account was deleted. */
+  clear(): void {
+    try {
+      const storage = this.document.defaultView?.localStorage;
+      storage?.removeItem(this.key);
+      storage?.removeItem('whylint-onboarding-v1');
+    } catch {
+      // Storage may be unavailable; the server copy is gone with the account.
+    }
+  }
+
   async restore(): Promise<LearningPreference | null> {
     if (this.session.status() === 'loading') await this.session.refresh();
     const userId = this.session.user()?.id;

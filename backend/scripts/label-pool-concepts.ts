@@ -1,9 +1,3 @@
-/**
- * Adds a canonical `concept` key to every question in the committed pool, so the feed can
- * avoid serving two questions about the same idea.
- *   npm run pool:concepts
- * Requires GEMINI_API_KEY and GEMINI_MODEL in backend/.env. Never runs in production.
- */
 import 'dotenv/config';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

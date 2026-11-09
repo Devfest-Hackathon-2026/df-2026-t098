@@ -14,10 +14,6 @@ type ToastInput = Toast extends infer T ? (T extends Toast ? Omit<T, 'id'> : nev
 
 const COMBO_MILESTONES = new Set([3, 5, 10, 15, 20, 30, 50]);
 
-/**
- * Learning progress shared by the feed HUD, cards, and profile. Taps return fresh progress,
- * so the HUD reacts instantly without polling. Guests get a local, session-only combo.
- */
 @Injectable({ providedIn: 'root' })
 export class ProgressStore {
   private readonly api = inject(LearningApi);
@@ -30,7 +26,6 @@ export class ProgressStore {
   readonly guestCorrect = signal(0);
   readonly guestAnswered = signal(0);
   readonly toasts = signal<Toast[]>([]);
-  /** Increments on every graded tap so views can replay a one-shot animation. */
   readonly pulse = signal<{ correct: boolean; xp: number; at: number } | null>(null);
 
   readonly combo = computed(() => this.progress()?.combo ?? this.guestCombo());
@@ -65,7 +60,6 @@ export class ProgressStore {
       const progress = await this.api.get<Progress>('/progress', signal);
       if (!signal.aborted) this.update(progress, false);
     } catch {
-      /* The HUD stays empty; the profile shows its own error and retry. */
     }
   }
 
@@ -84,14 +78,12 @@ export class ProgressStore {
     } else this.guestCombo.set(0);
   }
 
-  /** Explanations are graded by Gemini; refresh totals afterwards. */
   async refreshAfterAssessment(): Promise<void> {
     const signal = this.controller.signal;
     try {
       const progress = await this.api.get<Progress>('/progress', signal);
       if (!signal.aborted) this.update(progress, true);
     } catch {
-      /* Keep the previous HUD values. */
     }
   }
 

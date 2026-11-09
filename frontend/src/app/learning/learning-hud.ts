@@ -5,7 +5,6 @@ import { Icon } from './icon';
 import { ProgressStore, type Toast } from './progress-store';
 import type { Language } from './learning.types';
 
-/** Badge icons are names from the shared icon set, never emoji. */
 const BADGES: Record<string, { icon: string; ja: string; en: string }> = {
   'first-correct-tap': { icon: 'target', ja: 'はじめての正解', en: 'First correct answer' },
   'first-pass': { icon: 'lightbulb', ja: 'はじめての合格', en: 'First understanding' },
@@ -248,7 +247,9 @@ export function badgeInfo(id: string, language: Language): { icon: string; name:
         display: none;
       }
       .chip {
-        padding-inline: 8px;
+        padding-inline: 6px;
+        font-size: 0.75rem;
+        gap: 3px;
       }
     }
     @keyframes flare {
@@ -314,7 +315,6 @@ export class LearningHud {
     return progress ? Math.min(1, progress.dailyCompleted / progress.dailyGoal) : 0;
   });
 
-  /** A small, fixed burst; level-ups, the daily goal, and big combos are rare enough to earn it. */
   protected readonly confetti = Array.from({ length: 14 }, (_, index) => {
     const angle = (index / 14) * Math.PI * 2 + (index % 2) * 0.3;
     const distance = 70 + (index % 3) * 26;

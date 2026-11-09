@@ -22,10 +22,6 @@ export function readPoolFile(): PoolFile | null {
   return JSON.parse(readFileSync(path, 'utf8')) as PoolFile;
 }
 
-/**
- * Loads the committed, pre-generated tap-question pool so every environment can serve
- * instant questions without waiting for Gemini. Idempotent by question ID.
- */
 @Injectable()
 export class QuestionPoolSeeder implements OnApplicationBootstrap {
   private readonly logger = new Logger(QuestionPoolSeeder.name);
@@ -39,12 +35,11 @@ export class QuestionPoolSeeder implements OnApplicationBootstrap {
       if (inserted)
         this.logger.log(`Loaded ${inserted} new or updated pool questions`);
     } catch (error) {
-      // A missing migration must not stop the API; the feed falls back to Gemini batches.
+      // Leave the API up so the feed can fall back to generated questions.
       this.logger.warn(`Question pool not loaded: ${(error as Error).message}`);
     }
   }
 
-  /** Inserts new pool questions and refreshes quiz data on existing pool rows. */
   async seed(pool = readPoolFile()): Promise<number> {
     if (!pool?.questions.length) return 0;
     const rows = pool.questions.map((question) => ({

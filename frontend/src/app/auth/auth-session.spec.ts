@@ -418,4 +418,51 @@ describe('AuthSession', () => {
     expect(session.user()).toEqual(account);
     expect(vi.getTimerCount()).toBe(0);
   });
+  describe('account deletion', () => {
+    beforeEach(async () => {
+      fetchMock.mockResolvedValueOnce(response(200, account));
+      await session.refresh();
+    });
+
+    it('deletes through the cookie-backed endpoint and signs out only after a 204', async () => {
+      fetchMock.mockResolvedValueOnce(response(204));
+
+      await expect(session.deleteAccount()).resolves.toBe('deleted');
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        '/api/v1/auth/me',
+        expect.objectContaining({
+          method: 'DELETE',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          referrerPolicy: 'no-referrer',
+        }),
+      );
+      expect(session.status()).toBe('guest');
+      expect(session.user()).toBeNull();
+    });
+
+    it.each([
+      [500, 'failed'],
+      [403, 'failed'],
+      [429, 'rateLimit'],
+    ] as const)('keeps the signed-in account when the server answers %i', async (status, result) => {
+      fetchMock.mockResolvedValueOnce(response(status));
+
+      await expect(session.deleteAccount()).resolves.toBe(result);
+      expect(session.status()).toBe('authenticated');
+      expect(session.user()).toEqual(account);
+    });
+
+    it('re-checks the session after a 401 and keeps the account if the network fails', async () => {
+      fetchMock.mockResolvedValueOnce(response(401)).mockResolvedValueOnce(response(401));
+      await expect(session.deleteAccount()).resolves.toBe('unauthorized');
+      await vi.waitFor(() => expect(session.status()).toBe('guest'));
+
+      fetchMock.mockResolvedValueOnce(response(200, account));
+      await session.refresh();
+      fetchMock.mockRejectedValueOnce(new TypeError('offline'));
+      await expect(session.deleteAccount()).resolves.toBe('failed');
+      expect(session.status()).toBe('authenticated');
+    });
+  });
 });

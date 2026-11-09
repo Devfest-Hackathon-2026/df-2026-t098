@@ -5,7 +5,7 @@ if (process.env.WHYLINT_E2E !== '1' || process.env.GOOGLE_CLIENT_ID !== 'whylint
   throw new Error('The Google fixture is only available in the disposable test stack');
 }
 
-// Intercept only Google's HTTP boundary. The actual Google verifier still runs.
+// Mock Google HTTP and keep the real token verifier.
 nock.disableNetConnect();
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const keyId = 'whylint-fixture-key';

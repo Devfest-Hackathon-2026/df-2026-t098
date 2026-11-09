@@ -53,6 +53,9 @@ a {
   color: var(--accent);
   text-underline-offset: 4px;
 }
+.signin-cta {
+  color: var(--button-text);
+}
 .question-list a {
   display: flex;
   flex-direction: column;

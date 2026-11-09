@@ -1,4 +1,3 @@
-/** Public question destinations accepted by the authentication screens. */
 export function questionReturnTo(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const match = value.match(
@@ -9,7 +8,6 @@ export function questionReturnTo(value: unknown): string | null {
 
 const RETURN_KEY = 'whylint-google-auth-return';
 
-/** Bind a public return destination to the OAuth attempt's existing random state. */
 export function saveQuestionReturn(
   storage: Storage,
   state: string,
@@ -20,7 +18,6 @@ export function saveQuestionReturn(
   else storage.removeItem(RETURN_KEY);
 }
 
-/** Consume the intent once, including on invalid or stale callback data. */
 export function takeQuestionReturn(storage: Storage, state: string | null): string | null {
   const saved = storage.getItem(RETURN_KEY);
   storage.removeItem(RETURN_KEY);

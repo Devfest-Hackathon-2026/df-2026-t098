@@ -32,7 +32,6 @@
   --syntax-number: #f0c48f;
   --syntax-comment: #a0aaa0;
   --syntax-property: #f1c5a6;
-  /* Motion tokens. UI stays under 300ms; spring overshoot is for celebrations only. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -107,6 +106,7 @@ button {
     color 150ms ease,
     background-color 150ms ease;
 }
+a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -114,7 +114,26 @@ textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-/* Press feedback on pointer-down, for touch and mouse alike. Release eases back slower. */
+.signin-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+:root.theme-switching *,
+:root.theme-switching *::before,
+:root.theme-switching *::after {
+  transition: none !important;
+}
 button:not(:disabled):active {
   transform: scale(0.97);
   transition-duration: 60ms;
@@ -139,7 +158,6 @@ textarea {
   border: 0;
 }
 
-/* Syntax colors support scanning; punctuation and unrecognized tokens stay neutral. */
 .syntax-keyword,
 .syntax-boolean,
 .syntax-operator {
@@ -169,7 +187,6 @@ textarea {
   color: var(--syntax-property);
 }
 
-/* Hover is a color change only, and only where a precise pointer can hover. */
 @media (hover: hover) and (pointer: fine) {
   .app-shell
     button:not(.active):not(.selected):not(.is-saved):not(.primary):not([aria-pressed='true']):not(

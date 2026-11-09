@@ -197,8 +197,19 @@ export class HelpfulDto {
 }
 
 export class ReportDto {
-  @IsIn(['incorrect', 'unclear', 'outdated'])
-  reason!: 'incorrect' | 'unclear' | 'outdated';
+  @IsIn(['incorrect', 'unclear', 'outdated', 'inappropriate'])
+  reason!: 'incorrect' | 'unclear' | 'outdated' | 'inappropriate';
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(1000)
+  details?: string;
+}
+
+export class CommentReportDto {
+  @IsIn(['spam', 'harassment', 'inappropriate', 'other'])
+  reason!: 'spam' | 'harassment' | 'inappropriate' | 'other';
 
   @IsOptional()
   @Transform(trim)

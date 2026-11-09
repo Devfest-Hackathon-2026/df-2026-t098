@@ -27,7 +27,7 @@ export async function formatQuestionCode<T extends QuestionCode>(
   question: T,
 ): Promise<T> {
   if (!question.code || !question.codeLanguage) return question;
-  // Spot-the-bug options are line numbers, so reformatting would move the answer.
+  // Formatting would move the answer line.
   if (question.format === 'spot_bug') return question;
   const parser = PARSERS[question.codeLanguage.trim().toLowerCase()];
   if (typeof parser !== 'string') return question;
@@ -36,7 +36,6 @@ export async function formatQuestionCode<T extends QuestionCode>(
   let formatted = FORMATTED.get(key);
   if (formatted === undefined) {
     formatted = await formatCode(question.code, parser);
-    // Public lists format every snippet on every read; remember results (bounded).
     if (FORMATTED.size >= FORMAT_CACHE_SIZE)
       FORMATTED.delete(FORMATTED.keys().next().value!);
     FORMATTED.set(key, formatted);
@@ -65,7 +64,7 @@ async function formatCode(
     });
     return result.trimEnd();
   } catch {
-    // Legacy or illustrative snippets can be unparseable. Keep question reads usable.
+    // Keep the original snippet if formatting fails.
     return null;
   }
 }

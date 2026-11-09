@@ -89,3 +89,26 @@
     color: var(--accent);
   }
 }
+
+.question-block {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--text);
+}
+.question-block p {
+  margin: 0;
+}
+.question-block .secondary {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+}
+.question-block .danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}

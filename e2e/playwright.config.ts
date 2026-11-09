@@ -18,7 +18,7 @@ export default defineConfig({
     locale: 'ja-JP',
     serviceWorkers: 'block',
     screenshot: 'only-on-failure',
-    // Traces and videos capture cookies and request bodies. Keep fixtures in memory.
+    // Recordings can contain cookies and request bodies.
     trace: 'off',
     video: 'off',
   },

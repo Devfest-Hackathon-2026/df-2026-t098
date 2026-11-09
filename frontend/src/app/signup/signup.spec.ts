@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { Signup } from './signup';
 import { AuthApi } from '../auth/auth-api';
+import { DisplaySettings } from '../learning/display-settings';
 import { AuthSession } from '../auth/auth-session';
 import type { SessionStatus } from '../auth/auth-session';
 
@@ -21,6 +22,19 @@ describe('email signup', () => {
         { provide: AuthSession, useValue: { status, refresh: vi.fn() } },
       ],
     });
+  });
+
+  it('shares theme changes with the app and follows later shared changes', async () => {
+    const settings = TestBed.inject(DisplaySettings);
+    const fixture = TestBed.createComponent(Signup);
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.header .settings')).toBeNull();
+    settings.setTheme('light');
+    fixture.detectChanges();
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    settings.setTheme('dark');
+    fixture.detectChanges();
+    expect(document.documentElement.dataset['theme']).toBe('dark');
   });
 
   it('shows Japanese labels, password-manager autocomplete and field validation', async () => {

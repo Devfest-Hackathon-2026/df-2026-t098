@@ -1,8 +1,3 @@
-/**
- * Loads backend/seed/question-pool.json into the configured database without starting the API.
- *   npm run pool:seed
- * Safe to repeat: new questions are inserted and existing pool rows are refreshed.
- */
 import { AppDataSource } from '../src/datasource';
 import { QuestionPoolSeeder } from '../src/learning/question-pool.seeder';
 

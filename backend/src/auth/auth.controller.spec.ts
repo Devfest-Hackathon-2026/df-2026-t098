@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthController } from './auth.controller';
 import type { AuthService } from './auth.service';
@@ -7,9 +7,10 @@ describe('AuthController', () => {
   const authService = {
     login: jest.fn(),
     signup: jest.fn(),
+    deleteAccount: jest.fn(),
   };
   const controller = new AuthController(authService as unknown as AuthService);
-  const response = { cookie: jest.fn() } as unknown as Response;
+  const response = { cookie: jest.fn(), clearCookie: jest.fn() } as unknown as Response;
   beforeEach(() => jest.clearAllMocks());
 
   it.each([undefined, null, '', '   ', 42, {}])(
@@ -52,6 +53,29 @@ describe('AuthController', () => {
         'session-token',
         expect.objectContaining({ httpOnly: true, secure: true, sameSite: 'lax' }),
       );
+    });
+  });
+  describe('account deletion', () => {
+    const request = { user: { sub: 'user-1', sid: 'session-1' } } as never;
+
+    it('deletes the authenticated account and clears the web cookie', async () => {
+      authService.deleteAccount.mockResolvedValue(undefined);
+      await expect(controller.deleteAccount(request, response)).resolves.toBeUndefined();
+      expect(authService.deleteAccount).toHaveBeenCalledWith('user-1');
+      expect(response.clearCookie).toHaveBeenCalledWith(
+        'access_token',
+        expect.objectContaining({ httpOnly: true, secure: true }),
+      );
+    });
+
+    it('refuses an unauthenticated request and keeps the cookie when deletion fails', async () => {
+      await expect(controller.deleteAccount({} as never, response)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(authService.deleteAccount).not.toHaveBeenCalled();
+      authService.deleteAccount.mockRejectedValue(new Error('database unavailable'));
+      await expect(controller.deleteAccount(request, response)).rejects.toThrow('database');
+      expect(response.clearCookie).not.toHaveBeenCalled();
     });
   });
 });

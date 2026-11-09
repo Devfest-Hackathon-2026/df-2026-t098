@@ -56,7 +56,7 @@ Geminiの実接続はAPIキーとモデルの設定後に検証します。自�
 テスト用フィクスチャに置き換え、実際のバックエンドと一時的なPostgreSQLを使用します。
 Google Cloud Runへのデプロイは別途検証が必要です。
 コンテナ（アプリとAPIを同一オリジンで配信）の手順は [docs/deployment.md](docs/deployment.md) を参照してください。
-iOS/Android向けのネイティブアプリは別プロジェクトで開発する予定です。
+iOS（Swift）とAndroid（Kotlin）のネイティブアプリは [native/README.md](native/README.md) を参照してください。
 
 ### ローカル起動
 
@@ -124,7 +124,7 @@ the revised text you explicitly submit.
 Angular, NestJS, PostgreSQL, and TypeORM. Cloud Run is the intended deployment platform.
 The repository root `Dockerfile` builds one image that serves the Angular app and the API from the same
 origin; see [docs/deployment.md](docs/deployment.md) for its environment, release job, and probes.
-The native iOS and Android apps are planned as a separate project.
+The native iOS (Swift) and Android (Kotlin) projects are in [native/](native/README.md).
 
 The web frontend and API live in this repository. Use the backend and frontend commands above.
 Backend environment setup is in [backend/README.md](backend/README.md). Gemini generation,

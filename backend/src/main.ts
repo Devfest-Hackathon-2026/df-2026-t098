@@ -9,7 +9,7 @@ import cookieParser from 'cookie-parser';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   hardenHttp(app);
-  // Cloud Run sends SIGTERM before stopping an instance; close the server and database cleanly.
+  // Close the database pool on Cloud Run shutdown.
   app.enableShutdownHooks();
   app.setGlobalPrefix('api/v1');
   const frontend = frontendDirectory();

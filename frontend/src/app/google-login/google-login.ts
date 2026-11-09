@@ -1,25 +1,26 @@
+import { LegalLinks } from '../config/legal-links';
+import { Brand } from '../brand/brand';
 import { LoadingSkeleton } from '../learning/loading-skeleton';
 import { DOCUMENT } from '@angular/common';
 import { Component, DestroyRef, effect, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthSession } from '../auth/auth-session';
+import { DisplaySettings } from '../learning/display-settings';
 import { AuthApi } from '../auth/auth-api';
 import type { AuthFailure } from '../auth/auth-api';
 import { authError } from '../auth/auth-copy';
 import { CALLBACK_PATH, createAuthorizationUrl, readCallback, STATE_KEY } from './oauth-flow';
 import { questionReturnTo, saveQuestionReturn, takeQuestionReturn } from '../auth/auth-return';
 
-// Google OAuth client IDs are public. Never put a client secret in the frontend.
 const GOOGLE_WEB_CLIENT_ID =
   '8715935974-egdfj9tf8e1p71jjr2befadf47cne86l.apps.googleusercontent.com';
 const GOOGLE_LOGIN_ALLOWED_ORIGINS: readonly string[] = [
   'http://localhost:4200',
+  'https://whylint.com',
   'https://whylint-8715935974.asia-northeast1.run.app',
 ];
 const GOOGLE_EXCHANGE_TIMEOUT_MS = 10_000;
 
-type Language = 'ja' | 'en';
-type Theme = 'light' | 'dark';
 type Phase = 'ready' | 'working' | 'signed-in' | 'error';
 type ErrorKey = 'origin' | 'cancelled' | 'invalid' | 'storage' | 'api' | 'restart';
 type PasswordStatus =
@@ -55,8 +56,6 @@ const COPY = {
     storage: 'ログインを開始できませんでした。ブラウザの設定を確認してください。',
     api: 'ログインを確認できませんでした。時間をおいてもう一度お試しください。',
     restart: 'Googleログインを最初からやり直してください。',
-    light: 'ライトテーマに切り替え',
-    dark: 'ダークテーマに切り替え',
   },
   en: {
     back: 'Back to practice',
@@ -87,14 +86,12 @@ const COPY = {
     storage: 'Could not start sign-in. Check your browser settings and try again.',
     api: 'Could not complete sign-in. Please try again in a moment.',
     restart: 'Please start Google sign-in again.',
-    light: 'Switch to light theme',
-    dark: 'Switch to dark theme',
   },
 } as const;
 
 @Component({
   selector: 'app-google-login',
-  imports: [RouterLink, LoadingSkeleton],
+  imports: [Brand, RouterLink, LoadingSkeleton, LegalLinks],
   templateUrl: './google-login.html',
   styleUrl: './google-login.css',
 })
@@ -122,9 +119,8 @@ export class GoogleLogin implements OnInit {
   private redirecting = false;
   private destroyed = false;
   private exchangeController: AbortController | null = null;
-  private hasThemePreference = false;
-  protected readonly language = signal<Language>('ja');
-  protected readonly theme = signal<Theme>('dark');
+  private readonly settings = inject(DisplaySettings);
+  protected readonly language = this.settings.language;
   protected readonly phase = signal<Phase>('ready');
   protected readonly error = signal<ErrorKey | null>(null);
   protected readonly redirectFailed = signal(false);
@@ -149,53 +145,7 @@ export class GoogleLogin implements OnInit {
   }
 
   ngOnInit(): void {
-    if (!this.win) return;
-    const systemTheme = this.win.matchMedia?.('(prefers-color-scheme: light)');
-    try {
-      this.language.set(this.win.localStorage.getItem('whylint-language') === 'en' ? 'en' : 'ja');
-      const savedTheme = this.win.localStorage.getItem('whylint-theme');
-      this.hasThemePreference = savedTheme === 'light' || savedTheme === 'dark';
-      this.theme.set(
-        savedTheme === 'light' || savedTheme === 'dark'
-          ? savedTheme
-          : systemTheme?.matches
-            ? 'light'
-            : 'dark',
-      );
-    } catch {
-      this.theme.set(systemTheme?.matches ? 'light' : 'dark');
-    }
-    const onSystemThemeChange = (event: MediaQueryListEvent) => {
-      if (!this.hasThemePreference) {
-        this.theme.set(event.matches ? 'light' : 'dark');
-        this.applyTheme();
-      }
-    };
-    systemTheme?.addEventListener?.('change', onSystemThemeChange);
-    this.destroyRef.onDestroy(() =>
-      systemTheme?.removeEventListener?.('change', onSystemThemeChange),
-    );
-    this.applyTheme();
-    this.document.documentElement.lang = this.language();
     if (this.isCallback) void this.finishSignIn();
-  }
-
-  protected toggleTheme(): void {
-    this.theme.set(this.theme() === 'dark' ? 'light' : 'dark');
-    this.hasThemePreference = true;
-    this.applyTheme();
-    try {
-      this.win?.localStorage.setItem('whylint-theme', this.theme());
-    } catch {
-      /* Keep session setting. */
-    }
-  }
-
-  private applyTheme(): void {
-    this.document.documentElement.dataset['theme'] = this.theme();
-    this.document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', this.theme() === 'light' ? '#f3f5f0' : '#080808');
   }
 
   protected async submitPassword(

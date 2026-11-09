@@ -25,7 +25,7 @@ describe('AuthService', () => {
     updateGoogleAvatar: jest.fn(),
     updateGoogleName: jest.fn(),
   };
-  const sessions = { create: jest.fn(), revoke: jest.fn() };
+  const sessions = { create: jest.fn(), revoke: jest.fn(), revokeAll: jest.fn() };
   const transactionManager = {
     marker: 'transaction-manager',
   } as unknown as EntityManager;
@@ -336,6 +336,21 @@ describe('AuthService', () => {
     await expectIssuedSession(result, 'Login successful!');
   });
 
+  it('exchanges a mobile Google identity using the configured server audience', async () => {
+    mockGoogleIdentity();
+    users.findByGoogleId.mockResolvedValueOnce({ id: userId });
+    const result = await service.mobileGoogleLogin('native-id-token');
+    expect(verifyGoogle).toHaveBeenCalledWith({ idToken: 'native-id-token', audience: 'test-client-id' });
+    expect(exchange).not.toHaveBeenCalled();
+    await expectIssuedSession(result, 'Login successful!');
+  });
+
+  it('rejects invalid mobile identity tokens without issuing a session', async () => {
+    verifyGoogle.mockRejectedValueOnce(new Error('invalid token') as never);
+    await expect(service.mobileGoogleLogin('invalid')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(sessions.create).not.toHaveBeenCalled();
+  });
+
   it('creates a new Google account using the verified profile', async () => {
     mockGoogleIdentity();
     users.findByGoogleId.mockResolvedValueOnce(null);
@@ -602,5 +617,42 @@ describe('AuthService', () => {
     );
     expect(users.findByGoogleId).not.toHaveBeenCalled();
     expect(sessions.create).not.toHaveBeenCalled();
+  });
+  describe('deleteAccount', () => {
+    const query = jest.fn();
+    beforeEach(() => {
+      query.mockReset();
+      (transactionManager as unknown as { query: jest.Mock }).query = query;
+      sessions.revokeAll.mockResolvedValue(undefined);
+    });
+
+    it('locks the user, revokes every session and deletes the user in one transaction', async () => {
+      query.mockResolvedValueOnce([{ id: userId }]).mockResolvedValueOnce([]);
+      await expect(service.deleteAccount(userId)).resolves.toBeUndefined();
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(query.mock.calls[0][0]).toMatch(/FROM users WHERE id = \$1 FOR UPDATE/);
+      expect(sessions.revokeAll).toHaveBeenCalledWith(userId, transactionManager);
+      expect(query.mock.calls[1]).toEqual(['DELETE FROM users WHERE id = $1', [userId]]);
+      expect(sessions.revokeAll.mock.invocationCallOrder[0]).toBeGreaterThan(
+        query.mock.invocationCallOrder[0],
+      );
+      expect(sessions.revokeAll.mock.invocationCallOrder[0]).toBeLessThan(
+        query.mock.invocationCallOrder[1],
+      );
+    });
+
+    it('does nothing when the account is already gone', async () => {
+      query.mockResolvedValueOnce([]);
+      await expect(service.deleteAccount(userId)).resolves.toBeUndefined();
+      expect(sessions.revokeAll).not.toHaveBeenCalled();
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates a failed deletion so the transaction rolls back', async () => {
+      const failure = new Error('database unavailable');
+      query.mockResolvedValueOnce([{ id: userId }]).mockRejectedValueOnce(failure);
+      await expect(service.deleteAccount(userId)).rejects.toBe(failure);
+    });
   });
 });

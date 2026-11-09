@@ -20,6 +20,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthOriginGuard } from '../auth/guards/origin.guard';
+import { TapOriginGuard } from './tap-origin.guard';
 import { JsonBodyGuard } from '../auth/guards/json-body.guard';
 import { DatabaseErrorFilter } from '../auth/filters/database-error.filter';
 import { JwtGuard } from '../auth/jwt/jwt.guard';
@@ -29,6 +30,7 @@ import { CommunityService } from './community.service';
 import {
   AttemptDto,
   CommentDto,
+  CommentReportDto,
   HelpfulDto,
   ReportDto,
   FeedBatchDto,
@@ -180,7 +182,7 @@ export class LearningController {
   @Header('Cache-Control', 'no-store')
   @UseGuards(
     OptionalLearningAuthGuard,
-    AuthOriginGuard,
+    TapOriginGuard,
     JsonBodyGuard,
     LearningThrottleGuard,
   )
@@ -386,5 +388,55 @@ export class LearningController {
     @Body() body: ReportDto,
   ) {
     return this.contributions.report(request.user!.sub, id, body);
+  }
+
+  @Post('questions/:id/comments/:commentId/reports')
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(...authenticatedWrite)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  reportComment(
+    @Req() request: AuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('commentId', new ParseUUIDPipe()) commentId: string,
+    @Body() body: CommentReportDto,
+  ) {
+    return this.contributions.reportComment(
+      request.user!.sub,
+      id,
+      commentId,
+      body,
+    );
+  }
+
+  @Get('blocks')
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(JwtGuard, LearningThrottleGuard)
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  blocks(@Req() request: AuthenticatedRequest) {
+    return this.contributions.blocks(request.user!.sub);
+  }
+
+  // Blocking has no body, so it skips the JSON content-type guard. Cookie
+  // sessions are still protected by the origin check.
+  @Put('blocks/:userId')
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(JwtGuard, AuthOriginGuard, LearningThrottleGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  block(
+    @Req() request: AuthenticatedRequest,
+    @Param('userId', new ParseUUIDPipe()) userId: string,
+  ) {
+    return this.contributions.block(request.user!.sub, userId);
+  }
+
+  @Delete('blocks/:userId')
+  @HttpCode(204)
+  @UseGuards(JwtGuard, AuthOriginGuard, LearningThrottleGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  unblock(
+    @Req() request: AuthenticatedRequest,
+    @Param('userId', new ParseUUIDPipe()) userId: string,
+  ) {
+    return this.contributions.unblock(request.user!.sub, userId);
   }
 }

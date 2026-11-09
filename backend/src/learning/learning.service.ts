@@ -174,7 +174,6 @@ export class LearningService {
           userId,
           manager,
         );
-        // Gemini may return fewer than five valid questions. Top up from the shared pool.
         const topUp =
           generatedQuestions.length < 5
             ? await this.questions.pool(
@@ -236,7 +235,6 @@ export class LearningService {
     }
   }
 
-  /** Instant tap questions for guests, first loads, and Gemini fallbacks. */
   async pool(query: PoolQuery, userId: string | null) {
     let { topics, difficulty } = query;
     if (userId && !topics.length) {
@@ -269,11 +267,6 @@ export class LearningService {
     };
   }
 
-  /**
-   * Adaptive difficulty: start from the learner's latest generated level (or their chosen
-   * level after they change preferences). Five of the last six first taps correct moves up a
-   * level; two or fewer moves down. Weak topics are ranked by recent miss rate.
-   */
   async adapt(
     userId: string,
     preferences: LearningPreferences,

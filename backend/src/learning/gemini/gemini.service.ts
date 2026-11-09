@@ -199,7 +199,6 @@ export class GeminiService {
           Math.min(45_000, remaining),
         );
       } catch (error) {
-        // Keep valid questions from an earlier response; otherwise surface the provider error.
         if (accepted.length) return accepted;
         throw error;
       }
@@ -212,7 +211,6 @@ export class GeminiService {
         continue;
       }
 
-      // Keep every valid question. One malformed question never discards the rest of the batch.
       for (const value of result.questions.slice(0, 5)) {
         if (accepted.length >= 5) break;
         try {
@@ -242,7 +240,6 @@ export class GeminiService {
               : error;
         }
       }
-      // Three valid questions are enough; the feed tops up the batch from the question pool.
       if (accepted.length >= 3) return accepted;
     }
     if (accepted.length) return accepted;
@@ -430,7 +427,7 @@ export class GeminiService {
       );
       response = result.data;
     } catch (error) {
-      // Axios errors contain request headers and bodies. Never propagate them.
+      // Axios errors can include credentials and prompts.
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         if (status === 429) unavailable('RATE_LIMIT', status);
@@ -571,10 +568,6 @@ export function validateQuiz(
   };
 }
 
-/**
- * Models favour the first option for the right answer. Shuffle choices so position carries no
- * signal; keep true/false in its natural order and list spot-the-bug lines top to bottom.
- */
 export function arrangeOptions(
   format: QuizFormat,
   options: string[],
@@ -595,7 +588,6 @@ export function arrangeOptions(
 }
 
 function thinkingConfig(): { thinkingConfig?: { thinkingLevel: string } } {
-  // Gemini 3.x models accept a thinking level; "low" keeps tap quizzes fast.
   const level = (process.env.GEMINI_THINKING_LEVEL ?? 'low')
     .trim()
     .toLowerCase();
@@ -613,7 +605,7 @@ function isIncompleteJavaScript(code: string, language: string): boolean {
     return false;
   }
   try {
-    // Parse only; generated code is never executed.
+    // Parse the snippet without running it.
     new Script(code);
     return false;
   } catch (error) {
@@ -624,7 +616,6 @@ function isIncompleteJavaScript(code: string, language: string): boolean {
     ) {
       throw error;
     }
-    // Modules and JSX are not valid scripts. Only treat clear truncation as incomplete.
     return ['Unexpected end of input', 'Invalid or unexpected token'].includes(
       error.message,
     );
@@ -668,7 +659,6 @@ function normalizePrompt(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
-/** Leave transport headroom for JSON escaping, instructions, schema, and preferences. */
 function generationContext(prompts: string[], questions: NoveltyQuestion[]) {
   const recentQuestions: NoveltyQuestion[] = [];
   let questionBytes = 2;

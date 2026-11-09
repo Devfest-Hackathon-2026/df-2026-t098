@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { PublishQuestion } from './publish-question';
 import { AuthSession } from '../auth/auth-session';
@@ -22,13 +22,44 @@ describe('Community question publication', () => {
     });
   });
 
+  it('restores an unfinished post when the same account returns to the tab', async () => {
+    const first = TestBed.createComponent(PublishQuestion);
+    await first.whenStable();
+    const title = first.nativeElement.querySelector('#question-title') as HTMLInputElement;
+    title.value = 'An unfinished question';
+    title.dispatchEvent(new Event('input'));
+    await first.whenStable();
+    first.destroy();
+    const second = TestBed.createComponent(PublishQuestion);
+    await second.whenStable();
+    expect(second.nativeElement.querySelector('#question-title').value).toBe(
+      'An unfinished question',
+    );
+  });
+
+  it('does not restore a draft belonging to a different account', async () => {
+    const first = TestBed.createComponent(PublishQuestion);
+    await first.whenStable();
+    const title = first.nativeElement.querySelector('#question-title') as HTMLInputElement;
+    title.value = 'A private draft';
+    title.dispatchEvent(new Event('input'));
+    await first.whenStable();
+    first.destroy();
+    (TestBed.inject(AuthSession).user as unknown as WritableSignal<{ id: string }>).set({
+      id: 'another-author',
+    });
+    const second = TestBed.createComponent(PublishQuestion);
+    await second.whenStable();
+    expect(second.nativeElement.querySelector('#question-title').value).toBe('');
+  });
+
   it('retains a publication ID and the form across a retryable provider failure', async () => {
     send.mockRejectedValueOnce(new LearningError(503, 'AI_UNAVAILABLE')).mockResolvedValueOnce({
       question: { id: 'published', prompt: 'Why is a signed token useful?' },
     });
-    const fixture = TestBed.createComponent(PublishQuestion);
+    let fixture = TestBed.createComponent(PublishQuestion);
     await fixture.whenStable();
-    const root = fixture.nativeElement as HTMLElement;
+    let root = fixture.nativeElement as HTMLElement;
     for (const [id, value] of [
       ['question-title', 'A signed token'],
       ['question-prompt', 'Why is a signed token useful?'],
@@ -43,6 +74,11 @@ describe('Community question publication', () => {
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await fixture.whenStable();
     const requestId = send.mock.calls[0][2].requestId;
+    expect(root.querySelector<HTMLInputElement>('#question-title')?.value).toBe('A signed token');
+    fixture.destroy();
+    fixture = TestBed.createComponent(PublishQuestion);
+    await fixture.whenStable();
+    root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector<HTMLInputElement>('#question-title')?.value).toBe('A signed token');
     root
       .querySelector('form')!

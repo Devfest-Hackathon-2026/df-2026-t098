@@ -39,7 +39,6 @@
   content: '';
 }
 
-/* Tap answers */
 .quiz-options {
   display: grid;
   gap: 10px;
@@ -118,7 +117,6 @@
   width: 22px;
   height: 22px;
 }
-/* Side-by-side answers are narrow: tuck the mark into the corner so the label keeps its width. */
 .quiz-options.two-up .option-mark {
   position: absolute;
   top: 6px;
@@ -167,7 +165,6 @@
   opacity: 0.45;
 }
 
-/* Reveal */
 .reveal {
   margin-top: 16px;
   padding: 14px 16px;
@@ -212,7 +209,6 @@
   animation: xp-pop 420ms var(--ease-spring);
 }
 
-/* Go deeper */
 .deeper {
   display: grid;
   gap: 10px;
@@ -319,7 +315,6 @@
   background: var(--success);
 }
 
-/* Double-tap like */
 .heart-burst {
   position: absolute;
   left: var(--heart-x, 50%);
@@ -440,7 +435,6 @@
   flex-basis: 100%;
   order: 4;
 }
-/* Double-tap to like should never zoom the page. */
 .question-content {
   touch-action: manipulation;
 }

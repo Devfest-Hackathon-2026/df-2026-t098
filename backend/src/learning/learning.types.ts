@@ -19,7 +19,6 @@ export interface PublicAuthor {
   avatarUrl: string | null;
 }
 
-/** The viewer's latest tap on a question. The correct option is revealed only after a tap. */
 export interface PublicTap {
   choice: number;
   correct: boolean;
@@ -27,7 +26,6 @@ export interface PublicTap {
   quickExplanation: string;
 }
 
-/** Why the feed chose this card, rendered as a localized chip. */
 export interface CardReason {
   kind:
     | 'weak'
@@ -61,7 +59,6 @@ export interface PublicQuestion {
   saved: boolean;
   createdAt: string;
   format: QuestionFormat;
-  /** Canonical key for the idea tested, used to avoid serving near-duplicates. */
   concept: string | null;
   options: string[] | null;
   tap: PublicTap | null;
