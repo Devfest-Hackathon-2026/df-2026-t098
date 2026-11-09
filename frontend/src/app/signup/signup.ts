@@ -1,3 +1,4 @@
+import { ConsentNotice } from '../config/consent-notice';
 import { LegalLinks } from '../config/legal-links';
 import { Brand } from '../brand/brand';
 import { LoadingSkeleton } from '../learning/loading-skeleton';
@@ -43,7 +44,7 @@ const COPY = {
     submit: 'Create account',
     working: 'Creating your account…',
     signIn: 'Already have an account? Sign in',
-    back: 'Back to practice',
+    back: 'Back to learning',
     checking: 'Checking your account…',
     connection: 'Could not check your account. Check your connection and try again.',
     retry: 'Try again',
@@ -56,7 +57,7 @@ const COPY = {
 
 @Component({
   selector: 'app-signup',
-  imports: [Brand, RouterLink, LoadingSkeleton, LegalLinks],
+  imports: [Brand, RouterLink, LoadingSkeleton, LegalLinks, ConsentNotice],
   templateUrl: './signup.html',
   styleUrls: ['../auth/auth-page.css', './signup.css'],
 })

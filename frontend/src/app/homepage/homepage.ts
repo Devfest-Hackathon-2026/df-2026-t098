@@ -11,7 +11,8 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthSession } from '../auth/auth-session';
 import { DisplaySettings } from '../learning/display-settings';
 import { LearningApi, learningError } from '../learning/learning-api';
@@ -27,6 +28,21 @@ import { topicLabel } from '../learning/topic-label';
 import type { Question, TapResult } from '../learning/learning.types';
 
 type Tab = 'feed' | 'review' | 'rank' | 'publish' | 'profile' | 'settings';
+
+/** The tab shown in the address (?tab=…), so a reload, a link or Back returns to it. */
+const TAB_PARAM: Record<Tab, string | null> = {
+  feed: null,
+  review: 'practice',
+  rank: 'ranking',
+  publish: 'post',
+  profile: 'profile',
+  settings: 'settings',
+};
+
+function tabFromParam(value: string | null): Tab | null {
+  const match = (Object.keys(TAB_PARAM) as Tab[]).find((tab) => TAB_PARAM[tab] === value);
+  return value === null ? null : (match ?? null);
+}
 
 @Component({
   selector: 'app-homepage',
@@ -52,6 +68,8 @@ export class Homepage {
   private readonly api = inject(LearningApi);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly content = viewChild.required<ElementRef<HTMLElement>>('content');
   private controller = new AbortController();
   private reviewsOwner: string | null | undefined;
@@ -82,6 +100,12 @@ export class Homepage {
   protected readonly reviewsError = signal('');
 
   constructor() {
+    const initialTab = tabFromParam(this.route.snapshot.queryParamMap.get('tab'));
+    if (initialTab) this.tab.set(initialTab);
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const next = tabFromParam(params.get('tab')) ?? 'feed';
+      if (next !== this.tab()) this.openTab(next, this.content().nativeElement);
+    });
     const destroy = inject(DestroyRef);
     destroy.onDestroy(() => {
       this.controller.abort();
@@ -185,6 +209,13 @@ export class Homepage {
     content.classList.remove('is-paging');
     this.tab.set(tab);
     this.discussionQuestion.set(null);
+    const wanted = TAB_PARAM[tab];
+    if ((this.route.snapshot.queryParamMap.get('tab') ?? null) !== wanted)
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { tab: wanted },
+        queryParamsHandling: 'merge',
+      });
     if (tab === 'feed')
       afterNextRender(
         () => {

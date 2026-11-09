@@ -27,6 +27,12 @@ test("legal links and the support contact come from configuration on sign-in, si
   await expect(
     page.getByRole("link", { name: "support@example.test", exact: true }),
   ).toHaveAttribute("href", "mailto:support@example.test");
+  for (const path of ["/privacy", "/terms"]) {
+    await page.goto(path);
+    await expect(
+      page.getByRole("link", { name: "support@example.test", exact: true }),
+    ).toHaveAttribute("href", "mailto:support@example.test");
+  }
 });
 
 test("a learner confirms and deletes their account from Settings", async ({ page }) => {

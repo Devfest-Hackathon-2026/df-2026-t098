@@ -903,7 +903,7 @@ test("guest: skip setup, answer instantly without signing in, and get invited af
   await expect(page.locator(".signin-card")).toHaveCount(1);
   await expect(page.locator(".signin-card a")).toHaveAttribute(
     "href",
-    "/login",
+    "/login?reason=progress",
   );
   await expectUsableViewport(page);
   await page.screenshot({

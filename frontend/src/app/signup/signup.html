@@ -97,6 +97,7 @@
         @if (failure()) {
           <p class="field-error" role="alert">{{ errorMessage }}</p>
         }
+        <app-consent-notice action="signup" />
         <button
           class="primary password-button"
           type="submit"

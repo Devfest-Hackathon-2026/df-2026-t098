@@ -525,7 +525,7 @@ describe('Personal learning feed', () => {
     fixture.detectChanges();
     expect(store.items()[3].kind).toBe('signin');
     expect(fixture.nativeElement.querySelector('.signin-card a')?.getAttribute('href')).toBe(
-      '/login',
+      '/login?reason=progress',
     );
   });
 

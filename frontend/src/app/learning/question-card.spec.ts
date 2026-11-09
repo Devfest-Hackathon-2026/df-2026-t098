@@ -618,7 +618,7 @@ describe('Question understanding and social actions', () => {
     fixture.nativeElement.querySelector('.mobile-learning-actions .explain').click();
     await fixture.whenStable();
     expect(navigate).toHaveBeenCalledWith(['/login'], {
-      queryParams: { returnTo: '/questions/quiz-1?explain=1' },
+      queryParams: { reason: 'explain', returnTo: '/questions/quiz-1?explain=1' },
     });
   });
 

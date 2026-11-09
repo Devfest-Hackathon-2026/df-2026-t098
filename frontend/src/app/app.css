@@ -3,6 +3,29 @@
   min-height: 100dvh;
   background: var(--canvas);
 }
+.guest-import-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  color: var(--text);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.guest-import-notice p {
+  margin: 0;
+}
+.guest-import-notice button {
+  min-height: 44px;
+  padding: 6px 12px;
+  color: var(--accent);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
 .session-loading {
   max-width: 680px;
   margin: 0 auto;

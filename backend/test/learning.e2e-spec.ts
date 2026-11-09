@@ -21,6 +21,8 @@ import { LearningEngine1794000000000 } from '../migrations/1794000000000-Learnin
 import { TapQuizLearningLoop1794100000000 } from '../migrations/1794100000000-TapQuizLearningLoop';
 import { QuestionConcepts1794300000000 } from '../migrations/1794300000000-QuestionConcepts';
 import { FixIPv4OctetQuestion1794310000000 } from '../migrations/1794310000000-FixIPv4OctetQuestion';
+import { ClarifyIPv4OctetExplanation1794410000000 } from '../migrations/1794410000000-ClarifyIPv4OctetExplanation';
+import { GuestAnswerImport1794420000000 } from '../migrations/1794420000000-GuestAnswerImport';
 import { SocialLearningCommunity1794200000000 } from '../migrations/1794200000000-SocialLearningCommunity';
 import { AccountSafety1794400000000 } from '../migrations/1794400000000-AccountSafety';
 import type { GeneratedQuestion } from '../src/learning/gemini/gemini.types';
@@ -174,6 +176,8 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
         QuestionConcepts1794300000000,
         FixIPv4OctetQuestion1794310000000,
         AccountSafety1794400000000,
+        ClarifyIPv4OctetExplanation1794410000000,
+        GuestAnswerImport1794420000000,
       ],
     });
     await migrations.initialize();
@@ -1557,6 +1561,62 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
     ).toEqual([earlier, later]);
   });
 
+  it('imports guest choices in order once, preserving previously answered questions', async () => {
+    const learner = 2;
+    const [correct, retried, existing, missing] = Array.from({ length: 4 }, () => randomUUID());
+    await database.query(
+      `INSERT INTO learning_questions
+        (id,title,prompt,topics,difficulty,language,source,reference_answer,rubric,
+         format,options,correct_option,quick_explanation)
+        SELECT id,'Guest import fixture','Which option is correct?',ARRAY['general'],
+          'beginner','en','ai','Fixture reference','[]','choice','["One","Two"]',1,'Two is correct'
+        FROM unnest($1::uuid[]) AS input(id)`,
+      [[correct, retried, existing]],
+    );
+    await write('/questions/' + existing + '/taps', { choice: 0 }, learner).expect(200);
+    const before = (await read('/progress', learner).expect(200)).body;
+    const batch = {
+      accountId: users[learner],
+      requestId: randomUUID(),
+      answers: [
+        { questionId: correct, choice: 1 },
+        { questionId: retried, choice: 0 },
+        { questionId: retried, choice: 1 },
+        { questionId: existing, choice: 1 },
+        { questionId: missing, choice: 1 },
+      ],
+    };
+    await write('/guest-answers', batch, 0).expect(403);
+    await write('/guest-answers', {
+      ...batch, answers: [{ ...batch.answers[0], correct: true }],
+    }, learner).expect(400);
+    const imported = (await write('/guest-answers', batch, learner).expect(200)).body;
+    expect(imported).toMatchObject({
+      imported: 3,
+      skipped: 2,
+      progress: {
+        totalXp: before.totalXp + 5,
+        answeredTaps: before.answeredTaps + 2,
+        correctTaps: before.correctTaps + 1,
+        combo: 1,
+      },
+    });
+    const replay = (await write('/guest-answers', batch, learner).expect(200)).body;
+    expect(replay).toEqual(imported);
+    const rows = await database.query(
+      `SELECT question_id,choice,correct,review,xp_awarded
+        FROM learning_taps WHERE user_id = $1 AND question_id = ANY($2::uuid[])
+        ORDER BY created_at`,
+      [users[learner], [existing, correct, retried]],
+    );
+    expect(rows).toEqual([
+      { question_id: existing, choice: 0, correct: false, review: false, xp_awarded: 0 },
+      { question_id: correct, choice: 1, correct: true, review: false, xp_awarded: 5 },
+      { question_id: retried, choice: 0, correct: false, review: false, xp_awarded: 0 },
+      { question_id: retried, choice: 1, correct: true, review: true, xp_awarded: 0 },
+    ]);
+  });
+
   it('repairs the saved IPv4 quiz while preserving its correct answer position and tap', async () => {
     const id = '48a72346-5684-4d6d-b79d-502bb9579f67';
     const seed = readPoolFile()!.questions.find((question) => question.id === id)!;
@@ -1577,6 +1637,7 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
     const runner = database.createQueryRunner();
     try {
       await new FixIPv4OctetQuestion1794310000000().up(runner);
+      await new ClarifyIPv4OctetExplanation1794410000000().up(runner);
     } finally {
       await runner.release();
     }

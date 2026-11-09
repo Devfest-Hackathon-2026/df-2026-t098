@@ -22,8 +22,8 @@ import type { Language, Leaderboard } from './learning.types';
     <p class="hint">
       {{
         text(
-          '月曜にリセット · 日本時間 · 問題ごとのXPは一度だけ獲得できます。',
-          'Resets Monday · Japan time · Each question awards XP once.'
+          '月曜にリセット · 日本時間 · 問題ごとのXPは一度だけ獲得できます · 同点は先に達成した人が上位です。',
+          'Resets Monday · Japan time · Each question awards XP once · Ties go to whoever got there first.'
         )
       }}
     </p>

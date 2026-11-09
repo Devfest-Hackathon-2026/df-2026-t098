@@ -4082,7 +4082,7 @@
         "4"
       ],
       "correctOption": 3,
-      "quickExplanation": "300 is above the IPv4 octet maximum of 255. The comparison returns false and correctly rejects that input.",
+      "quickExplanation": "Position 4. octet4 is '300', above the maximum of 255 for an IPv4 octet (each one must be 0 to 255). The other three (192, 168 and 1) are valid, so the fourth is the odd one out. The check octet4 <= 255 returns false, which correctly rejects the address; it only tests octet4, so a full validator would check all four.",
       "concept": "ipv4-address-validation"
     },
     {

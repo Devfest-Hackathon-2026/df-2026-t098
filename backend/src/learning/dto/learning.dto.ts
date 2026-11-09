@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import { INTERESTS } from '../learning.catalog';
 import type { Difficulty, LearningLanguage } from '../learning.types';
@@ -150,6 +151,26 @@ export class TapDto {
   @Min(0)
   @Max(3)
   choice!: number;
+}
+
+export class GuestAnswerDto extends TapDto {
+  @IsUUID()
+  questionId!: string;
+}
+
+export class GuestAnswersDto {
+  @IsUUID()
+  accountId!: string;
+
+  @IsUUID('4')
+  requestId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => GuestAnswerDto)
+  answers!: GuestAnswerDto[];
 }
 
 export class FollowUpDto {

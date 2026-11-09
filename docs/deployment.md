@@ -29,6 +29,7 @@ What is verified and what is not is listed at the end of this page.
 | `PORT` | no | Defaults to 8080 in the image; Cloud Run sets it. |
 | `FRONTEND_DIST` | set by the image | `/app/public`. Unset means API only (local development). A wrong path stops startup. |
 | `LEARNING_POOL_SEED` | no | `off` skips the seed at startup once the release job owns it. The seed is idempotent either way. |
+| `SUPPORT_CONTACT` | for public support | Email address or HTTPS contact page, visible to signed-out visitors on the legal pages and in Settings. For WhyLint, use `kenzie@whylint.com` once forwarding is tested. |
 
 `NODE_ENV=production` is baked into the image (it enables HSTS). Never commit real values; `.env*`
 files are excluded from the Docker build context.

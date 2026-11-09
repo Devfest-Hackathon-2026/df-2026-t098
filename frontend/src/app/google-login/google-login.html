@@ -6,6 +6,9 @@
     <a routerLink="/" class="back"><span aria-hidden="true">←</span> {{ ui.back }}</a>
     <h1>{{ ui.title }}</h1>
     <p class="intro">{{ ui.intro }}</p>
+    @if (reason; as why) {
+      <p class="reason">{{ why }}</p>
+    }
     @if (redirectFailed() && session.status() === 'authenticated') {
       <p class="error" role="alert">{{ ui.navigationError }}</p>
       <button class="primary retry-button" type="button" (click)="retryRedirect()">
@@ -117,6 +120,7 @@
           /></svg
         ><span>{{ ui.submit }}</span>
       </button>
+      <app-consent-notice />
     }
     <app-legal-links />
   </main>

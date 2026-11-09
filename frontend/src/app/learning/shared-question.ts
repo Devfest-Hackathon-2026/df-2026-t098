@@ -6,6 +6,7 @@ import { DisplaySettings } from './display-settings';
 import { LearningApi, learningError } from './learning-api';
 import { QuestionCard } from './question-card';
 import { LoadingSkeleton } from './loading-skeleton';
+import { ProgressStore } from './progress-store';
 import type { Question } from './learning.types';
 
 @Component({
@@ -94,6 +95,7 @@ export class SharedQuestion {
   protected readonly settings = inject(DisplaySettings);
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(LearningApi);
+  private readonly progress = inject(ProgressStore);
   protected readonly session = inject(AuthSession);
   private controller = new AbortController();
   private readonly params = toSignal(this.route.paramMap, { requireSync: true });
@@ -134,6 +136,9 @@ export class SharedQuestion {
     this.loading.set(true);
     this.error.set('');
     try {
+      const transfer = this.progress.syncGuestAnswers();
+      if (transfer) await transfer;
+      if (signal.aborted) return;
       const id = this.route.snapshot.paramMap.get('id');
       const result = await this.api.get<{ question: Question }>(
         '/questions/' + encodeURIComponent(id ?? ''),

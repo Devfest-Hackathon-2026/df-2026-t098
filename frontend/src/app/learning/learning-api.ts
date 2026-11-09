@@ -28,7 +28,7 @@ export class LearningApi {
       path.endsWith('/attempts') ||
       path.endsWith('/follow-ups') ||
       (path === '/questions' && method === 'POST');
-    const timeout = setTimeout(abort, usesAi ? 75_000 : 10_000);
+    const timeout = setTimeout(abort, usesAi ? 75_000 : path === '/guest-answers' ? 30_000 : 10_000);
     try {
       const response = await this.request(`/api/v1/learning${path}`, {
         method,

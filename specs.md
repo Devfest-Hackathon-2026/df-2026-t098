@@ -1119,3 +1119,38 @@ Verification: the web production build, 249 unit tests, and 18 focused browser c
 The desktop sidebar and phone gear were also checked with a saved question on Profile. Five
 iPhone 17 simulator tests passed across learning, account deletion, and display preferences.
 Android `assembleDebug` and `lintDebug` passed. Android UI was not exercised on a device.
+
+## Production audit fixes and legal pages — 2026-11-09
+
+Driven by the first-time-user audit of whylint.com (phone and desktop).
+
+- **Terms of Service and Privacy Policy** are now pages in the app: `/terms` and `/privacy` (`frontend/src/app/legal/`), Japanese and English, with a language switch. The text describes what the code does today (email and Google sign-in, Gemini processing, the 7-day `access_token` cookie, Google Fonts, account deletion cascading with published questions kept without an author). It names no operator, address or contact: the contact block shows `SUPPORT_CONTACT` when configured, otherwise points to "Report a problem". **It is a draft for the owner to review with counsel** (minimum age, governing law, retention, operator identity). `LEGAL_BASE_URL` still overrides the links when the owner publishes elsewhere. Sign-in and sign-up now say "By continuing you agree to the Terms and Privacy Policy" with links (`app-consent-notice`), and the legal links in the footer fall back to the in-app pages.
+- **Practice sign-in button** was unreadable (accent text on a button colour; 1.16:1 in dark, 2.45:1 in light) because `.collection > a` in the homepage styles beat `.signin-cta`. Fixed with `:not(.signin-cta)`.
+- **Sign-in walls explain themselves.** Guest taps on Explain why, Save, Like, Practice, Post and "Sign in to save" go to `/login?reason=…` and the page says why; Save and Like now return to the question. The back link no longer says "Back to practice".
+- **Guest progress survives a reload** (`GuestSession`, sessionStorage, cleared on sign-in): the counter, combo and answered cards come back, and answered cards are not served again.
+- **Header chips** have titles and clearer screen-reader text; "Save progress" is "Sign in to save".
+- **First screen**: a one-line pitch on onboarding, a note on why Continue is disabled, and the first language now follows the browser (Japanese for `ja*`, otherwise English; a saved choice wins). Guests can change language in Settings. Specs run with `navigator.language = ja-JP` (`src/test-setup.ts`).
+- **Read feedback** on phones opens a sheet titled "Feedback", scrolled to the explanation. The IPv4 octet explanation now says why position 4 (seed and migration `1794410000000`).
+- **Bug of the Day** label is shown on phones. Tabs are in the address (`?tab=practice|ranking|post|profile|settings`), so reload, links and Back work.
+- Light theme answer badges are stronger; the ranking note explains how ties are ordered.
+- Not changed: guest feed content mix (about 55% of the pool has no code) and near-duplicate concepts in the pool; Android/iOS were not touched (their legal URL setting still points at the Cloud Run host, which serves the same pages after deploy).
+
+## Guest progress and public support
+
+- After password signup, password login, or Google sign-in, the web app submits the guest tab's
+  stored question IDs and selected options in answer order. Previously stored guest data can supply
+  its last choice per question. Keep up to 200 recent answers, including retries.
+- `POST /api/v1/learning/guest-answers` requires the signed-in account, its allowed browser origin,
+  and an account-bound request ID. The server grades against the current public question and uses
+  the normal tap XP and review schedule. It skips missing or incompatible questions and questions
+  the account already answered. A retry within the imported session can become a normal review.
+  The import records activity on the current Japan day and derives progress from stored answers.
+- Save a pending batch against the intended account in the current tab before sending it. Clear
+  the pending batch only after acknowledgment. A failed request stays available for retry, even
+  after reload or signing back into the same account. The account lock and completed request record
+  make the import safe to retry without awarding XP twice.
+- Terms, Privacy, and Settings display the public `SUPPORT_CONTACT` without requiring sign-in.
+  The production value for the next release is `kenzie@whylint.com`. Verify mail forwarding before
+  publishing the address. Remove the signed-in question-report form as the fallback support path.
+- Verify server grading, chronological retries, duplicate requests, existing account answers,
+  and guest answers carrying into Profile after signup.

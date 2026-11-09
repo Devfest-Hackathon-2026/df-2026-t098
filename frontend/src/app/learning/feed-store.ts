@@ -4,6 +4,7 @@ import { AuthSession } from '../auth/auth-session';
 import { OnboardingState } from '../onboarding/onboarding-state';
 import { BlockStore } from './block-store';
 import { DisplaySettings } from './display-settings';
+import { GuestSession } from './guest-session';
 import { LearningApi, LearningError, learningError } from './learning-api';
 import { ProgressStore } from './progress-store';
 import { similarQuestionNovelty, validQuestionNovelty } from './question-novelty';
@@ -46,6 +47,7 @@ export class FeedStore {
   private readonly settings = inject(DisplaySettings);
   private readonly onboarding = inject(OnboardingState);
   private readonly progress = inject(ProgressStore);
+  private readonly guest = inject(GuestSession);
   private readonly blocks = inject(BlockStore);
   private readonly document = inject(DOCUMENT);
   private controller = new AbortController();
@@ -117,6 +119,8 @@ export class FeedStore {
       'whylint-pending-batch:' + this.identity,
     );
     this.seen.clear();
+    // A guest who reloads keeps what they answered, and is not served the same cards again.
+    if (!this.authenticated) for (const id of this.guest.answeredIds()) this.seen.add(id);
     this.noveltyHistory.length = 0;
     this.reviewed.clear();
     this.relearned.clear();
@@ -132,6 +136,9 @@ export class FeedStore {
   private async start(): Promise<void> {
     const signal = this.controller.signal;
     this.booting.set(true);
+    const transfer = this.authenticated ? this.progress.syncGuestAnswers() : undefined;
+    if (transfer) await transfer;
+    if (signal.aborted) return;
     await this.loadDaily(signal);
     if (signal.aborted) return;
     await this.loadPool();
@@ -274,10 +281,15 @@ export class FeedStore {
       if (signal.aborted) return;
       this.daily.set(daily);
       const question = daily.question;
-      if (question && !question.tap && !this.seen.has(question.id)) {
-        this.seen.add(question.id);
-        this.rememberNovelty(question);
-        this.insertAt(0, { key: 'daily-' + question.id, kind: 'question', question, daily: true });
+      if (question && !question.tap) {
+        const cached = this.authenticated ? undefined : this.guest.tapFor(question.id);
+        const key = 'daily-' + question.id;
+        const present = this.items().some((item) => item.key === key);
+        if (!present && (cached || !this.seen.has(question.id))) {
+          this.seen.add(question.id);
+          this.rememberNovelty(question);
+          this.insertAt(0, { key, kind: 'question', question, daily: true, tap: cached });
+        }
       }
     } catch {
     }

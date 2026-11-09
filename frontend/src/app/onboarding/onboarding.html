@@ -13,6 +13,16 @@
         }
       </div>
       @if (step() === 1) {
+        @if (!editing) {
+          <p class="pitch">
+            {{
+              text(
+                'WhyLintは、コードが「なぜそう動くのか」を、1問ずつ理解していく学習アプリです。ログインなしで試せます。',
+                'WhyLint helps you understand why code works, one short question at a time. No account needed to try it.'
+              )
+            }}
+          </p>
+        }
         <div class="onboarding-language">
           <app-language-picker
             [language]="language"
@@ -54,6 +64,16 @@
             )
           }}
         </p>
+        @if (!interests().length) {
+          <p class="note need-one" role="status">
+            {{
+              text(
+                '続けるには、分野を1つ以上選んでください。選ばずに始めるなら上の「スキップ」へ。',
+                'Pick at least one area to continue, or use “Skip” above to start right away.'
+              )
+            }}
+          </p>
+        }
         <div class="actions">
           <button
             class="primary"

@@ -132,7 +132,7 @@
                   )
                 }}
               </p>
-              <a class="primary" routerLink="/login">{{
+              <a class="primary" routerLink="/login" [queryParams]="{ reason: 'progress' }">{{
                 text('ログインして続ける', 'Sign in to keep going')
               }}</a>
               <button type="button" class="link-button" (click)="next(index)">
@@ -187,7 +187,7 @@
           }}
         </p>
         @if (authSession.status() !== 'authenticated') {
-          <a class="signin-cta" routerLink="/login">{{
+          <a class="signin-cta" routerLink="/login" [queryParams]="{ reason: 'practice' }">{{
             text('ログインして復習', 'Sign in to practice')
           }}</a>
         } @else {

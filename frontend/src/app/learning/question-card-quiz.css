@@ -100,6 +100,11 @@
     600 13px 'DM Mono',
     monospace;
 }
+:host-context([data-theme='light']) .option-letter {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
 .quiz-options.two-up .option-letter {
   font-size: 1.125rem;
 }
