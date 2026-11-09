@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
-# HTTP smoke checks for a running WhyLint instance that serves the Angular app and the API on one
-# origin (the container image, or `node dist/src/main.js` with FRONTEND_DIST set).
-#
-#   e2e/scripts/smoke-http.sh http://localhost:8080
-#
-# The base URL must equal the server's FRONTEND_URL: it is sent as the Origin of the signup request.
-# The script creates one throwaway account. Run it only against a disposable database.
+# Use a disposable database. This script creates an account.
 set -uo pipefail
 
 BASE=${1:?usage: smoke-http.sh <base-url>}
@@ -16,7 +10,6 @@ fail=0
 ok() { echo "  PASS  $1"; pass=$((pass + 1)); }
 bad() { echo "  FAIL  $1"; fail=$((fail + 1)); }
 
-# check <name> <expected text in headers+body, case-insensitive> <curl args...>
 check() {
   local name=$1 want=$2
   shift 2
@@ -25,7 +18,6 @@ check() {
   if grep -qiF -- "$want" <<<"$out"; then ok "$name"; else bad "$name (wanted: $want)"; head -1 <<<"$out" | sed 's/^/        /'; fi
 }
 
-# refuse <name> <unwanted text> <curl args...>
 refuse() {
   local name=$1 unwanted=$2
   shift 2

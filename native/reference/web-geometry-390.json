@@ -1,0 +1,167 @@
+{
+  ".topbar": {
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 53
+    },
+    "font": "16px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "2px 12px",
+    "gap": "10px"
+  },
+  ".brand": {
+    "rect": {
+      "x": 12,
+      "y": 2,
+      "width": 22.8125,
+      "height": 48
+    },
+    "font": "700 20px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "0px",
+    "gap": "8px"
+  },
+  ".main-nav": {
+    "rect": {
+      "x": 0,
+      "y": 791,
+      "width": 390,
+      "height": 53
+    },
+    "font": "16px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgb(8, 8, 8)",
+    "borderRadius": "0px",
+    "padding": "2px 4px",
+    "gap": "normal"
+  },
+  ".main-nav button": {
+    "rect": {
+      "x": 4,
+      "y": 794,
+      "width": 76.390625,
+      "height": 48
+    },
+    "font": "12px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(198, 242, 78)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "2px 0px",
+    "gap": "2px"
+  },
+  ".feed-slide": {
+    "rect": {
+      "x": 16,
+      "y": 53,
+      "width": 358,
+      "height": 738
+    },
+    "font": "16px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "8px 0px",
+    "gap": "normal"
+  },
+  ".question-card": {
+    "rect": {
+      "x": 16,
+      "y": 61,
+      "width": 358,
+      "height": 722
+    },
+    "font": "16px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgb(21, 21, 21)",
+    "borderRadius": "16px",
+    "padding": "8px",
+    "gap": "normal"
+  },
+  ".question-summary": {
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0
+    },
+    "font": "12px / 18px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(180, 180, 172)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "0px",
+    "gap": "12px"
+  },
+  ".code-window": {
+    "rect": {
+      "x": 24,
+      "y": 186,
+      "width": 342,
+      "height": 189.75
+    },
+    "font": "16px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgb(9, 9, 9)",
+    "borderRadius": "12px",
+    "padding": "0px",
+    "gap": "normal"
+  },
+  ".code-line": {
+    "rect": {
+      "x": 24,
+      "y": 192.875,
+      "width": 342,
+      "height": 44
+    },
+    "font": "16.065px / 20.8845px \"DM Mono\", monospace",
+    "fontFamily": "\"DM Mono\", monospace",
+    "color": "rgb(232, 232, 223)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "0px",
+    "gap": "0px"
+  },
+  ".card-actions": {
+    "rect": {
+      "x": 24,
+      "y": 682,
+      "width": 342,
+      "height": 49
+    },
+    "font": "16px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "2px 0px",
+    "gap": "4px"
+  },
+  ".mobile-learning-actions": {
+    "rect": {
+      "x": 24,
+      "y": 731,
+      "width": 342,
+      "height": 44
+    },
+    "font": "16px \"DM Sans\", system-ui, sans-serif",
+    "fontFamily": "\"DM Sans\", system-ui, sans-serif",
+    "color": "rgb(245, 245, 242)",
+    "background": "rgba(0, 0, 0, 0)",
+    "borderRadius": "0px",
+    "padding": "0px",
+    "gap": "8px"
+  }
+}

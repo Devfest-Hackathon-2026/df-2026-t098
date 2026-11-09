@@ -13,7 +13,6 @@ export interface GenerationPreferences {
   interests: string[];
   technologies: string[];
   difficulty: string;
-  /** Topics the learner answered correctly three times in a row. */
   strongTopics?: string[];
 }
 
@@ -27,12 +26,10 @@ export interface GeneratedQuestion {
   language: LearningLanguage;
   referenceAnswer: string;
   rubric: string[];
-  /** Tap quiz. Null format means an explanation-only (legacy) question. */
   format: QuizFormat | null;
   options: string[] | null;
   correctOption: number | null;
   quickExplanation: string | null;
-  /** Canonical kebab-case key for the idea tested; null for older or community questions. */
   concept: string | null;
 }
 

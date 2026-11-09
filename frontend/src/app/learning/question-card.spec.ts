@@ -8,7 +8,6 @@ import { ProgressStore } from './progress-store';
 import type { Assessment, Question } from './learning.types';
 
 describe('Question understanding and social actions', () => {
-  // jsdom lacks native dialog methods. Browser tests cover modality and focus containment.
   beforeAll(() => {
     const show = function (this: HTMLDialogElement) {
       this.open = true;
@@ -621,5 +620,205 @@ describe('Question understanding and social actions', () => {
     expect(navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnTo: '/questions/quiz-1?explain=1' },
     });
+  });
+
+  it('reduces a paged question density while keeping code and every choice inline', async () => {
+    compactViewport();
+    let resize: ResizeObserverCallback = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resize = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const fixture = await create(
+      { ...quiz, code: 'const first = 1;\nconsole.log(first);', codeLanguage: 'javascript' },
+      { paged: true, nextable: true },
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    const stage = root.querySelector<HTMLElement>('[data-testid="question-stage"]')!;
+    const natural = root.querySelector<HTMLElement>('.question-stage-natural')!;
+    Object.defineProperty(stage, 'clientHeight', { configurable: true, value: 280 });
+    vi.spyOn(natural, 'getBoundingClientRect').mockImplementation(
+      () =>
+        ({
+          height: 320 * Number(natural.style.getPropertyValue('--question-density') || 1),
+        }) as DOMRect,
+    );
+    resize([], {} as ResizeObserver);
+    await vi.waitFor(() => {
+      expect(Number(natural.style.getPropertyValue('--question-density'))).toBeLessThan(1);
+      expect(natural.getBoundingClientRect().height).toBeLessThanOrEqual(281);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const fitted = natural.style.getPropertyValue('--question-density');
+    expect(root.getAttribute('data-fit-overflow')).toBeNull();
+    expect(natural.querySelector('.reveal-slot')).not.toBeNull();
+    expect(natural.hasAttribute('inert')).toBe(false);
+    expect(root.querySelector('.question-stage-preview')).toBeNull();
+    expect(root.querySelector('.full-question-button')).toBeNull();
+    expect(natural.querySelector('pre')?.textContent).toContain('console.log(first);');
+    expect(natural.querySelectorAll('.quiz-option')).toHaveLength(quiz.options!.length);
+    send.mockResolvedValueOnce(tapResult(0));
+    natural.querySelector<HTMLButtonElement>('.quiz-option')!.click();
+    await fixture.whenStable();
+    expect(natural.querySelectorAll('.quiz-option')).toHaveLength(quiz.options!.length);
+    expect(natural.querySelector('.reveal-slot')).toBeNull();
+    expect(natural.querySelector('.reveal')).not.toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(natural.style.getPropertyValue('--question-density')).toBe(fitted);
+    natural.querySelector<HTMLButtonElement>('.review-question')!.click();
+    await fixture.whenStable();
+    const dialog = root.querySelector<HTMLDialogElement>('.learning-details')!;
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector('.reveal')?.textContent).toContain(tapResult(0).quickExplanation);
+    const next = vi.fn();
+    fixture.componentInstance.next.subscribe(next);
+    dialog.querySelector<HTMLButtonElement>('.next-button')!.click();
+    await fixture.whenStable();
+    expect(next).toHaveBeenCalledOnce();
+    expect(dialog.open).toBe(false);
+    Object.defineProperty(stage, 'clientHeight', { configurable: true, value: 900 });
+    resize([], {} as ResizeObserver);
+    await vi.waitFor(() =>
+      expect(Number(natural.style.getPropertyValue('--question-density'))).toBe(1.2),
+    );
+  });
+
+  it('does not grow a short card so much that its code needs horizontal scrolling', async () => {
+    compactViewport();
+    let resize: ResizeObserverCallback = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resize = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const fixture = await create(
+      { ...quiz, code: 'const message = greeting + , + name;', codeLanguage: 'javascript' },
+      { paged: true, nextable: true },
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    const stage = root.querySelector<HTMLElement>('[data-testid="question-stage"]')!;
+    const natural = root.querySelector<HTMLElement>('.question-stage-natural')!;
+    const pre = natural.querySelector<HTMLElement>('pre')!;
+    const density = () => Number(natural.style.getPropertyValue('--question-density') || 1);
+    Object.defineProperty(stage, 'clientHeight', { configurable: true, value: 900 });
+    vi.spyOn(natural, 'getBoundingClientRect').mockImplementation(
+      () => ({ height: 200 * density() }) as DOMRect,
+    );
+    Object.defineProperty(pre, 'clientWidth', { configurable: true, value: 300 });
+    Object.defineProperty(pre, 'scrollWidth', {
+      configurable: true,
+      get: () => (density() > 1.05 ? 340 : 300),
+    });
+    resize([], {} as ResizeObserver);
+    await vi.waitFor(() => {
+      expect(density()).toBeGreaterThan(1);
+      expect(density()).toBeLessThanOrEqual(1.05);
+    });
+  });
+
+  it('never shrinks a dense paged card below the reading floor; it scrolls inside instead', async () => {
+    compactViewport();
+    let resize: ResizeObserverCallback = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resize = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const fixture = await create(
+      { ...quiz, code: 'const first = 1;\nconsole.log(first);', codeLanguage: 'javascript' },
+      { paged: true, nextable: true },
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    const stage = root.querySelector<HTMLElement>('[data-testid="question-stage"]')!;
+    const natural = root.querySelector<HTMLElement>('.question-stage-natural')!;
+    Object.defineProperty(stage, 'clientHeight', { configurable: true, value: 280 });
+    vi.spyOn(natural, 'getBoundingClientRect').mockImplementation(
+      () =>
+        ({
+          height: 900 * Number(natural.style.getPropertyValue('--question-density') || 1),
+        }) as DOMRect,
+    );
+    resize([], {} as ResizeObserver);
+    await vi.waitFor(() => {
+      expect(Number(natural.style.getPropertyValue('--question-density'))).toBe(0.72);
+      expect(root.getAttribute('data-fit-overflow')).toBe('true');
+    });
+  });
+
+  it('keeps shared-question cards in normal flow even when their content is long', async () => {
+    compactViewport();
+    const fixture = await create({ ...quiz, prompt: quiz.prompt.repeat(20) });
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.classList.contains('paged')).toBe(false);
+    expect(root.querySelector('.full-question-button')).toBeNull();
+    expect(root.querySelector('.question-stage-natural')?.hasAttribute('inert')).toBe(false);
+  });
+
+  it('shows answer feedback on a paged bug question and keeps the complete code in its sheet', async () => {
+    compactViewport();
+    const quickExplanation = 'The WHERE keyword is misspelled on line three.';
+    const fixture = await create(
+      {
+        ...quiz,
+        format: 'spot_bug',
+        code: 'SELECT id\nFROM users\nWHER age > 20;',
+        codeLanguage: 'sql',
+        options: ['1', '2', '3'],
+      },
+      {
+        paged: true,
+        nextable: true,
+        cachedTap: { choice: 0, correct: false, correctOption: 2, quickExplanation },
+      },
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    const natural = root.querySelector('.question-stage-natural')!;
+    expect(natural.querySelectorAll('button.code-line')).toHaveLength(3);
+    expect(natural.querySelector('.reveal')?.textContent).toContain('おしい');
+    natural.querySelector<HTMLButtonElement>('.review-question')!.click();
+    await fixture.whenStable();
+    const full = root.querySelector('.learning-details .full-question-stage')!;
+    expect(full.querySelectorAll('button.code-line')).toHaveLength(3);
+    expect(full.textContent).toContain('WHER age > 20;');
+    expect(full.textContent).toContain(quickExplanation);
+    expect(full.querySelector('.answer-summary')?.textContent).toContain('3行目');
+    expect(full.querySelector('.answer-summary')?.textContent).toContain('1行目');
+    expect(full.querySelector('.review-question')).toBeNull();
+  });
+
+  it('does not turn repeated swipe gestures into a double-tap like', async () => {
+    const fixture = await create(quiz);
+    const root = fixture.nativeElement as HTMLElement;
+    const stage = root.querySelector<HTMLElement>('[data-testid="question-stage"]')!;
+    const dispatch = (type: string, y: number) => {
+      const event = new Event(type, { bubbles: true });
+      Object.assign(event, { pointerType: 'touch', pointerId: 1, clientX: 100, clientY: y });
+      stage.dispatchEvent(event);
+    };
+    dispatch('pointerdown', 160);
+    dispatch('pointermove', 100);
+    dispatch('pointerup', 160);
+    dispatch('pointerdown', 160);
+    dispatch('pointermove', 100);
+    dispatch('pointerup', 160);
+    await fixture.whenStable();
+    expect(root.querySelector('.heart-burst')).toBeNull();
+    expect(send).not.toHaveBeenCalled();
   });
 });

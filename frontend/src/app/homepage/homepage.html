@@ -1,28 +1,17 @@
 <div class="app-shell" [class.has-discussion]="discussionQuestion() !== null">
   <header class="topbar">
-    <a class="brand" routerLink="/" aria-label="WhyLint"
-      ><span aria-hidden="true">w<span>_</span></span
-      ><span class="brand-name"> whylint<span class="brand-dot">.</span></span></a
-    >
+    <a class="brand" routerLink="/" aria-label="WhyLint">
+      <app-brand class="brand-wide" />
+      <app-brand class="brand-compact" [compact]="true" />
+    </a>
     <app-learning-hud [language]="settings.language()" />
-    <div class="header-actions">
-      <button
-        type="button"
-        (click)="settings.toggleTheme()"
-        [attr.aria-label]="
-          settings.theme() === 'dark'
-            ? text('ライトテーマに切り替え', 'Switch to light theme')
-            : text('ダークテーマに切り替え', 'Switch to dark theme')
-        "
-      >
-        <app-icon [name]="settings.theme() === 'dark' ? 'sun' : 'moon'" />
-      </button>
-    </div>
   </header>
   <nav class="main-nav" [attr.aria-label]="text('メインナビゲーション', 'Main navigation')">
     @for (item of tabs; track item) {
       <button
         type="button"
+        [class.settings-nav]="item === 'settings'"
+        [class.settings-parent]="item === 'profile' && tab() === 'settings'"
         [class.active]="tab() === item"
         [attr.aria-current]="tab() === item ? 'page' : null"
         (click)="openTab(item, content)"
@@ -37,7 +26,6 @@
     [class.feed-content]="tab() === 'feed'"
     [attr.tabindex]="tab() === 'feed' ? 0 : null"
     [attr.aria-label]="tab() === 'feed' ? text('問題フィード', 'Question feed') : null"
-    (scroll)="onScroll(content)"
   >
     @if (authSession.status() === 'unavailable') {
       <div class="session-error" role="alert">
@@ -98,6 +86,7 @@
               [relearn]="item.relearn ?? false"
               [daily]="item.daily ?? false"
               [nextable]="true"
+              [paged]="true"
               (next)="next(index)"
               [discussion]="discussionQuestion() === item.key"
               (discussionChange)="setDiscussion(item.key, $event)"
@@ -114,6 +103,23 @@
                 }}</span>
               </p>
             }
+          } @else if (item.kind === 'blocked') {
+            <div class="signin-card blocked-card" data-testid="blocked-question">
+              <h2>{{ text('ブロックしたユーザーです', 'You blocked this learner') }}</h2>
+              <p>
+                {{
+                  text(
+                    item.authorName + 'さんの質問は表示されません。ブロックは設定の「アカウント設定」から解除できます。',
+                    'Questions from ' +
+                      item.authorName +
+                      ' are hidden. You can unblock them in Account settings.'
+                  )
+                }}
+              </p>
+              <button type="button" class="link-button" (click)="next(index)">
+                {{ text('次の問題へ', 'Next question') }}
+              </button>
+            </div>
           } @else {
             <div class="signin-card">
               <app-icon class="signin-icon" name="flame" [filled]="true" aria-hidden="true" />
@@ -153,7 +159,7 @@
         </div>
       }
       @if (!feed.loading() && !feed.generating() && !feed.error() && feed.items().length) {
-        <div class="feed-end">
+        <div class="feed-slide feed-end">
           <p>
             {{
               authSession.user()
@@ -181,7 +187,9 @@
           }}
         </p>
         @if (authSession.status() !== 'authenticated') {
-          <a routerLink="/login">{{ text('ログインして復習', 'Sign in to practice') }}</a>
+          <a class="signin-cta" routerLink="/login">{{
+            text('ログインして復習', 'Sign in to practice')
+          }}</a>
         } @else {
           @if (reviewsLoading()) {
             <app-loading-skeleton
@@ -215,11 +223,20 @@
         }
       </section>
     } @else if (tab() === 'rank') {
-      <app-leaderboard-panel [language]="settings.language()" />
+      <app-leaderboard-panel
+        [language]="settings.language()"
+        (startLearning)="openTab('feed', content)"
+      />
     } @else if (tab() === 'publish') {
       <app-publish-question [language]="settings.language()" />
+    } @else if (tab() === 'settings') {
+      <app-profile-panel
+        view="settings"
+        [language]="settings.language()"
+        (navigate)="openTab($event, content)"
+      />
     } @else {
-      <app-profile-panel [language]="settings.language()" />
+      <app-profile-panel [language]="settings.language()" (navigate)="openTab($event, content)" />
     }
   </main>
 </div>

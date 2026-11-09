@@ -200,7 +200,6 @@ export class AssessmentService {
     };
   }
 
-  /** Per-topic accuracy from first taps and explanations. Mastery = share answered correctly. */
   async topicMastery(
     userId: string,
     filter: { since?: string; only?: string[]; exclude?: string[] } = {},
@@ -238,32 +237,26 @@ export class AssessmentService {
     const weekStart = learningWeek();
     const rows = await this.database.query(
       `SELECT u.id,u.username,u.name,u.avatar_url,sum(x.xp_awarded)::int AS xp FROM (
-        SELECT user_id,xp_awarded,day FROM learning_attempts
+        SELECT user_id,xp_awarded,created_at FROM learning_attempts
         WHERE day >= $1::date AND day < $1::date + 7 AND xp_awarded > 0
-        UNION ALL SELECT user_id,xp_awarded,day FROM learning_taps
+        UNION ALL SELECT user_id,xp_awarded,created_at FROM learning_taps
         WHERE day >= $1::date AND day < $1::date + 7 AND xp_awarded > 0
       ) x JOIN users u ON u.id = x.user_id
-      GROUP BY u.id ORDER BY xp DESC,u.id LIMIT 50`,
+      GROUP BY u.id ORDER BY xp DESC,max(x.created_at) ASC,u.id ASC LIMIT 50`,
       [weekStart],
     );
-    let rank = 0;
-    let previousXp: number | undefined;
     return {
       weekStart,
       timezone: LEARNING_TIMEZONE,
-      entries: rows.map((row, index) => {
-        if (row.xp !== previousXp) rank = index + 1;
-        previousXp = row.xp;
-        return {
-          rank,
-          user: {
-            id: row.id,
-            displayName: row.username || row.name || 'Learner',
-            avatarUrl: row.avatar_url ?? null,
-          },
-          xp: row.xp,
-        };
-      }),
+      entries: rows.map((row, index) => ({
+        rank: index + 1,
+        user: {
+          id: row.id,
+          displayName: row.username || row.name || 'Learner',
+          avatarUrl: row.avatar_url ?? null,
+        },
+        xp: row.xp,
+      })),
     };
   }
 }

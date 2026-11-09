@@ -1,0 +1,15 @@
+artifacts/
+**/qa/builds/
+**/build/
+**/.gradle/
+**/.kotlin/
+**/local.properties
+**/DerivedData/
+**/xcuserdata/
+**/*.xcuserstate
+**/Local.xcconfig
+**/.env
+**/*.keystore
+**/*.jks
+**/*.p12
+**/*.mobileprovision

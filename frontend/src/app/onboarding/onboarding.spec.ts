@@ -14,6 +14,7 @@ describe('Learning interests onboarding', () => {
   const get = vi.fn();
 
   beforeEach(() => {
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     localStorage.clear();
     user.set(null);
     status.set('guest');
@@ -36,7 +37,67 @@ describe('Learning interests onboarding', () => {
       ],
     });
   });
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('moves focus and scroll position to the new step heading in both directions', async () => {
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const fixture = TestBed.createComponent(Onboarding);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.domain')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(root.querySelector('h1'));
+    expect(root.querySelector('h1')?.textContent).toContain('好きな技術');
+    expect(scroll).toHaveBeenLastCalledWith({ top: 0, behavior: 'instant' });
+    root.querySelector<HTMLButtonElement>('.back')!.click();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(root.querySelector('h1'));
+    expect(root.querySelector('h1')?.textContent).toContain('何を学びたい');
+  });
+
+  it('locks preference controls while saving and restores them after a failed request', async () => {
+    user.set({
+      id: 'learner',
+      email: 'learner@example.test',
+      name: null,
+      username: 'learner',
+      avatarUrl: null,
+    });
+    status.set('authenticated');
+    let rejectSave!: (error: Error) => void;
+    send.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectSave = reject;
+        }),
+    );
+    const fixture = TestBed.createComponent(Onboarding);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.domain')!.click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    await fixture.whenStable();
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+    const fields = root.querySelector<HTMLFieldSetElement>('.preference-fields')!;
+    expect(fields.disabled).toBe(true);
+    expect(root.querySelector('#technology-search')?.matches(':disabled')).toBe(true);
+    expect(root.querySelector('.stack-list button')?.matches(':disabled')).toBe(true);
+    expect(root.querySelector('.difficulty button')?.matches(':disabled')).toBe(true);
+    rejectSave(new Error('Fixture save failure'));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fields.disabled).toBe(false);
+    });
+    expect(root.querySelector('#technology-search')?.matches(':disabled')).toBe(false);
+  });
 
   it('migrates the supported old JavaScript preference without losing the choice', () => {
     localStorage.setItem(

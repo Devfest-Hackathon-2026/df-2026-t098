@@ -31,6 +31,46 @@ describe('AuthOriginGuard', () => {
     expect(guard.canActivate(contextFor('https://example.test'))).toBe(true);
   });
 
+  it('allows an already-validated bearer session to write without browser cookies', () => {
+    const req = {
+      method: 'PUT', path: '/api/v1/learning/preferences',
+      user: { sub: 'verified-user', sid: 'verified-session' },
+      headers: { authorization: 'Bearer verified-token' },
+    };
+    expect(guard.canActivate(contextFor(undefined, req))).toBe(true);
+    expect(() => guard.canActivate(contextFor(undefined, { ...req, user: undefined }))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(contextFor(undefined, {
+      ...req, headers: { ...req.headers, cookie: 'access_token=ambient' },
+    }))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(contextFor(undefined, {
+      ...req, headers: { ...req.headers, origin: 'https://untrusted.example' },
+    }))).toThrow(ForbiddenException);
+  });
+
+  it('lets a bearer session delete its account without an Origin, but never with a cookie', () => {
+    const req = {
+      method: 'DELETE', path: '/api/v1/auth/me',
+      user: { sub: 'verified-user', sid: 'verified-session' },
+      headers: { authorization: 'Bearer verified-token' },
+    };
+    expect(guard.canActivate(contextFor(undefined, req))).toBe(true);
+    expect(() => guard.canActivate(contextFor(undefined, {
+      ...req, headers: { ...req.headers, cookie: 'access_token=ambient' },
+    }))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(contextFor(undefined, {
+      ...req, cookies: { access_token: 'ambient' },
+    }))).toThrow(ForbiddenException);
+    // A browser cookie session must come from the web origin.
+    expect(() => guard.canActivate(contextFor('https://untrusted.example', {
+      method: 'DELETE', path: '/api/v1/auth/me', user: req.user,
+      headers: { cookie: 'access_token=session', origin: 'https://untrusted.example' },
+    }))).toThrow(ForbiddenException);
+    expect(guard.canActivate(contextFor('http://localhost:4200', {
+      method: 'DELETE', path: '/api/v1/auth/me', user: req.user,
+      headers: { cookie: 'access_token=session', origin: 'http://localhost:4200' },
+    }))).toBe(true);
+  });
+
   it.each([
     undefined,
     'null',

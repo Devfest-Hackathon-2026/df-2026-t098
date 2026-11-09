@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
-import type { CommentDto, ReportDto } from './dto/learning.dto';
+import type {
+  CommentDto,
+  CommentReportDto,
+  ReportDto,
+} from './dto/learning.dto';
 import { QuestionsService } from './questions.service';
 import type { PublicAuthor } from './learning.types';
 
@@ -35,6 +39,24 @@ const COMMENT_SELECT = `SELECT c.id,c.question_id,c.text,c.kind,c.parent_id,c.de
   (c.deleted_at IS NULL AND EXISTS (SELECT 1 FROM learning_comment_helpful h
     WHERE h.comment_id = c.id AND h.user_id = $2::uuid)) AS helpful`;
 
+/**
+ * SQL predicate: the viewer cannot see this comment because they blocked its author
+ * or reported it. A null viewer (guest) hides nothing.
+ */
+function hiddenFromViewer(comment: string, viewer: string): string {
+  return `(EXISTS (SELECT 1 FROM learning_user_blocks hb
+      WHERE hb.blocker_id = ${viewer}::uuid AND hb.blocked_id = ${comment}.user_id)
+    OR EXISTS (SELECT 1 FROM learning_comment_reports hr
+      WHERE hr.user_id = ${viewer}::uuid AND hr.comment_id = ${comment}.id))`;
+}
+
+/** A reply is hidden together with a root the viewer cannot see. */
+function visibleToViewer(comment: string, viewer: string): string {
+  return `NOT ${hiddenFromViewer(comment, viewer)}
+    AND (${comment}.parent_id IS NULL OR NOT EXISTS (SELECT 1 FROM learning_comments hp
+      WHERE hp.id = ${comment}.parent_id AND ${hiddenFromViewer('hp', viewer)}))`;
+}
+
 @Injectable()
 export class CommunityService {
   constructor(
@@ -46,8 +68,9 @@ export class CommunityService {
     await this.questions.question(questionId);
     const rows: CommentRow[] = await this.database.query(
       `WITH recent AS (
-        SELECT id,parent_id FROM learning_comments WHERE question_id = $1 AND deleted_at IS NULL
-        ORDER BY created_at DESC,id DESC LIMIT 50
+        SELECT rc.id,rc.parent_id FROM learning_comments rc
+        WHERE rc.question_id = $1 AND rc.deleted_at IS NULL AND ${visibleToViewer('rc', '$2')}
+        ORDER BY rc.created_at DESC,rc.id DESC LIMIT 50
       ), visible AS (
         SELECT id FROM recent UNION SELECT parent_id FROM recent WHERE parent_id IS NOT NULL
       )
@@ -67,7 +90,7 @@ export class CommunityService {
       );
     await this.questions.question(questionId);
     const id = await this.database.transaction(async (manager) => {
-      // Serialize retries by writer without blocking independent contributors.
+      // Lock per writer so retries cannot create duplicate posts.
       await manager.query('SELECT pg_advisory_xact_lock(1104,hashtext($1))', [
         userId,
       ]);
@@ -187,6 +210,8 @@ export class CommunityService {
   }
 
   async creator(userId: string, viewerId: string | null) {
+    if (viewerId && (await this.isBlocked(viewerId, userId)))
+      throw new NotFoundException('Creator not found');
     const [user] = await this.database.query(
       'SELECT id,username,name,avatar_url FROM users WHERE id = $1',
       [userId],
@@ -202,7 +227,8 @@ export class CommunityService {
       FROM learning_comments c JOIN users u ON u.id = c.user_id
       JOIN learning_questions q ON q.id = c.question_id
       WHERE c.user_id = $1 AND c.kind = 'explanation' AND c.parent_id IS NULL
-        AND c.deleted_at IS NULL ORDER BY c.created_at DESC,c.id DESC LIMIT 20`,
+        AND c.deleted_at IS NULL AND NOT ${hiddenFromViewer('c', '$2')}
+      ORDER BY c.created_at DESC,c.id DESC LIMIT 20`,
       [userId, viewerId],
     );
     const [counts] = await this.database.query(
@@ -235,6 +261,70 @@ export class CommunityService {
       [userId, questionId, input.reason, input.details ?? ''],
     );
     return { id: row.id as string, status: 'open' as const };
+  }
+
+  async reportComment(
+    userId: string,
+    questionId: string,
+    commentId: string,
+    input: CommentReportDto,
+  ) {
+    const [comment] = await this.database.query(
+      'SELECT user_id,deleted_at FROM learning_comments WHERE id = $1 AND question_id = $2',
+      [commentId, questionId],
+    );
+    if (!comment || comment.deleted_at)
+      throw new NotFoundException('Contribution not found');
+    if (comment.user_id === userId)
+      throw new BadRequestException('You cannot report your own contribution');
+    const [row] = await this.database.query(
+      `INSERT INTO learning_comment_reports (user_id,comment_id,reason,details)
+      VALUES ($1,$2,$3,$4) ON CONFLICT (user_id,comment_id,reason) WHERE status = 'open'
+      DO UPDATE SET details = EXCLUDED.details,updated_at = now() RETURNING id`,
+      [userId, commentId, input.reason, input.details ?? ''],
+    );
+    return { id: row.id as string, status: 'open' as const };
+  }
+
+  async block(userId: string, blockedId: string) {
+    if (userId === blockedId)
+      throw new BadRequestException('You cannot block yourself');
+    const [target] = await this.database.query(
+      'SELECT id FROM users WHERE id = $1',
+      [blockedId],
+    );
+    if (!target) throw new NotFoundException('User not found');
+    await this.database.query(
+      `INSERT INTO learning_user_blocks (blocker_id,blocked_id) VALUES ($1,$2)
+      ON CONFLICT (blocker_id,blocked_id) DO NOTHING`,
+      [userId, blockedId],
+    );
+    return { blocked: true as const };
+  }
+
+  async unblock(userId: string, blockedId: string): Promise<void> {
+    await this.database.query(
+      'DELETE FROM learning_user_blocks WHERE blocker_id = $1 AND blocked_id = $2',
+      [userId, blockedId],
+    );
+  }
+
+  async blocks(userId: string) {
+    const rows = await this.database.query(
+      `SELECT u.id,u.username,u.name,u.avatar_url FROM learning_user_blocks b
+      JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = $1
+      ORDER BY b.created_at DESC,u.id LIMIT 200`,
+      [userId],
+    );
+    return { users: rows.map((row) => publicAuthor(row, row.id)) };
+  }
+
+  private async isBlocked(viewerId: string, otherId: string): Promise<boolean> {
+    const rows = await this.database.query(
+      'SELECT 1 FROM learning_user_blocks WHERE blocker_id = $1 AND blocked_id = $2',
+      [viewerId, otherId],
+    );
+    return rows.length > 0;
   }
 
   private async commentById(

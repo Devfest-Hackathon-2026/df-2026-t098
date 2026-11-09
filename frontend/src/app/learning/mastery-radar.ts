@@ -6,7 +6,6 @@ const SIZE = 260;
 const CENTER = SIZE / 2;
 const RADIUS = 86;
 
-/** Six-axis radar of accuracy per interest, so learners see where they are strong and weak. */
 @Component({
   selector: 'app-mastery-radar',
   template: `
@@ -124,7 +123,6 @@ export class MasteryRadar {
       const angle = (Math.PI * 2 * index) / items.length - Math.PI / 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
-      // Unanswered interests sit at a small baseline so the shape stays readable.
       const value = item.answered ? Math.max(0.08, item.mastery) : 0.04;
       return {
         topic: item.topic,

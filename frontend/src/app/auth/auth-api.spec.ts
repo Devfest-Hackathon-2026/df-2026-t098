@@ -113,7 +113,6 @@ describe('AuthApi', () => {
     expect(validUsername('  学習者_1  ')).toBe(true);
     expect(validUsername('name@example.test')).toBe(false);
     expect(validUsername('ab')).toBe(false);
-    // U+1F331 is one character outside the BMP; it counts once, not as two UTF-16 units.
     expect(validSignupPassword('\u{1F331}'.repeat(15))).toBe(true);
     expect(validSignupPassword('\u{1F331}'.repeat(129))).toBe(false);
     expect(validSignupPassword('short')).toBe(false);

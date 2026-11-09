@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Builds nothing: starts an already built WhyLint image against a throwaway PostgreSQL container,
-# runs the release job (twice, to prove it is repeatable), then runs the HTTP smoke checks.
-#
-#   docker build -t whylint .
-#   e2e/scripts/container-smoke.sh whylint
-#
-# Needs Docker and openssl. Uses the public postgres:16-alpine image and a private network.
 set -euo pipefail
 
 IMAGE=${1:?usage: container-smoke.sh <image>}
@@ -28,7 +21,7 @@ docker network create "$NAME" >/dev/null
 docker run -d --name "$NAME-db" --network "$NAME" \
   -e POSTGRES_USER=whylint -e POSTGRES_DB=whylint -e POSTGRES_HOST_AUTH_METHOD=trust \
   postgres:16-alpine >/dev/null
-# The image's entrypoint first runs a socket-only server; a TCP check waits for the real one.
+# Wait for TCP after Postgres finishes its socket-only setup.
 for _ in $(seq 1 60); do
   docker exec "$NAME-db" pg_isready -h 127.0.0.1 -U whylint -d whylint >/dev/null 2>&1 && break
   sleep 1

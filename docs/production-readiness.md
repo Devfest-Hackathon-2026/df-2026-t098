@@ -31,6 +31,21 @@ Eight blockers below need to be closed first; most are configuration and process
 | B3 database | **Partly done**: `DB_SSL` (`off`/`verify`/`no-verify`) with CA from env or file; compiled release job (`npm run release`) for migrations and the pool; Unix-socket URLs verified locally. Still open: least-privilege roles, backups and point-in-time recovery, TLS against a managed database. |
 | B7 | `TRUST_PROXY` is documented for Cloud Run. Global Gemini budget, signup CAPTCHA, and shared rate-limit storage are still open. |
 | H6 dependency | `multer` is pinned to 2.5.0 through an npm `overrides` entry (`npm audit fix` cannot fix it on Nest 11); `npm audit --omit=dev` is clean in all three packages and runs in CI. Remove the override on the move to Nest 12. |
+| B2 live (2026-11-09) | The production Cloud Run service is up: `/api/v1/health`, `/health/ready`, `/learning/feed/pool` and `/learning/catalog` return 200 and the mobile auth routes are deployed. It scales to zero, and the first requests after idle timed out at 15 s, which breaks a native app's first launch (see H-N1 in the native audit). The Docker image was not rebuilt in the 2026-11-09 pass. |
+
+## Native apps (2026-11-09)
+
+The iOS and Android apps add six store-submission blockers on top of B1–B8: no account deletion (N1),
+no comment reporting or user blocking (N2), no privacy policy or terms link (N3), Google sign-in without
+Sign in with Apple (N4), iOS privacy manifest, export compliance and iPad orientations (N5), and Android
+signing and AAB (N6). The mobile auth boundary passed a 32-check adversarial probe. Full findings,
+evidence, and what was not verified: [native-audit-2026-11-09.md](native-audit-2026-11-09.md).
+
+**Status 2026-11-09:** N1–N3 now have code on the web, iOS and Android (account deletion, comment
+reports, blocking, configurable privacy/terms links and support contact); they stay open until the owner
+publishes the documents, sets the real support contact and the stores accept the submission. B5 account
+deletion is done; export, the minimum age and the policies are not. H2 is partly addressed: comments can
+be reported and users blocked, but there is still no review queue and no content filter.
 
 ## High
 

@@ -6,6 +6,7 @@ import {
   completeOnboarding,
   learner,
   mockGoogleAuthorization,
+  openAccountSettings,
   openGuestLogin,
   openProfile,
   origin,
@@ -202,6 +203,7 @@ test('Google username: optional onboarding skip, profile save, retry and persist
   await expect(page).toHaveURL(`${origin}/`);
   expect((await browserRequest(page, '/api/v1/auth/me')).body.username).toBeNull();
   await openProfile(page);
+  await openAccountSettings(page);
   await page.screenshot({ path: testInfo.outputPath('profile-username.png'), fullPage: true });
   await page.getByLabel('ユーザー名（任意）', { exact: true }).fill(`  ${username}  `);
   const foreground = page.waitForResponse(
@@ -237,8 +239,9 @@ test('Google username: onboarding save persists across Google re-login', async (
   await expect(page).toHaveURL(`${origin}/`);
   await openProfile(page);
   await expect(page.getByText(`@${username}`, { exact: true })).toBeVisible();
+  await openAccountSettings(page);
   await page.getByRole('button', { name: 'ログアウト', exact: true }).click();
-  await page.getByRole('link', { name: /Googleでログイン/ }).click();
+  await page.getByRole('link', { name: 'ログイン', exact: true }).click();
   await page.getByRole('button', { name: 'Googleで続ける', exact: true }).click();
   await expect(page).toHaveURL(`${origin}/`);
   await openProfile(page);
@@ -281,6 +284,7 @@ test('UI logout: revokes a copied cookie, preserves another session and restores
     ).toBe(200);
     await page.goto('/');
     await openProfile(page);
+    await openAccountSettings(page);
     const button = page.getByRole('button', { name: 'ログアウト', exact: true });
     await expect(button).toBeInViewport();
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -289,7 +293,7 @@ test('UI logout: revokes a copied cookie, preserves another session and restores
     );
     await button.click();
     expect((await logout).status()).toBe(204);
-    await expect(page.getByRole('link', { name: /Googleでログイン/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'ログイン', exact: true })).toBeVisible();
     expect((await context.cookies()).some((value) => value.name === 'access_token')).toBe(false);
     expect((await replay.get('/api/v1/auth/me')).status()).toBe(401);
     expect((await browserRequest(otherPage, '/api/v1/auth/me')).status).toBe(200);
@@ -310,6 +314,7 @@ test('UI logout: retains account on failure, disables repeat clicks and retries 
   expect((await browserRequest(page, '/api/v1/auth/signup', 'POST', account)).status).toBe(201);
   await page.goto('/');
   await openProfile(page);
+  await openAccountSettings(page);
   await page.route('**/api/v1/auth/logout', (route) => route.fulfill({ status: 503 }));
   const button = page.getByRole('button', { name: 'ログアウト', exact: true });
   await button.click();
@@ -340,7 +345,7 @@ test('UI logout: retains account on failure, disables repeat clicks and retries 
   } finally {
     release();
   }
-  await expect(page.getByRole('link', { name: /Googleでログイン/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'ログイン', exact: true })).toBeVisible();
   expect((await context.cookies()).some((cookie) => cookie.name === 'access_token')).toBe(false);
   expect((await browserRequest(page, '/api/v1/auth/me')).status).toBe(401);
 });
@@ -423,7 +428,6 @@ test('mocked Google: mismatched state is consumed and rejected without backend e
   expect(await page.evaluate((key) => sessionStorage.getItem(key) === null, stateKey)).toBe(true);
   expect(exchanges).toBe(0);
   expect((await context.cookies()).some((cookie) => cookie.name === 'access_token')).toBe(false);
-  // A direct callback has no state left to consume and must also fail locally.
   await page.goto('/auth/google/callback?state=fixture-reused&code=whylint-fixture-rejected');
   await expect(page.getByRole('alert')).toContainText('ログインを確認できませんでした。');
   await expect(page).toHaveURL(`${origin}/login`);

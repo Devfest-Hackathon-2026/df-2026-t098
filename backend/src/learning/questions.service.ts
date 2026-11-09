@@ -56,7 +56,10 @@ export class QuestionsService {
       (SELECT count(*)::int FROM learning_reactions r WHERE r.question_id = q.id AND r.liked) AS likes,
       coalesce((SELECT r.liked FROM learning_reactions r WHERE r.question_id = q.id AND r.user_id = $${userParameter}),false) AS liked,
       coalesce((SELECT r.saved FROM learning_reactions r WHERE r.question_id = q.id AND r.user_id = $${userParameter}),false) AS saved
-      FROM learning_questions q LEFT JOIN users u ON u.id = q.author_id ${where}`,
+      FROM (SELECT bq.* FROM learning_questions bq WHERE NOT EXISTS (
+        SELECT 1 FROM learning_user_blocks bb
+        WHERE bb.blocker_id = $${userParameter}::uuid AND bb.blocked_id = bq.author_id)) q
+      LEFT JOIN users u ON u.id = q.author_id ${where}`,
       [...parameters, userId],
     );
     return Promise.all(
@@ -221,7 +224,6 @@ export class QuestionsService {
     }
   }
 
-  /** Tap-quiz questions anyone can play instantly, without waiting for Gemini. */
   async pool(
     input: {
       language: LearningLanguage;
@@ -260,11 +262,6 @@ export class QuestionsService {
     return selectNovelQuestions(candidates, previous, input.limit);
   }
 
-  /**
-   * Public content of questions the learner has already met, used to avoid near-duplicates:
-   * IDs the browser has shown this session, the learner's recent Gemini questions, what they
-   * answered in the last 60 days on any device, and what recent feed batches served them.
-   */
   async noveltyContext(
     ids: string[],
     userId: string | null,
@@ -289,17 +286,13 @@ export class QuestionsService {
     );
   }
 
-  /**
-   * Practice questions due today (from 09:00). Serving one moves it to the next morning, so a
-   * skipped question returns once a day until the learner answers it correctly.
-   */
   async dueReviews(
     userId: string,
     language: LearningLanguage,
     limit: number,
     manager = this.database.manager,
   ): Promise<PublicQuestion[]> {
-    // Select and reschedule atomically so parallel feed requests never serve one twice.
+    // Claim each review once across concurrent feed requests.
     if (!manager.queryRunner?.isTransactionActive)
       return this.database.transaction((transaction) =>
         this.dueReviews(userId, language, limit, transaction),
@@ -454,7 +447,6 @@ export class QuestionsService {
       concept: row.concept ?? null,
       options: row.options ?? null,
       tap: row.tap ?? null,
-      // In the viewer's Practice collection: shown fresh so it can be answered again.
       ...(row.practice
         ? {
             review: {

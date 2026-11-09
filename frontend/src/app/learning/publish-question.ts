@@ -1,10 +1,12 @@
 import {
   Component,
+  afterNextRender,
   DestroyRef,
   ElementRef,
   effect,
   inject,
   input,
+  Injector,
   signal,
   untracked,
   viewChild,
@@ -14,6 +16,7 @@ import { RouterLink } from '@angular/router';
 import { AuthSession } from '../auth/auth-session';
 import { LearningApi, learningError } from './learning-api';
 import { LEARNING_CATALOG } from './learning-catalog';
+import { PublishDraftStore } from './publish-draft';
 import type { Difficulty, Language, NewQuestion, Question } from './learning.types';
 
 @Component({
@@ -26,6 +29,9 @@ export class PublishQuestion {
   readonly language = input<Language>('ja');
   protected readonly session = inject(AuthSession);
   private readonly api = inject(LearningApi);
+  private readonly drafts = inject(PublishDraftStore);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private controller = new AbortController();
   private owner: string | null | undefined;
   private requestId = '';
@@ -39,7 +45,6 @@ export class PublishQuestion {
   protected readonly codeLanguage = signal('');
   protected readonly topic = signal('general');
   protected readonly difficulty = signal<Difficulty>('beginner');
-  /** Optional tap quiz so community questions play like the rest of the feed. */
   protected readonly options = signal<string[]>(['', '', '', '']);
   protected readonly correctOption = signal<number | null>(null);
   protected readonly letters = ['A', 'B', 'C', 'D'];
@@ -49,16 +54,47 @@ export class PublishQuestion {
   protected readonly published = signal<Question | null>(null);
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.controller.abort());
+    inject(DestroyRef).onDestroy(() => {
+      if (this.owner && this.session.user()?.id === this.owner && !this.published()) {
+        this.drafts.save(this.owner, {
+          title: this.title(),
+          prompt: this.prompt(),
+          referenceAnswer: this.referenceAnswer(),
+          code: this.code(),
+          codeLanguage: this.codeLanguage(),
+          topic: this.topic(),
+          difficulty: this.difficulty(),
+          options: [...this.options()],
+          correctOption: this.correctOption(),
+          requestId: this.requestId,
+          submittedPayload: this.submittedPayload,
+        });
+      }
+      this.controller.abort();
+    });
     effect(() => {
       if (this.session.status() === 'loading' || this.session.status() === 'unavailable') return;
       const owner = this.session.user()?.id ?? null;
       untracked(() => {
         if (owner === this.owner) return;
         this.owner = owner;
+        const draft = this.drafts.take(owner);
         this.controller.abort();
         this.controller = new AbortController();
         this.clear();
+        if (draft) {
+          this.title.set(draft.title);
+          this.prompt.set(draft.prompt);
+          this.referenceAnswer.set(draft.referenceAnswer);
+          this.code.set(draft.code);
+          this.codeLanguage.set(draft.codeLanguage);
+          this.topic.set(draft.topic);
+          this.difficulty.set(draft.difficulty);
+          this.options.set(draft.options);
+          this.correctOption.set(draft.correctOption);
+          this.requestId = draft.requestId;
+          this.submittedPayload = draft.submittedPayload;
+        }
       });
     });
   }
@@ -71,6 +107,7 @@ export class PublishQuestion {
     return this.language() === 'ja' ? ja : en;
   }
   protected clear(): void {
+    this.drafts.clear();
     this.title.set('');
     this.prompt.set('');
     this.referenceAnswer.set('');
@@ -84,6 +121,12 @@ export class PublishQuestion {
     this.publishing.set(false);
     this.requestId = '';
     this.submittedPayload = '';
+  }
+
+  private focusField(id: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('#' + id)?.focus(), {
+      injector: this.injector,
+    });
   }
 
   protected async publish(event: Event): Promise<void> {
@@ -110,6 +153,13 @@ export class PublishQuestion {
           'Use at least 3 characters for the title, and 10 each for the question and reference explanation.',
         ),
       );
+      this.focusField(
+        question.title.length < 3
+          ? 'question-title'
+          : question.prompt.length < 10
+            ? 'question-prompt'
+            : 'question-reference',
+      );
       return;
     }
     const hasCode = !!this.code().trim();
@@ -128,6 +178,7 @@ export class PublishQuestion {
       );
       const details = this.codeFields()?.nativeElement;
       if (details) details.open = true;
+      this.focusField(hasCode ? 'question-code-language' : 'question-code');
       return;
     }
     if (hasCode) {
@@ -146,6 +197,7 @@ export class PublishQuestion {
             'For a tap quiz, add at least two options and mark the correct one.',
           ),
         );
+        this.focusField(filled.length < 2 ? 'option-0' : 'correct-' + filled[0].index);
         return;
       }
       question.format = 'choice';
@@ -167,7 +219,10 @@ export class PublishQuestion {
         { ...question, requestId: this.requestId },
         signal,
       );
-      if (!signal.aborted) this.published.set(result.question);
+      if (!signal.aborted) {
+        this.drafts.clear();
+        this.published.set(result.question);
+      }
     } catch (error) {
       if (!signal.aborted) this.error.set(learningError(error, this.language()));
     } finally {

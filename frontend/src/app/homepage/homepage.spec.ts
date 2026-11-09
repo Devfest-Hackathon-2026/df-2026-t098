@@ -103,7 +103,6 @@ describe('Personal learning feed', () => {
     sessionStorage.clear();
   });
 
-  /** The mocked API is not tracked by Angular stability, so flush its chained promises. */
   async function settle(fixture: ComponentFixture<Homepage>) {
     for (let round = 0; round < 6; round++) {
       await fixture.whenStable();
@@ -123,6 +122,32 @@ describe('Personal learning feed', () => {
     expect(cards(root)).toHaveLength(10);
     expect(root.querySelector('.quiz-option')?.textContent).toContain('Signature');
     expect(root.querySelector('.swipe-hint')).not.toBeNull();
+  });
+
+  it('keeps the feed position when a secondary tab is destroyed', async () => {
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    const content = root.querySelector<HTMLElement>('main.content')!;
+    content.scrollTop = 321;
+    const profile = [...root.querySelectorAll<HTMLButtonElement>('.main-nav button')].find(
+      (button) => button.textContent?.includes('プロフィール'),
+    )!;
+    profile.click();
+    await settle(fixture);
+    content.scrollTop = 99;
+    fixture.destroy();
+    expect(TestBed.inject(FeedStore).scrollTop).toBe(321);
+  });
+
+  it('does not answer inert measurement controls through number shortcuts', async () => {
+    const fixture = TestBed.createComponent(Homepage);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector('.question-stage-natural')!.setAttribute('inert', '');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }));
+    await settle(fixture);
+    expect(send.mock.calls.some(([path]) => path.includes('/taps'))).toBe(false);
   });
 
   it('keeps cards ahead by loading more when the learner nears the end', async () => {

@@ -1,0 +1,533 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		121075C10ADB1DECC9545F97 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B389B0635821688272FEE2B8 /* GoogleSignIn */; };
+		1A2056DD50C0EA7915558B66 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979E5AA26330640BCD6C4E02 /* AppStore.swift */; };
+		29D1C5D1F9F3E3431DB4D386 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 273B51937132EEFC830D90EB /* Assets.xcassets */; };
+		353336864FEB086D11E7A8E9 /* WhyLintApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299E696E1929D2E34E209EB2 /* WhyLintApp.swift */; };
+		3D4477B7CCB4EB6F0D70BDCA /* CommunityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E645009A471CB5B227928E /* CommunityViews.swift */; };
+		4F29A9173083ADC2C191125D /* QuestionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CD8249170AE47EBD46FBF0 /* QuestionView.swift */; };
+		6C5DD81FE904ADF4E3EC5B0C /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 181E622524747633F8C28B91 /* API.swift */; };
+		9B2503F7EDB08EAB085288E8 /* DMMono-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0D0F15293075AA11592E34F2 /* DMMono-LICENSE.txt */; };
+		B9F4BD1601FC188807C53739 /* GoogleLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 453B14048211B9E373C32D60 /* GoogleLogin.swift */; };
+		D128C36ABE076447AD67C96B /* google-g.png in Resources */ = {isa = PBXBuildFile; fileRef = A4BBA4B4B682DBCB26023623 /* google-g.png */; };
+		D57CC64E4596A6149A96E5EF /* Panels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98114C105A09E1685842EF1F /* Panels.swift */; };
+		DAD92DA16CFA5CC86CF9627F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1F49A573B9E53257AD962DAA /* PrivacyInfo.xcprivacy */; };
+		DFB1B0D6E76A26E6F0B22BC4 /* DMSans-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 7053F50FC918ACCCFCE799B5 /* DMSans-LICENSE.txt */; };
+		E3F58FD329D83FAF2FC77229 /* DMSans.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1FCE790BE9B6D612F24CE428 /* DMSans.ttf */; };
+		F2C19E3250239B59AD44C6BC /* DMMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EFD2370969BB16937FA59EBF /* DMMono-Regular.ttf */; };
+		FD6233E094A517A8E87E296E /* WhyLintUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37F52951E76A46B9C6E9CA6 /* WhyLintUITests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		81E6EF0A25BC4940C65CAA03 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1EC78CCA7B37B7198C2C4720 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CC9BB59413D924F4E10C0028;
+			remoteInfo = WhyLint;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0D0F15293075AA11592E34F2 /* DMMono-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "DMMono-LICENSE.txt"; sourceTree = "<group>"; };
+		14F8626817822D06DD08752B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		181E622524747633F8C28B91 /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
+		1F49A573B9E53257AD962DAA /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1FCE790BE9B6D612F24CE428 /* DMSans.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = DMSans.ttf; sourceTree = "<group>"; };
+		23CD8249170AE47EBD46FBF0 /* QuestionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestionView.swift; sourceTree = "<group>"; };
+		273B51937132EEFC830D90EB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		299E696E1929D2E34E209EB2 /* WhyLintApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhyLintApp.swift; sourceTree = "<group>"; };
+		453B14048211B9E373C32D60 /* GoogleLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleLogin.swift; sourceTree = "<group>"; };
+		46E645009A471CB5B227928E /* CommunityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityViews.swift; sourceTree = "<group>"; };
+		7053F50FC918ACCCFCE799B5 /* DMSans-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "DMSans-LICENSE.txt"; sourceTree = "<group>"; };
+		979E5AA26330640BCD6C4E02 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		98114C105A09E1685842EF1F /* Panels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels.swift; sourceTree = "<group>"; };
+		9C579BCF7C46CAE9BD0BF664 /* WhyLintUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhyLintUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A4BBA4B4B682DBCB26023623 /* google-g.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "google-g.png"; sourceTree = "<group>"; };
+		C37F52951E76A46B9C6E9CA6 /* WhyLintUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhyLintUITests.swift; sourceTree = "<group>"; };
+		D72489F03A951EE9C8FC396E /* WhyLint.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WhyLint.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EFD2370969BB16937FA59EBF /* DMMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DMMono-Regular.ttf"; sourceTree = "<group>"; };
+		FDE1F59F7717120179B72F3E /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4B2E513C816FF583F826DF62 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				121075C10ADB1DECC9545F97 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		074DE5F3F9521F5555E50F3E /* WhyLint */ = {
+			isa = PBXGroup;
+			children = (
+				181E622524747633F8C28B91 /* API.swift */,
+				979E5AA26330640BCD6C4E02 /* AppStore.swift */,
+				273B51937132EEFC830D90EB /* Assets.xcassets */,
+				46E645009A471CB5B227928E /* CommunityViews.swift */,
+				453B14048211B9E373C32D60 /* GoogleLogin.swift */,
+				14F8626817822D06DD08752B /* Info.plist */,
+				98114C105A09E1685842EF1F /* Panels.swift */,
+				1F49A573B9E53257AD962DAA /* PrivacyInfo.xcprivacy */,
+				23CD8249170AE47EBD46FBF0 /* QuestionView.swift */,
+				299E696E1929D2E34E209EB2 /* WhyLintApp.swift */,
+				42964CA13613603652873FEC /* Resources */,
+			);
+			path = WhyLint;
+			sourceTree = "<group>";
+		};
+		1CBFDBFE5F08B8D4D7FD56BC /* ios */ = {
+			isa = PBXGroup;
+			children = (
+				FDE1F59F7717120179B72F3E /* Config.xcconfig */,
+			);
+			name = ios;
+			path = .;
+			sourceTree = "<group>";
+		};
+		42964CA13613603652873FEC /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				0D0F15293075AA11592E34F2 /* DMMono-LICENSE.txt */,
+				EFD2370969BB16937FA59EBF /* DMMono-Regular.ttf */,
+				7053F50FC918ACCCFCE799B5 /* DMSans-LICENSE.txt */,
+				1FCE790BE9B6D612F24CE428 /* DMSans.ttf */,
+				A4BBA4B4B682DBCB26023623 /* google-g.png */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		4699E37C4BADA7552A1BF8F3 /* WhyLintUITests */ = {
+			isa = PBXGroup;
+			children = (
+				C37F52951E76A46B9C6E9CA6 /* WhyLintUITests.swift */,
+			);
+			path = WhyLintUITests;
+			sourceTree = "<group>";
+		};
+		55FBE541FAFA0D5C68969160 = {
+			isa = PBXGroup;
+			children = (
+				1CBFDBFE5F08B8D4D7FD56BC /* ios */,
+				074DE5F3F9521F5555E50F3E /* WhyLint */,
+				4699E37C4BADA7552A1BF8F3 /* WhyLintUITests */,
+				99DCD536A285E234777B2AB2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		99DCD536A285E234777B2AB2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D72489F03A951EE9C8FC396E /* WhyLint.app */,
+				9C579BCF7C46CAE9BD0BF664 /* WhyLintUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0E76F8A639C0D3DC1F5081E5 /* WhyLintUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A2488CA8849B0FB0324BD8F /* Build configuration list for PBXNativeTarget "WhyLintUITests" */;
+			buildPhases = (
+				AE830C2BEED3A5745AEA77A7 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3314AA270A315E47A8FFAB42 /* PBXTargetDependency */,
+			);
+			name = WhyLintUITests;
+			packageProductDependencies = (
+			);
+			productName = WhyLintUITests;
+			productReference = 9C579BCF7C46CAE9BD0BF664 /* WhyLintUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		CC9BB59413D924F4E10C0028 /* WhyLint */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 693B9977F0B0BA24845CA544 /* Build configuration list for PBXNativeTarget "WhyLint" */;
+			buildPhases = (
+				368AB95109C581C04FD46EAA /* Sources */,
+				AAF2674F27A9ACC43B93E031 /* Resources */,
+				4B2E513C816FF583F826DF62 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WhyLint;
+			packageProductDependencies = (
+				B389B0635821688272FEE2B8 /* GoogleSignIn */,
+			);
+			productName = WhyLint;
+			productReference = D72489F03A951EE9C8FC396E /* WhyLint.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1EC78CCA7B37B7198C2C4720 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					0E76F8A639C0D3DC1F5081E5 = {
+						TestTargetID = CC9BB59413D924F4E10C0028;
+					};
+					CC9BB59413D924F4E10C0028 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 83F7F8659661091964CC1FB8 /* Build configuration list for PBXProject "WhyLint" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 55FBE541FAFA0D5C68969160;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1AB6921F0A85F3DD2428A1DB /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 99DCD536A285E234777B2AB2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CC9BB59413D924F4E10C0028 /* WhyLint */,
+				0E76F8A639C0D3DC1F5081E5 /* WhyLintUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAF2674F27A9ACC43B93E031 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				29D1C5D1F9F3E3431DB4D386 /* Assets.xcassets in Resources */,
+				9B2503F7EDB08EAB085288E8 /* DMMono-LICENSE.txt in Resources */,
+				F2C19E3250239B59AD44C6BC /* DMMono-Regular.ttf in Resources */,
+				DFB1B0D6E76A26E6F0B22BC4 /* DMSans-LICENSE.txt in Resources */,
+				E3F58FD329D83FAF2FC77229 /* DMSans.ttf in Resources */,
+				DAD92DA16CFA5CC86CF9627F /* PrivacyInfo.xcprivacy in Resources */,
+				D128C36ABE076447AD67C96B /* google-g.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		368AB95109C581C04FD46EAA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6C5DD81FE904ADF4E3EC5B0C /* API.swift in Sources */,
+				1A2056DD50C0EA7915558B66 /* AppStore.swift in Sources */,
+				3D4477B7CCB4EB6F0D70BDCA /* CommunityViews.swift in Sources */,
+				B9F4BD1601FC188807C53739 /* GoogleLogin.swift in Sources */,
+				D57CC64E4596A6149A96E5EF /* Panels.swift in Sources */,
+				4F29A9173083ADC2C191125D /* QuestionView.swift in Sources */,
+				353336864FEB086D11E7A8E9 /* WhyLintApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AE830C2BEED3A5745AEA77A7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD6233E094A517A8E87E296E /* WhyLintUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3314AA270A315E47A8FFAB42 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CC9BB59413D924F4E10C0028 /* WhyLint */;
+			targetProxy = 81E6EF0A25BC4940C65CAA03 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		264D34AA548F9F1712383D63 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.whylint.native.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = WhyLint;
+			};
+			name = Debug;
+		};
+		3EF8B28B40B69E2A285800AB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C5D4ZV8X9X;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WhyLint/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.whylint.native;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		53419A4C04CA8DB13664A7FE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = FDE1F59F7717120179B72F3E /* Config.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				WHYLINT_API_URL = "https:/$()/whylint-8715935974.asia-northeast1.run.app";
+			};
+			name = Debug;
+		};
+		5396DE7E95FCA40E8C073B57 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.whylint.native.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = WhyLint;
+			};
+			name = Release;
+		};
+		71C007FFD335E535B7764FBD /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = FDE1F59F7717120179B72F3E /* Config.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_UPCOMING_FEATURE_NONISOLATED_NONSENDING_BY_DEFAULT = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				WHYLINT_API_URL = "https:/$()/whylint-8715935974.asia-northeast1.run.app";
+			};
+			name = Release;
+		};
+		9DBD5C600D7B106C07829396 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C5D4ZV8X9X;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WhyLint/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.whylint.native;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0A2488CA8849B0FB0324BD8F /* Build configuration list for PBXNativeTarget "WhyLintUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				264D34AA548F9F1712383D63 /* Debug */,
+				5396DE7E95FCA40E8C073B57 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		693B9977F0B0BA24845CA544 /* Build configuration list for PBXNativeTarget "WhyLint" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9DBD5C600D7B106C07829396 /* Debug */,
+				3EF8B28B40B69E2A285800AB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		83F7F8659661091964CC1FB8 /* Build configuration list for PBXProject "WhyLint" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				53419A4C04CA8DB13664A7FE /* Debug */,
+				71C007FFD335E535B7764FBD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1AB6921F0A85F3DD2428A1DB /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = exactVersion;
+				version = 10.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B389B0635821688272FEE2B8 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1AB6921F0A85F3DD2428A1DB /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1EC78CCA7B37B7198C2C4720 /* Project object */;
+}

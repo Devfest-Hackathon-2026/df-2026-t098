@@ -139,11 +139,31 @@ export class LearningQuestionReportEntity {
   @PrimaryGeneratedColumn('uuid') id!: string;
   @Column('uuid') user_id!: string;
   @Column('uuid') question_id!: string;
-  @Column('varchar') reason!: 'incorrect' | 'unclear' | 'outdated';
+  @Column('varchar') reason!:
+    'incorrect' | 'unclear' | 'outdated' | 'inappropriate';
   @Column('text') details!: string;
   @Column('varchar') status!: 'open' | 'resolved';
   @Column('timestamptz') created_at!: Date;
   @Column('timestamptz') updated_at!: Date;
+}
+
+@Entity('learning_comment_reports')
+export class LearningCommentReportEntity {
+  @PrimaryGeneratedColumn('uuid') id!: string;
+  @Column('uuid') user_id!: string;
+  @Column('uuid') comment_id!: string;
+  @Column('varchar') reason!: 'spam' | 'harassment' | 'inappropriate' | 'other';
+  @Column('text') details!: string;
+  @Column('varchar') status!: 'open' | 'resolved';
+  @Column('timestamptz') created_at!: Date;
+  @Column('timestamptz') updated_at!: Date;
+}
+
+@Entity('learning_user_blocks')
+export class LearningUserBlockEntity {
+  @PrimaryColumn('uuid') blocker_id!: string;
+  @PrimaryColumn('uuid') blocked_id!: string;
+  @Column('timestamptz') created_at!: Date;
 }
 
 export const LEARNING_ENTITIES = [
@@ -158,4 +178,6 @@ export const LEARNING_ENTITIES = [
   LearningDailyChallengeEntity,
   LearningCommentHelpfulEntity,
   LearningQuestionReportEntity,
+  LearningCommentReportEntity,
+  LearningUserBlockEntity,
 ];

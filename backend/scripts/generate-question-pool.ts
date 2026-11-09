@@ -1,9 +1,3 @@
-/**
- * Generates the committed tap-question pool with the real Gemini configuration.
- *   npm run pool:generate            # all interests × difficulties × languages
- *   npm run pool:generate -- --rounds 2
- * Requires GEMINI_API_KEY and GEMINI_MODEL in backend/.env. Never runs in production.
- */
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

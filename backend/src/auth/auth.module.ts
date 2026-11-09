@@ -2,6 +2,8 @@ import 'dotenv/config';
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { MobileAuthController } from './mobile-auth.controller';
+import { MobileClientGuard } from './guards/mobile-client.guard';
 import { DatabaseErrorFilter } from './filters/database-error.filter';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -31,6 +33,7 @@ import { SessionsService } from './sessions/sessions.service';
   ],
   providers: [
     AuthService,
+    MobileClientGuard,
     SessionsService,
     JwtGuard,
     AuthOriginGuard,
@@ -38,7 +41,7 @@ import { SessionsService } from './sessions/sessions.service';
     DatabaseErrorFilter,
     ThrottlerGuard,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, MobileAuthController],
   exports: [
     JwtGuard,
     SessionsService,

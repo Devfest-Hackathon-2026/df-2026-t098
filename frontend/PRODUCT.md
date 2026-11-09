@@ -6,7 +6,7 @@
 
 adaptive
 
-WhyLint uses Angular for its mobile and desktop web experience. The native mobile app is planned as a separate project.
+WhyLint uses Angular for its mobile and desktop web experience. Separate Swift iOS and Kotlin Android clients live under `native/` and follow the same visual design and backend contracts.
 
 ## Users and purpose
 

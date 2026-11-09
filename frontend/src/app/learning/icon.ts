@@ -6,6 +6,8 @@ const PATHS: Record<string, string> = {
   rank: 'M8 3h8v6a4 4 0 0 1-8 0V3ZM8 5H4v3a4 4 0 0 0 4 4M16 5h4v3a4 4 0 0 1-4 4M12 13v6M8 21h8',
   publish: 'M12 5v14M5 12h14',
   profile: 'M15 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM5 20a7 7 0 0 1 14 0',
+  settings:
+    'M10 3h4l.7 2.6 2 .9 2.4-.9 2 3.4-1.8 1.8v2.4l1.8 1.8-2 3.4-2.4-.9-2 .9L14 21h-4l-.7-2.6-2-.9-2.4.9-2-3.4 1.8-1.8v-2.4L2.9 9l2-3.4 2.4.9 2-.9L10 3ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   like: 'M20.5 5.5a5 5 0 0 0-7 0L12 7l-1.5-1.5a5 5 0 0 0-7 7L12 21l8.5-8.5a5 5 0 0 0 0-7Z',
   comment: 'M21 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 19 0Z',
   share: 'M12 16V3M7 8l5-5 5 5M5 13v7h14v-7',
@@ -72,7 +74,6 @@ const PATHS: Record<string, string> = {
 })
 export class Icon {
   readonly name = input('feed');
-  /** Solid fill, for emphasis (flame, heart, bolt). */
   readonly filled = input(false);
   protected get path() {
     return PATHS[this.name()] ?? PATHS['feed'];

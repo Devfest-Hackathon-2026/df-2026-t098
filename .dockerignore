@@ -22,6 +22,7 @@
 .impeccable
 .playwright-mcp
 e2e
+native
 docs
 skills-lock.json
 **/*.log

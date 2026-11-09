@@ -54,7 +54,6 @@ const NAMES: Record<string, string> = {
   gcp: 'GCP',
 };
 
-/** Human-readable, localized label for a lowercase topic tag. */
 export function topicLabel(topic: string, language: Language): string {
   const key = topic.trim().toLowerCase();
   if (INTERESTS[key]) return INTERESTS[key][language];

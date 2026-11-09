@@ -147,7 +147,6 @@ export const TECHNOLOGIES = [
   'Cypress',
 ];
 
-/** Topic tags that belong to each interest. Used for matching, card reasons, and mastery. */
 export const INTEREST_TOPICS: Record<string, string[]> = {
   frontend: [
     'frontend',
@@ -240,7 +239,6 @@ export const INTEREST_TOPICS: Record<string, string[]> = {
   ],
 };
 
-/** Adds the interest IDs implied by a question's topic tags. */
 export function withInterestTags(topics: string[]): string[] {
   const tags = topics
     .map((topic) => topic.trim().toLowerCase())
@@ -251,7 +249,6 @@ export function withInterestTags(topics: string[]): string[] {
   return [...new Set([...tags, ...interests])].slice(0, 12);
 }
 
-/** Expands chosen interests to their related topic tags. */
 export function expandInterests(items: string[]): string[] {
   return [
     ...new Set(

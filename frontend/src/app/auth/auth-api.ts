@@ -44,7 +44,7 @@ export class AuthApi {
       ]);
       if (!response || controller.signal.aborted) return { ok: false, reason: 'unavailable' };
       if (response.status === 200 || response.status === 201) {
-        // Finish the response before session restoration can replace the form.
+        // Read the result before refreshing the session, which can replace the form.
         await Promise.race([response.text(), cancelled]);
         if (controller.signal.aborted) return { ok: false, reason: 'unavailable' };
         return (await this.session.refresh()) ? { ok: true } : { ok: false, reason: 'unavailable' };

@@ -110,10 +110,108 @@
                 {{ text('削除', 'Delete') }}
               </button>
             }
+            @if (authenticated && comment.author.id !== session.user()?.id) {
+              <button
+                type="button"
+                class="report-comment"
+                data-testid="report-comment"
+                [attr.aria-label]="text('このコメントを報告', 'Report this comment')"
+                [attr.aria-expanded]="reportingId() === comment.id"
+                [disabled]="mutating || loading()"
+                (click)="openReport(comment)"
+              >
+                {{ text('報告', 'Report') }}
+              </button>
+              <button
+                type="button"
+                class="block-user"
+                data-testid="block-user"
+                [attr.aria-label]="text(comment.author.displayName + 'をブロック', 'Block ' + comment.author.displayName)"
+                [attr.aria-expanded]="blockingId() === comment.id"
+                [disabled]="mutating || loading()"
+                (click)="askBlock(comment)"
+              >
+                {{ text('ブロック', 'Block') }}
+              </button>
+            }
           </div>
+          @if (reportingId() === comment.id) {
+            <form
+              class="comment-report"
+              data-testid="comment-report-form"
+              (submit)="$event.preventDefault(); submitReport(comment)"
+            >
+              <label [for]="'comment-report-reason-' + comment.id">{{
+                text('報告の理由', 'Report reason')
+              }}</label>
+              <select
+                [id]="'comment-report-reason-' + comment.id"
+                name="commentReportReason"
+                [ngModel]="reportReason()"
+                (ngModelChange)="reportReason.set($event)"
+                [disabled]="mutating"
+              >
+                <option value="spam">{{ text('スパム・宣伝', 'Spam or advertising') }}</option>
+                <option value="harassment">{{ text('嫌がらせ・攻撃的', 'Harassment or abuse') }}</option>
+                <option value="inappropriate">
+                  {{ text('不適切な内容', 'Inappropriate content') }}
+                </option>
+                <option value="other">{{ text('その他', 'Something else') }}</option>
+              </select>
+              <label [for]="'comment-report-details-' + comment.id">{{
+                text('補足（任意）', 'Details (optional)')
+              }}</label>
+              <textarea
+                [id]="'comment-report-details-' + comment.id"
+                name="commentReportDetails"
+                [ngModel]="reportDetails()"
+                (ngModelChange)="reportDetails.set($event)"
+                [disabled]="mutating"
+                maxlength="1000"
+                rows="2"
+              ></textarea>
+              <div class="inline-actions">
+                <button type="submit" class="secondary" [disabled]="mutating">
+                  {{ reporting() ? text('送信中…', 'Sending…') : text('報告を送信', 'Submit report') }}
+                </button>
+                <button type="button" class="secondary" [disabled]="mutating" (click)="reportingId.set(null)">
+                  {{ text('キャンセル', 'Cancel') }}
+                </button>
+              </div>
+            </form>
+          }
+          @if (blockingId() === comment.id) {
+            <div class="comment-block" role="alertdialog" data-testid="block-confirm">
+              <p>
+                {{
+                  text(
+                    comment.author.displayName + 'さんをブロックしますか？ このユーザーのコメントと質問は表示されなくなります。設定の「アカウント設定」から解除できます。',
+                    'Block ' + comment.author.displayName + '? Their comments and questions will be hidden. You can unblock them in Account settings.'
+                  )
+                }}
+              </p>
+              <div class="inline-actions">
+                <button
+                  type="button"
+                  class="secondary danger"
+                  data-testid="confirm-block"
+                  [disabled]="mutating"
+                  (click)="confirmBlock(comment)"
+                >
+                  {{ blocking() ? text('ブロック中…', 'Blocking…') : text('ブロックする', 'Block') }}
+                </button>
+                <button type="button" class="secondary" [disabled]="mutating" (click)="blockingId.set(null)">
+                  {{ text('キャンセル', 'Cancel') }}
+                </button>
+              </div>
+            </div>
+          }
         }
       </div>
     </ng-template>
+    @if (notice()) {
+      <p class="discussion-notice" role="status" data-testid="discussion-notice">{{ notice() }}</p>
+    }
     <ol>
       @for (comment of roots(); track comment.id) {
         <li class="discussion-thread">
@@ -222,7 +320,9 @@
     </form>
   } @else {
     <p class="discussion-sign-in">
-      <a routerLink="/login">{{ text('ログインしてコメントする', 'Sign in to comment') }}</a>
+      <a class="signin-cta" routerLink="/login">{{
+        text('ログインしてコメントする', 'Sign in to comment')
+      }}</a>
     </p>
   }
 </dialog>

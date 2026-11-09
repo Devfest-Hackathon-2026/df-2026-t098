@@ -18,7 +18,7 @@ const frontend = process.env.WHYLINT_FRONTEND_DIR
   : path.resolve(directory, "../frontend");
 const backendTests = process.argv.includes("--backend-tests");
 const backendPort = Number(process.env.WHYLINT_E2E_BACKEND_PORT ?? 3101);
-// Google sign-in tests need 4200; other suites can use a free port beside a running dev server.
+// Google fixtures use the callback registered on port 4200.
 const frontendPort = Number(process.env.WHYLINT_E2E_FRONTEND_PORT ?? 4200);
 const frontendOrigin = `http://localhost:${frontendPort}`;
 const children = [];
@@ -55,7 +55,7 @@ async function run(command, args, options = {}) {
   }
   const [code] = await once(child, "close");
   if (code !== 0) {
-    // Do not echo arguments or captured application output: they may contain cookies.
+    // Command output can include session cookies.
     const missing = output.includes("not found") || code === -2;
     throw new Error(
       `${path.basename(command)} failed${missing ? " (check prerequisites and PATH)" : ""}`,
@@ -94,7 +94,6 @@ async function waitFor(url, child) {
       const response = await fetch(url, { signal: AbortSignal.timeout(1500) });
       if (response.status === 200 || response.status === 401) return;
     } catch {
-      /* Retry only while the owned process is alive. */
     }
     await delay(200);
   }
@@ -208,13 +207,16 @@ async function main() {
     GEMINI_API_KEY: "whylint-fixture-gemini-key",
     GEMINI_MODEL: "fixture-gemini",
     FRONTEND_URL: frontendOrigin,
+    // Where the owner would publish the legal pages; the browser tests only read the links.
+    LEGAL_BASE_URL: "https://legal.example.test/whylint",
+    SUPPORT_CONTACT: "support@example.test",
     PORT: String(backendPort),
     WHYLINT_E2E: "1",
     PGCONNECT_TIMEOUT: "5",
     PGPASSWORD: "",
     PGPASSFILE: emptyEnvironment,
   };
-  // libpq interprets even an empty PGSERVICE as a named-service request.
+  // Even an empty PGSERVICE makes libpq look up a service.
   for (const key of Object.keys(environment)) {
     if (
       key.startsWith("PG") &&

@@ -1,184 +1,184 @@
 <div class="onboarding-shell">
   <header class="header">
-    <div class="brand" aria-label="WhyLint">
-      <span class="mark" aria-hidden="true">w<span>_</span></span> whylint<span class="dot">.</span>
-    </div>
-    <div class="settings">
-      <button type="button" (click)="settings.toggleTheme()">
-        {{ settings.theme() === 'dark' ? text('ライト', 'Light') : text('ダーク', 'Dark') }}
-      </button>
-    </div>
+    <div class="brand" aria-label="WhyLint" role="img"><app-brand /></div>
   </header>
   <main class="body">
-    <div class="progress">
-      <span>{{ text('ステップ', 'Step') }} {{ step() }} / 2</span>
-      @if (!editing) {
-        <button type="button" class="quick-start" [disabled]="starting()" (click)="quickStart()">
-          {{ text('スキップしてすぐ始める →', 'Skip, just start →') }}
-        </button>
-      }
-    </div>
-    @if (step() === 1) {
-      <div class="onboarding-language">
-        <app-language-picker
-          [language]="language"
-          [selected]="language"
-          (changed)="settings.setLanguage($event)"
-        />
-      </div>
-      <h1>{{ text('何を学びたいですか？', 'What would you like to learn?') }}</h1>
-      <p class="intro">
-        {{
-          text(
-            '興味のある分野を選びましょう。いくつでも選べます。',
-            'Choose the areas you’re curious about. Pick more than one.'
-          )
-        }}
-      </p>
-      <div class="choices" role="group" [attr.aria-label]="text('興味のある分野', 'Interests')">
-        @for (interest of catalog().interests; track interest.id) {
-          <button
-            class="domain"
-            type="button"
-            [class.selected]="interests().includes(interest.id)"
-            [attr.aria-pressed]="interests().includes(interest.id)"
-            (click)="toggleInterest(interest.id)"
-          >
-            <strong>{{ interest.label[language] }}</strong>
-            <span class="indicator" aria-hidden="true"></span>
+    <fieldset class="preference-fields" [disabled]="starting()" [attr.aria-busy]="starting()">
+      <div class="progress">
+        <span>{{ text('ステップ', 'Step') }} {{ step() }} / 2</span>
+        @if (!editing) {
+          <button type="button" class="quick-start" [disabled]="starting()" (click)="quickStart()">
+            {{ text('スキップしてすぐ始める →', 'Skip, just start →') }}
           </button>
         }
       </div>
-      <p class="note">
-        {{
-          text(
-            'JWT、HTTP、マイクロサービスなど、技術の共通知識もフィードに登場します。',
-            'Your feed also includes shared foundations such as JWT, HTTP, and microservices.'
-          )
-        }}
-      </p>
-      <div class="actions">
-        <button
-          class="primary"
-          type="button"
-          [disabled]="!interests().length"
-          (click)="step.set(2)"
-        >
-          {{ text('次へ', 'Continue') }}
-        </button>
-        @if (editing) {
-          <button class="back" type="button" (click)="cancel()">
-            {{ text('変更をキャンセル', 'Cancel changes') }}
-          </button>
-        }
-      </div>
-    } @else {
-      <h1>{{ text('好きな技術から始めよう', 'Start with your technologies') }}</h1>
-      <p class="intro">
-        {{
-          text(
-            '言語やフレームワークを選択できます。選ばずに、一般的な技術から始めても大丈夫です。',
-            'Choose languages and frameworks, or start with general technology questions.'
-          )
-        }}
-      </p>
-      <label class="search-label" for="technology-search">{{
-        text('言語・技術を検索', 'Search languages and technologies')
-      }}</label>
-      <div class="search">
-        <input
-          id="technology-search"
-          type="search"
-          [ngModel]="query()"
-          (ngModelChange)="query.set($event)"
-          maxlength="60"
-          autocomplete="off"
-          [placeholder]="text('例：Python、React、Rust', 'Try Python, React, Rust')"
-        />
-      </div>
-      @if (technologies().length) {
-        <div
-          class="selected-technologies"
-          [attr.aria-label]="text('選択中の技術', 'Selected technologies')"
-        >
-          @for (technology of technologies(); track technology) {
-            <button
-              type="button"
-              (click)="toggleTechnology(technology)"
-              [attr.aria-label]="text('選択を解除：', 'Remove ') + technology"
-            >
-              {{ technology }} <span aria-hidden="true">×</span>
-            </button>
-          }
+      @if (step() === 1) {
+        <div class="onboarding-language">
+          <app-language-picker
+            [language]="language"
+            [selected]="language"
+            [disabled]="starting()"
+            (changed)="settings.setLanguage($event)"
+          />
         </div>
-      }
-      <div
-        class="stack-list"
-        role="group"
-        [attr.aria-label]="text('言語とフレームワーク', 'Languages and frameworks')"
-      >
-        @for (technology of options; track technology) {
-          <button
-            type="button"
-            [class.selected]="technologies().includes(technology)"
-            [attr.aria-pressed]="technologies().includes(technology)"
-            [disabled]="technologies().length >= 40 && !technologies().includes(technology)"
-            (click)="toggleTechnology(technology)"
-          >
-            {{ technology }}
-          </button>
-        }
-      </div>
-      @if (canAdd) {
-        <button
-          class="custom-add"
-          type="button"
-          [disabled]="technologies().length >= 40"
-          (click)="addTechnology()"
-        >
-          {{ text('追加する：', 'Add ') }}{{ query().trim() }}
-        </button>
-      }
-      <p class="note">
-        {{ technologies().length }} / 40
-        {{
-          text(
-            '選択中。見つからない技術は追加できます。',
-            'selected. You can add a technology that isn’t listed.'
-          )
-        }}
-      </p>
-      <fieldset class="difficulty">
-        <legend>{{ text('開始レベル', 'Starting level') }}</legend>
-        <div>
-          @for (level of levels; track level) {
-            <button
-              type="button"
-              [attr.aria-pressed]="difficulty() === level"
-              (click)="difficulty.set(level)"
-            >
-              {{ levelLabel(level) }}
-            </button>
-          }
-        </div>
-      </fieldset>
-      <app-username-setup
-        [language]="language"
-        [showSaveButton]="false"
-        inputId="onboarding-username"
-      />
-      @if (error()) {
-        <p class="error" role="alert">{{ error() }}</p>
-      }
-      <div class="actions">
-        <button class="primary" type="button" [disabled]="starting()" (click)="complete()">
+        <h1 #stepHeading tabindex="-1">
+          {{ text('何を学びたいですか？', 'What would you like to learn?') }}
+        </h1>
+        <p class="intro">
           {{
-            starting() ? text('保存中…', 'Saving…') : text('学習を始める', 'Start learning')
-          }}</button
-        ><button class="back" type="button" [disabled]="starting()" (click)="step.set(1)">
-          {{ text('戻る', 'Back') }}
-        </button>
-      </div>
-    }
+            text(
+              '興味のある分野を選びましょう。いくつでも選べます。',
+              'Choose the areas you’re curious about. Pick more than one.'
+            )
+          }}
+        </p>
+        <div class="choices" role="group" [attr.aria-label]="text('興味のある分野', 'Interests')">
+          @for (interest of catalog().interests; track interest.id) {
+            <button
+              class="domain"
+              type="button"
+              [class.selected]="interests().includes(interest.id)"
+              [attr.aria-pressed]="interests().includes(interest.id)"
+              (click)="toggleInterest(interest.id)"
+            >
+              <strong>{{ interest.label[language] }}</strong>
+              <span class="indicator" aria-hidden="true"></span>
+            </button>
+          }
+        </div>
+        <p class="note">
+          {{
+            text(
+              'JWT、HTTP、マイクロサービスなど、技術の共通知識もフィードに登場します。',
+              'Your feed also includes shared foundations such as JWT, HTTP, and microservices.'
+            )
+          }}
+        </p>
+        <div class="actions">
+          <button
+            class="primary"
+            type="button"
+            [disabled]="!interests().length"
+            (click)="changeStep(2)"
+          >
+            {{ text('次へ', 'Continue') }}
+          </button>
+          @if (editing) {
+            <button class="back" type="button" (click)="cancel()">
+              {{ text('変更をキャンセル', 'Cancel changes') }}
+            </button>
+          }
+        </div>
+      } @else {
+        <h1 #stepHeading tabindex="-1">
+          {{ text('好きな技術から始めよう', 'Start with your technologies') }}
+        </h1>
+        <p class="intro">
+          {{
+            text(
+              '言語やフレームワークを選択できます。選ばずに、一般的な技術から始めても大丈夫です。',
+              'Choose languages and frameworks, or start with general technology questions.'
+            )
+          }}
+        </p>
+        <label class="search-label" for="technology-search">{{
+          text('言語・技術を検索', 'Search languages and technologies')
+        }}</label>
+        <div class="search">
+          <input
+            id="technology-search"
+            type="search"
+            [ngModel]="query()"
+            (ngModelChange)="query.set($event)"
+            maxlength="60"
+            autocomplete="off"
+            [placeholder]="text('例：Python、React、Rust', 'Try Python, React, Rust')"
+          />
+        </div>
+        @if (technologies().length) {
+          <div
+            class="selected-technologies"
+            [attr.aria-label]="text('選択中の技術', 'Selected technologies')"
+          >
+            @for (technology of technologies(); track technology) {
+              <button
+                type="button"
+                (click)="toggleTechnology(technology)"
+                [attr.aria-label]="text('選択を解除：', 'Remove ') + technology"
+              >
+                {{ technology }} <span aria-hidden="true">×</span>
+              </button>
+            }
+          </div>
+        }
+        <div
+          class="stack-list"
+          role="group"
+          [attr.aria-label]="text('言語とフレームワーク', 'Languages and frameworks')"
+        >
+          @for (technology of options; track technology) {
+            <button
+              type="button"
+              [class.selected]="technologies().includes(technology)"
+              [attr.aria-pressed]="technologies().includes(technology)"
+              [disabled]="technologies().length >= 40 && !technologies().includes(technology)"
+              (click)="toggleTechnology(technology)"
+            >
+              {{ technology }}
+            </button>
+          }
+        </div>
+        @if (canAdd) {
+          <button
+            class="custom-add"
+            type="button"
+            [disabled]="technologies().length >= 40"
+            (click)="addTechnology()"
+          >
+            {{ text('追加する：', 'Add ') }}{{ query().trim() }}
+          </button>
+        }
+        <p class="note">
+          {{ technologies().length }} / 40
+          {{
+            text(
+              '選択中。見つからない技術は追加できます。',
+              'selected. You can add a technology that isn’t listed.'
+            )
+          }}
+        </p>
+        <fieldset class="difficulty">
+          <legend>{{ text('開始レベル', 'Starting level') }}</legend>
+          <div>
+            @for (level of levels; track level) {
+              <button
+                type="button"
+                [attr.aria-pressed]="difficulty() === level"
+                (click)="difficulty.set(level)"
+              >
+                {{ levelLabel(level) }}
+              </button>
+            }
+          </div>
+        </fieldset>
+        <app-username-setup
+          [language]="language"
+          [showSaveButton]="false"
+          inputId="onboarding-username"
+        />
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+        <div class="actions">
+          <button class="primary" type="button" [disabled]="starting()" (click)="complete()">
+            {{
+              starting() ? text('保存中…', 'Saving…') : text('学習を始める', 'Start learning')
+            }}</button
+          ><button class="back" type="button" [disabled]="starting()" (click)="changeStep(1)">
+            {{ text('戻る', 'Back') }}
+          </button>
+        </div>
+      }
+    </fieldset>
   </main>
 </div>

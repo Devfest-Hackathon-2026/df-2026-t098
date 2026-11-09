@@ -20,8 +20,12 @@ import { PasswordAuthSessions1793930000000 } from '../migrations/1793930000000-P
 import { LearningEngine1794000000000 } from '../migrations/1794000000000-LearningEngine';
 import { TapQuizLearningLoop1794100000000 } from '../migrations/1794100000000-TapQuizLearningLoop';
 import { QuestionConcepts1794300000000 } from '../migrations/1794300000000-QuestionConcepts';
+import { FixIPv4OctetQuestion1794310000000 } from '../migrations/1794310000000-FixIPv4OctetQuestion';
 import { SocialLearningCommunity1794200000000 } from '../migrations/1794200000000-SocialLearningCommunity';
+import { AccountSafety1794400000000 } from '../migrations/1794400000000-AccountSafety';
 import type { GeneratedQuestion } from '../src/learning/gemini/gemini.types';
+import { readPoolFile } from '../src/learning/question-pool.seeder';
+import { learningWeek } from '../src/learning/learning-calendar';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) {
@@ -137,7 +141,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
   beforeAll(async () => {
     process.env.JWT_SECRET = 'learning-test-only-secret-at-least-32-characters';
     process.env.FRONTEND_URL = origin;
-    // Tests insert their own pool questions so results do not depend on the committed seed.
     process.env.LEARNING_POOL_SEED = 'off';
     setup = new DataSource({
       type: 'postgres',
@@ -169,6 +172,8 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
         TapQuizLearningLoop1794100000000,
         SocialLearningCommunity1794200000000,
         QuestionConcepts1794300000000,
+        FixIPv4OctetQuestion1794310000000,
+        AccountSafety1794400000000,
       ],
     });
     await migrations.initialize();
@@ -558,7 +563,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
       FROM learning_question_progress WHERE user_id = $1 AND question_id = $2`,
       [users[0], question.id],
     );
-    // A miss returns to the feed at the next 09:00 Japan time.
     expect(missed).toEqual({
       box: 1,
       needs_review: true,
@@ -571,7 +575,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
       (await read('/reviews')).body.questions.map((item) => item.id),
     ).toContain(question.id);
 
-    // Solving it right away (the in-session retry) clears it from Practice without new XP.
     const relearn = await write(`/questions/${question.id}/taps`, {
       choice: 1,
     }).expect(200);
@@ -739,7 +742,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
     expect(
       (await write(`/questions/${missed.id}/taps`, { choice: 0 })).body.correct,
     ).toBe(false);
-    // Not due yet: it waits for the next 09:00.
     const early = await write('/feed/batches', {
       requestId: randomUUID(),
       language: 'ja',
@@ -747,7 +749,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
     expect(
       early.body.reviewQuestions.map((question) => question.id),
     ).not.toContain(missed.id);
-    // 09:00 arrives.
     await database.query(
       `UPDATE learning_question_progress SET due_at = now() - interval '1 minute'
       WHERE user_id = $1 AND question_id = $2`,
@@ -765,7 +766,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
     );
     expect(review.review).toMatchObject({ box: 1 });
     expect(review.reason).toEqual({ kind: 'review', topic: null });
-    // Served once today; if skipped it returns at the next 09:00, not in every batch.
     const [served] = await database.query(
       `SELECT due_at > now() AS later,
         to_char(due_at AT TIME ZONE 'Asia/Tokyo','HH24:MI') AS local_time
@@ -780,7 +780,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
     expect(
       (await read('/reviews')).body.questions.map((item) => item.id),
     ).toContain(missed.id);
-    // Practice questions can be retried any time; a correct answer clears them.
     const solved = await write(`/questions/${missed.id}/taps`, {
       choice: 1,
     }).expect(200);
@@ -968,7 +967,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
 
   it('counts retries of the same failed provider request against the per-user budget', async () => {
     const operations = app.get(LearningOperationsService);
-    // Use a separate fixture user so previous success requests do not affect this boundary.
     const [user] = await database.query(
       `INSERT INTO users (email,username) VALUES ($1,$2) RETURNING id`,
       [
@@ -1430,7 +1428,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
       topics: ['variety'],
       code: null,
       codeLanguage: null,
-      // Older rows have no concept key; this test covers the wording-based comparison.
       concept: null,
       prompt:
         'Why does a secure website use HTTPS instead of HTTP when handling personal user data? Choose the best explanation.',
@@ -1502,7 +1499,6 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
       codeLanguage: null,
       concept: null,
     });
-    // Only public question content reaches generation (concept is public on every question).
     expect(
       generationContext.every(
         (question) =>
@@ -1535,5 +1531,64 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
       },
       1,
     ).expect(400);
+  });
+
+  it('assigns unique places and gives the earlier XP total priority', async () => {
+    const later = '00000000-0000-4000-8000-000000000001';
+    const earlier = '00000000-0000-4000-8000-000000000002';
+    await database.getRepository(UserEntity).insert([
+      { id: later, email: 'ranking-later@example.test' },
+      { id: earlier, email: 'ranking-earlier@example.test' },
+    ]);
+    const questionId = await app.get(QuestionsService).insert(database.manager, generated()[0], 'ai', null);
+    const week = learningWeek();
+    await database.query(
+      `INSERT INTO learning_taps (user_id, question_id, choice, correct, xp_awarded, day, created_at)
+       VALUES ($1,$3,0,true,5,$4,$5), ($2,$3,0,true,5,$4,$6)`,
+      [
+        later, earlier, questionId, week,
+        `${week}T10:00:00+09:00`, `${week}T09:00:00+09:00`,
+      ],
+    );
+    const ranking = (await read('/leaderboard').expect(200)).body.entries;
+    expect(ranking.map((entry) => entry.rank)).toEqual(ranking.map((_, index) => index + 1));
+    expect(
+      ranking.filter((entry) => [earlier, later].includes(entry.user.id)).map((entry) => entry.user.id),
+    ).toEqual([earlier, later]);
+  });
+
+  it('repairs the saved IPv4 quiz while preserving its correct answer position and tap', async () => {
+    const id = '48a72346-5684-4d6d-b79d-502bb9579f67';
+    const seed = readPoolFile()!.questions.find((question) => question.id === id)!;
+    const oldPrompt = 'Which line contains an invalid character that causes this IPv4 address check to fail? Select the buggy line number and explain why.';
+    await database.query(
+      `INSERT INTO learning_questions
+        (id,title,prompt,code,code_language,topics,difficulty,language,source,reference_answer,rubric,
+         format,options,correct_option,quick_explanation)
+       VALUES ($1,'Invalid Character in IPv4 Address',$2,$3,'javascript',ARRAY['networking'],
+         'beginner','en','ai','Old reference','[]','spot_bug','["1","2","3","4"]',3,'Old feedback')`,
+      [id, oldPrompt, seed.code],
+    );
+    await database.query(
+      `INSERT INTO learning_taps (user_id,question_id,choice,correct,xp_awarded,day)
+       VALUES ($1,$2,3,true,5,$3)`,
+      [users[0], id, learningWeek()],
+    );
+    const runner = database.createQueryRunner();
+    try {
+      await new FixIPv4OctetQuestion1794310000000().up(runner);
+    } finally {
+      await runner.release();
+    }
+    const result = (await read('/questions/' + id).expect(200)).body.question;
+    expect(result).toMatchObject({
+      title: seed.title,
+      prompt: seed.prompt,
+      format: 'choice',
+      options: ['1', '2', '3', '4'],
+      tap: { choice: 3, correct: true, correctOption: 3, quickExplanation: seed.quickExplanation },
+    });
+    const [stored] = await database.query('SELECT xp_awarded FROM learning_taps WHERE question_id = $1', [id]);
+    expect(stored.xp_awarded).toBe(5);
   });
 });

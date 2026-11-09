@@ -14,7 +14,7 @@ export class LanguagePicker {
   readonly changed = output<Language>();
 
   restoreSelection(language: Language): void {
-    // An immediate failed save can settle before Angular renders the temporary selection.
+    // The save can fail before Angular paints the new selection.
     for (const input of this.element.nativeElement.querySelectorAll<HTMLInputElement>('input')) {
       input.checked = input.value === language;
     }

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
@@ -15,7 +16,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import type { Request, Response } from 'express';
 import { SignupDto } from './dto/signup.dto';
@@ -96,6 +97,20 @@ export class AuthController {
     }
 
     return this.authService.getCurrentUser(req.user.sub);
+  }
+
+  @Delete('me')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(204)
+  @UseGuards(JwtGuard, AuthOriginGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  async deleteAccount(
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    if (!req.user) throw new UnauthorizedException('User not authenticated');
+    await this.authService.deleteAccount(req.user.sub);
+    res.clearCookie('access_token', COOKIE_OPTIONS);
   }
 
   @Patch('me/username')

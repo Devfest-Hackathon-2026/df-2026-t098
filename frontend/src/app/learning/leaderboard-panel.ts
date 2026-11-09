@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, inject, input, output, signal } from '@angular/core';
 import { Icon } from './icon';
 import { LoadingSkeleton } from './loading-skeleton';
 import { AuthSession } from '../auth/auth-session';
@@ -79,13 +79,16 @@ import type { Language, Leaderboard } from './learning.types';
             <span>{{ entry.xp }} XP</span>
           </li>
         } @empty {
-          <li>
+          <li class="empty">
             {{
               text(
                 '今週の学習はここから。最初の問題に挑戦しよう。',
                 'A fresh week. Be the first to work through a question.'
               )
             }}
+            <button class="signin-cta" type="button" (click)="startLearning.emit()">
+              {{ text('問題に挑戦する', 'Start a question') }}
+            </button>
           </li>
         }
       </ol>
@@ -100,6 +103,11 @@ import type { Language, Leaderboard } from './learning.types';
   styleUrls: ['./learning-panels.css'],
   styles: [
     `
+      li.empty {
+        display: grid;
+        justify-items: start;
+        gap: 4px;
+      }
       .daily {
         margin: 24px 0 8px;
         padding: 16px 18px;
@@ -111,7 +119,7 @@ import type { Language, Leaderboard } from './learning.types';
         align-items: center;
         gap: 8px;
         margin: 0 0 4px;
-        font-size: 18px;
+        font-size: 1.125rem;
       }
       .daily h2 app-icon {
         color: var(--accent);
@@ -125,7 +133,7 @@ import type { Language, Leaderboard } from './learning.types';
         border-radius: 50%;
         background: var(--border);
         color: var(--text);
-        font-size: 11px;
+        font-size: 0.6875rem;
         font-weight: 700;
       }
       .place[data-place='1'] {
@@ -147,7 +155,7 @@ import type { Language, Leaderboard } from './learning.types';
         margin: 12px 0 0;
         padding: 0;
         list-style: none;
-        font-size: 13px;
+        font-size: 0.8125rem;
       }
       .solvers li {
         padding: 4px 10px;
@@ -174,16 +182,16 @@ import type { Language, Leaderboard } from './learning.types';
       .ranking strong {
         flex: 1;
         min-width: 0;
-        font-size: 15px;
+        font-size: 0.9375rem;
         overflow-wrap: anywhere;
       }
       .ranking li > span:last-child {
         white-space: nowrap;
-        font-size: 13px;
+        font-size: 0.8125rem;
       }
       .ranking small {
         color: var(--muted);
-        font-size: 11px;
+        font-size: 0.6875rem;
         font-weight: 400;
       }
       .ranking .you {
@@ -194,6 +202,7 @@ import type { Language, Leaderboard } from './learning.types';
 })
 export class LeaderboardPanel {
   readonly language = input<Language>('ja');
+  readonly startLearning = output<void>();
   protected readonly session = inject(AuthSession);
   protected readonly feed = inject(FeedStore);
   private readonly api = inject(LearningApi);

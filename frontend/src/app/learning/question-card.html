@@ -8,8 +8,12 @@
   [attr.data-question-id]="question().id"
 >
   <div
+    #stageViewport
     class="question-content"
     data-testid="question-stage"
+    (pointerdown)="onContentPointerDown($event)"
+    (pointermove)="onContentPointerMove($event)"
+    (pointercancel)="cancelContentPointer()"
     (dblclick)="doubleClickLike($event)"
     (pointerup)="onContentPointerUp($event)"
   >
@@ -26,6 +30,98 @@
         </span>
       }
     }
+    <div #stageMeasure class="question-stage-natural" [style.--question-density]="density()">
+      <ng-container [ngTemplateOutlet]="questionStage" />
+    </div>
+  </div>
+  <div class="card-actions">
+    <button
+      type="button"
+      (click)="toggleLike()"
+      [disabled]="liking()"
+      [attr.aria-pressed]="liked()"
+      [attr.aria-label]="text('いいね', 'Like')"
+    >
+      <app-icon name="like" /><span>{{ likes() }}</span>
+    </button>
+    <button
+      #commentsButton
+      type="button"
+      (click)="toggleComments()"
+      [attr.aria-expanded]="discussion()"
+      [attr.aria-controls]="'discussion-' + controlId()"
+      [attr.aria-label]="text('コメント', 'Comments')"
+    >
+      <app-icon name="comment" /><span>{{ text('コメント', 'Comments') }}</span>
+    </button>
+    <button type="button" (click)="share()" [attr.aria-label]="text('共有', 'Share')">
+      <app-icon name="share" /><span>{{ text('共有', 'Share') }}</span>
+    </button>
+    <button
+      class="save-button"
+      type="button"
+      (click)="toggleSave()"
+      [disabled]="saving()"
+      [attr.aria-pressed]="saved()"
+      [class.is-saved]="saved()"
+    >
+      <app-icon name="save" /><span>{{
+        saved() ? text('保存済み', 'Saved') : text('保存', 'Save')
+      }}</span>
+    </button>
+  </div>
+  <div class="question-answer">
+    @if (pagedCompact()) {
+      @if (socialError() || shareMessage() || shareUrl()) {
+        <button class="card-notice" type="button" (click)="openDetails('info', $event)">
+          {{
+            socialError()
+              ? text('操作できませんでした。詳細を見る', 'Action failed. View details')
+              : text('共有の詳細を見る', 'View sharing details')
+          }}
+        </button>
+      }
+    } @else {
+      <ng-container [ngTemplateOutlet]="socialFeedback" />
+    }
+    @if (compact()) {
+      <div class="mobile-learning-actions">
+        <button
+          class="deeper-button explain"
+          type="button"
+          (click)="openExplain()"
+          [attr.aria-label]="text('なぜ？を説明する', 'Explain why')"
+        >
+          <app-icon name="pencil" aria-hidden="true" /><span>{{
+            text('なぜ？', 'Explain why')
+          }}</span>
+        </button>
+        @if (revealed()) {
+          <button
+            class="deeper-button ask"
+            type="button"
+            (click)="openAsk($event)"
+            [attr.aria-label]="text('まだモヤモヤ？', 'Still confused?')"
+          >
+            <app-icon name="comment" aria-hidden="true" /><span>{{
+              text('質問する', 'Ask Gemini')
+            }}</span>
+          </button>
+        }
+        <button
+          class="deeper-button info"
+          type="button"
+          (click)="openDetails('info', $event)"
+          [attr.aria-label]="text('問題の詳細', 'Question details')"
+        >
+          <span>{{ text('詳細', 'Details') }}</span>
+        </button>
+      </div>
+    } @else {
+      <ng-container [ngTemplateOutlet]="learningBody" />
+    }
+  </div>
+  <ng-template #questionStage let-inSheet="inSheet">
     <div class="question-meta">
       @if (reasonChip; as chip) {
         <span class="reason-chip" [class.reason-daily]="daily()"
@@ -110,7 +206,8 @@
     @if (tappable() && !codeLines()) {
       <div
         class="quiz-options"
-        [class.two-up]="question().format === 'true_false'"
+        [class.binary]="question().format === 'true_false'"
+        [class.two-up]="question().format === 'true_false' || twoColumnChoices()"
         role="group"
         [attr.aria-label]="text('答えを選ぶ', 'Choose an answer')"
         (keydown)="onOptionsKeydown($event)"
@@ -140,7 +237,13 @@
     }
     @if (tapError()) {
       <div class="tap-recovery" data-testid="tap-recovery">
-        <p class="error" role="alert">{{ tapError() }}</p>
+        <p class="error" role="alert">
+          {{
+            pagedCompact() && !inSheet
+              ? text('回答を送信できませんでした。', 'Could not submit your answer.')
+              : tapError()
+          }}
+        </p>
         @if (tapSignIn()) {
           <a routerLink="/login" [queryParams]="{ returnTo: '/questions/' + question().id }">{{
             text('ログインして回答する', 'Sign in to answer')
@@ -152,6 +255,9 @@
         }
       </div>
     }
+    @if (pagedCompact() && !inSheet && tappable() && !tap() && !tapError()) {
+      <div class="reveal-slot" aria-hidden="true"></div>
+    }
     @if (tap(); as result) {
       <section class="reveal" [class.correct]="result.correct" aria-live="polite">
         <div class="reveal-heading">
@@ -162,7 +268,7 @@
             <span class="xp-float" aria-label="XP">+{{ tapXp() }} XP</span>
           }
           @if (nextable()) {
-            <button type="button" class="next-button" (click)="next.emit()">
+            <button type="button" class="next-button" (click)="nextQuestion()">
               {{ text('次へ', 'Next') }} <span aria-hidden="true">↓</span>
             </button>
           }
@@ -174,47 +280,32 @@
             }}</span>
           }
         </div>
-        <p>{{ result.quickExplanation }}</p>
+        @if (pagedCompact() && inSheet) {
+          <dl class="answer-summary">
+            <div>
+              <dt>{{ text('正解', 'Correct answer') }}</dt>
+              <dd>{{ answerLabel(result.correctOption) }}</dd>
+            </div>
+            @if (!result.correct) {
+              <div>
+                <dt>{{ text('あなたの回答', 'Your answer') }}</dt>
+                <dd>{{ answerLabel(result.choice) }}</dd>
+              </div>
+            }
+          </dl>
+        }
+        @if (!pagedCompact() || inSheet) {
+          <p>{{ result.quickExplanation }}</p>
+        }
+        @if (pagedCompact() && !inSheet) {
+          <button class="review-question" type="button" (click)="openDetails('question', $event)">
+            {{ text('解説を見る', 'Read feedback') }}
+          </button>
+        }
       </section>
     }
-  </div>
-  <div class="card-actions">
-    <button
-      type="button"
-      (click)="toggleLike()"
-      [disabled]="liking()"
-      [attr.aria-pressed]="liked()"
-      [attr.aria-label]="text('いいね', 'Like')"
-    >
-      <app-icon name="like" /><span>{{ likes() }}</span>
-    </button>
-    <button
-      #commentsButton
-      type="button"
-      (click)="toggleComments()"
-      [attr.aria-expanded]="discussion()"
-      [attr.aria-controls]="'discussion-' + controlId()"
-      [attr.aria-label]="text('コメント', 'Comments')"
-    >
-      <app-icon name="comment" /><span>{{ text('コメント', 'Comments') }}</span>
-    </button>
-    <button type="button" (click)="share()" [attr.aria-label]="text('共有', 'Share')">
-      <app-icon name="share" /><span>{{ text('共有', 'Share') }}</span>
-    </button>
-    <button
-      class="save-button"
-      type="button"
-      (click)="toggleSave()"
-      [disabled]="saving()"
-      [attr.aria-pressed]="saved()"
-      [class.is-saved]="saved()"
-    >
-      <app-icon name="save" /><span>{{
-        saved() ? text('保存済み', 'Saved') : text('保存', 'Save')
-      }}</span>
-    </button>
-  </div>
-  <div class="question-answer">
+  </ng-template>
+  <ng-template #socialFeedback>
     @if (socialError()) {
       <p class="error" role="alert">{{ socialError() }}</p>
     }
@@ -227,44 +318,11 @@
         }}<input readonly [value]="shareUrl()" (focus)="$any($event.target).select()"
       /></label>
     }
-    @if (compact()) {
-      <div class="mobile-learning-actions">
-        <button
-          class="deeper-button explain"
-          type="button"
-          (click)="openExplain()"
-          [attr.aria-label]="text('なぜ？を説明する', 'Explain why')"
-        >
-          <app-icon name="pencil" aria-hidden="true" /><span>{{
-            text('なぜ？', 'Explain why')
-          }}</span>
-        </button>
-        @if (revealed()) {
-          <button
-            class="deeper-button ask"
-            type="button"
-            (click)="openAsk($event)"
-            [attr.aria-label]="text('まだモヤモヤ？', 'Still confused?')"
-          >
-            <app-icon name="comment" aria-hidden="true" /><span>{{
-              text('質問する', 'Ask Gemini')
-            }}</span>
-          </button>
-        }
-        <button
-          class="deeper-button info"
-          type="button"
-          (click)="openDetails('info', $event)"
-          [attr.aria-label]="text('問題の詳細', 'Question details')"
-        >
-          <span>{{ text('詳細', 'Details') }}</span>
-        </button>
-      </div>
-    } @else {
-      <ng-container [ngTemplateOutlet]="learningBody" />
-    }
-  </div>
+  </ng-template>
   <ng-template #learningBody>
+    @if (pagedCompact() && detailMode() === 'info') {
+      <ng-container [ngTemplateOutlet]="socialFeedback" />
+    }
     @if (!compact() && tappable() && !explainOpen() && !result()) {
       <div class="deeper" [class.ready]="revealed()">
         <button type="button" class="deeper-button explain" (click)="openExplain()">
@@ -552,6 +610,9 @@
               </option>
               <option value="unclear">{{ text('内容が分かりにくい', 'Unclear wording') }}</option>
               <option value="outdated">{{ text('情報が古い', 'Outdated information') }}</option>
+              <option value="inappropriate">
+                {{ text('不適切・攻撃的な内容', 'Offensive or inappropriate content') }}
+              </option>
             </select>
             <label [for]="'report-details-' + controlId()">{{
               text('補足（任意）', 'Details (optional)')
@@ -587,6 +648,39 @@
               {{ reporting() ? text('送信中…', 'Sending…') : text('報告を送信', 'Submit report') }}
             </button>
           </form>
+          @if (blockableAuthor; as author) {
+            <div class="question-block" data-testid="block-author">
+              @if (!blockConfirm()) {
+                <button class="secondary" type="button" (click)="blockConfirm.set(true)">
+                  {{ text(author.displayName + 'をブロック', 'Block ' + author.displayName) }}
+                </button>
+              } @else {
+                <p>
+                  {{
+                    text(
+                      author.displayName + 'さんをブロックしますか？ このユーザーのコメントと質問は表示されなくなります。',
+                      'Block ' + author.displayName + '? Their comments and questions will be hidden.'
+                    )
+                  }}
+                </p>
+                <button
+                  class="secondary danger"
+                  type="button"
+                  data-testid="confirm-block-author"
+                  [disabled]="blocking()"
+                  (click)="blockAuthor(author)"
+                >
+                  {{ blocking() ? text('ブロック中…', 'Blocking…') : text('ブロックする', 'Block') }}
+                </button>
+                <button class="secondary" type="button" [disabled]="blocking()" (click)="blockConfirm.set(false)">
+                  {{ text('キャンセル', 'Cancel') }}
+                </button>
+              }
+              @if (blockError()) {
+                <p class="error" role="alert">{{ blockError() }}</p>
+              }
+            </div>
+          }
         } @else {
           <p class="guest-note">
             <a routerLink="/login">{{ text('ログインして報告', 'Sign in to report a problem') }}</a>
@@ -618,7 +712,18 @@
           <app-icon name="close" />
         </button>
       </header>
-      <div class="learning-details-body"><ng-container [ngTemplateOutlet]="learningBody" /></div>
+      <div class="learning-details-body">
+        @if (detailMode() === 'question') {
+          <div class="full-question-stage">
+            <ng-container
+              [ngTemplateOutlet]="questionStage"
+              [ngTemplateOutletContext]="{ inSheet: true }"
+            />
+          </div>
+        } @else {
+          <ng-container [ngTemplateOutlet]="learningBody" />
+        }
+      </div>
     </dialog>
   }
   <app-question-discussion

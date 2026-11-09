@@ -1,0 +1,13 @@
+WHYLINT_GOOGLE_IOS_CLIENT_ID = 8715935974-vj9r1bfgfnfm2pcav72hmkpc8iqf0bqq.apps.googleusercontent.com
+WHYLINT_GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.8715935974-vj9r1bfgfnfm2pcav72hmkpc8iqf0bqq
+WHYLINT_GOOGLE_SERVER_CLIENT_ID = 8715935974-egdfj9tf8e1p71jjr2befadf47cne86l.apps.googleusercontent.com
+
+// Where the owner publishes the privacy policy and terms (`/privacy` and `/terms` are appended)
+// and how learners reach support. Both are shown in the app and left out when empty.
+WHYLINT_LEGAL_URL = https:/$()/whylint-8715935974.asia-northeast1.run.app
+WHYLINT_SUPPORT_CONTACT =
+// Debug builds and UI tests show a reserved example address so the row is visible; Release stays
+// empty until the owner sets the real contact.
+WHYLINT_SUPPORT_CONTACT[config=Debug] = support@example.test
+
+#include? "GoogleSignIn.local.xcconfig"

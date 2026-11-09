@@ -9,13 +9,6 @@ import { DataSource } from 'typeorm';
 const PROBE_TIMEOUT_MS = 2_000;
 const RESULT_TTL_MS = 2_000;
 
-/**
- * Probes for the load balancer and uptime checks. They are public, so they return a fixed
- * body and never include configuration or error text.
- *
- *   GET /api/v1/health        the process is up (no database access)
- *   GET /api/v1/health/ready  the database answers; 503 otherwise
- */
 @Controller('health')
 export class HealthController {
   private checkedAt = 0;
@@ -38,7 +31,7 @@ export class HealthController {
     return { status: 'ok' };
   }
 
-  /** Shares one probe between concurrent callers and remembers the answer briefly. */
+  // Reuse one probe for simultaneous readiness requests.
   private databaseReachable(): Promise<boolean> {
     if (Date.now() - this.checkedAt < RESULT_TTL_MS)
       return Promise.resolve(this.lastReachable);

@@ -885,3 +885,237 @@ verified resolution status.
 - Cloud Run needs its matching Google OAuth client ID and client secret. Register the
   deployed callback with Google and verify a real login separately after deployment.
 
+# Mobile feed paging and UI audit remediation — 2026-11-08
+
+- The compact Feed uses one fixed-height slide per available viewport. A short
+  vertical touch gesture advances exactly one lesson, reverse gestures return one,
+  and long flings do not skip lessons. Horizontal code pans, pinch zoom, cancelled
+  gestures, form controls, and open-sheet scrolling retain their own behavior.
+  A consumed swipe must not submit an answer through a compatibility click.
+- Primary question cards fit before and after answering, including network error
+  recovery. The complete prompt, code, and choices stay inline. Use measured
+  typography, tighter spacing, and suitable columns to fit the stage. Detailed
+  feedback remains optional in the existing sheet. Record dense-content reading
+  and target-size tradeoffs explicitly in the audit.
+- Preserve the active item across viewport/reading-size changes and pruning.
+  Record Feed position only while Feed is the active tab.
+- Remediate the audited recovery and task-state problems. Shared lessons expose
+  session failure and retry. Publication drafts survive tab changes per account.
+  Comments stay usable at short viewport heights. Onboarding step changes restore
+  heading focus and top position, long technology chips wrap, and save snapshots
+  cannot diverge from editable controls. Auth uses shared display settings.
+- Verify all homepage tabs and public/auth/onboarding routes in both languages,
+  themes, reading sizes, narrow/short phone and desktop viewports. Add specific
+  touch-event regressions for small/reverse/long/cancelled swipes, answer taps,
+  modal isolation, resize alignment, and full-question access. Use disposable
+  PostgreSQL and isolated external services for repeatable browser tests.
+- Record the audit coverage, fixed findings, and remaining device checks in docs.
+  Physical iPhone swipe feel, IME behavior, and VoiceOver still require verification.
+
+- Verification for the mobile paging remediation completed on 2026-11-09. All288
+  frontend unit tests passed, as did application/spec TypeScript checks and the
+  production build. The isolated4300 browser run passed56 tests, with two mobile-only
+  cases skipped in the desktop project and ten port4200 Google fixture cases excluded.
+  The final paging subset passed after adding Larger-text and landscape assertions.
+- The audit and resolution matrix are in docs/ui-ux-audit-2026-11-08.md. Remaining
+  device checks and lower-priority findings are explicitly listed there.
+# Inline question sizing correction — 2026-11-09
+
+- Keep the complete question and its answer choices visible directly in the compact
+  feed. The user rejected replacing them with a preview or required question sheet.
+- Fit the available stage using smaller typography, tighter spacing, compact code
+  rows, and suitable choice columns. Measure actual rendered content and converge
+  without repeated resizing loops. Keep horizontal code panning and short vertical
+  feed paging. Preserve code and choices after answering as well.
+- Optional metadata and detailed feedback can use the existing Details surface.
+  Validate complete prompt/choice/code geometry at phone sizes, including the
+  densest supported seed questions, Larger text, and landscape. Record any case
+  that exceeds the verified readable sizing range rather than claiming universal fit.
+
+
+- Inline fit verification covers six existing seed questions, including the17-line
+  Kubernetes example, at320×568,390×844, and844×390, plus Larger text. Exceptional
+  density can reach8px prompt/choices and6px code, with32px bug-line targets. This
+  is a documented readability/accessibility tradeoff on tiny screens. The complete
+  question and choices remain inline at every tested size.
+
+## Audit fixes, feed paging, and native audit — 2026-11-09
+
+- **Feed paging.** Touch paging on the homepage feed uses `touch-action: pinch-zoom` on the card
+  content so the browser no longer claims the vertical pan, and the release is our own animation
+  (`settleTo`): it follows the flick velocity, is interruptible by the next touch, and only starts a
+  page change when the drag is mostly vertical. Covered by `e2e/tests/feed-paging.spec.ts`.
+- **Reading floors supersede the earlier tiny-screen tradeoff.** The card fitter scales within
+  0.72–1.2 and stops at a 13 px reading floor for prompt and choices (11 px for code). Below that
+  the card scrolls inside instead of shrinking, so the "8 px prompt / 6 px code" case recorded in the
+  inline-fit note above no longer applies. Answer targets keep 44 px minimums in the paged card.
+- **Answered state.** Answered code lines keep full strength (tinted correct/wrong); only unpicked
+  lines dim to 0.6.
+- **Guest CTA and theme switch.** `.signin-cta` is a 48 px button; `switchTheme` suspends transitions
+  for the frame so the whole page changes together.
+- **Verification.** Frontend unit 226/226; production build 280.41 kB with no budget warning;
+  Playwright 51 pass, 3 skipped, 10 Google-fixture tests that need port 4200 (same as before).
+- **Native audit.** `docs/native-audit-2026-11-09.md` records the UI/UX and production-readiness
+  audit of the SwiftUI and Compose apps: six store blockers (account deletion, comment reporting and
+  blocking, privacy policy links, Sign in with Apple, iOS privacy manifest/export compliance/iPad
+  orientations, Android signing/AAB), a 32-check mobile auth boundary probe, the iOS launch-screen
+  white flash, iOS answer-pick marking and VoiceOver state, and the iOS UI tests being tied to
+  Japanese strings. `docs/production-readiness.md` and `docs/ui-ux-audit-2026-11-09.md` link to it.
+  No application source changed in that pass.
+
+## Native fix pass — 2026-11-09
+
+Small issues from `docs/native-audit-2026-11-09.md`, fixed in `native/ios` and `native/android`:
+
+- **Answer states.** iOS and Android mark the learner's wrong pick (red tint, ×) as well as the
+  correct line or choice (green tint, ✓), so the result no longer relies on color. iOS reads the pick
+  from `tap.choice`, so restored answers are marked. Rows and choices expose "Your answer,
+  correct/incorrect" or "Correct answer" to VoiceOver and TalkBack; iOS also announces the result.
+  Choice buttons reserve a fixed 20 pt result slot so text does not re-wrap. On Android the code block
+  rows share one width, at least the card width, so highlights span the whole line.
+- **iOS feedback.** Success/error notification haptics replace one light impact; row, choice and
+  banner states ease in over 180 ms and skip the animation under Reduce Motion.
+- **Android banner** has the result icon and the same Japanese copy as iOS (`おしい！`).
+- **iOS launch and App Store files.** `LaunchBackground` color asset (light `#F3F5F0`, dark
+  `#080808`) for `UILaunchScreen`; `PrivacyInfo.xcprivacy` (UserDefaults `CA92.1`, no tracking,
+  email, name, user ID, user content, product interaction); `ITSAppUsesNonExemptEncryption = NO`;
+  four iPad orientations. The data types and the encryption answer are a reading of the code and need
+  the owner's review before submission.
+- **Logout** clears the local token first and revokes on the server best-effort, on both platforms,
+  so an offline logout no longer leaves the learner signed in.
+- **iOS UI tests.** DEBUG launch argument `--language ja|en` (in memory only; init does not persist
+  it) is pinned in every test, the outcome assertion accepts both labels, and a new assertion checks
+  the VoiceOver value of the learner's own answer. 8 of 8 pass.
+- **Xcode project.** `project.yml` does not carry the signing team, so `xcodegen generate` drops
+  `DEVELOPMENT_TEAM`. The project was regenerated, the team restored by hand, and only the privacy
+  manifest entries were added. Put the team in a local xcconfig before regenerating again.
+- **Not done / not verified.** Android haptics and animation, XP float, offline logout on a device,
+  VoiceOver and TalkBack sessions, any physical device, App Store validation.
+
+## Store blockers N1–N3: account deletion, UGC safety, legal links — 2026-11-09
+
+Closes the first three store-submission blockers from `docs/native-audit-2026-11-09.md` on the
+backend, the web app, iOS and Android. Nothing is committed.
+
+### N1 — account deletion
+
+- `DELETE /auth/me` (`auth.controller.ts`, `AuthService.deleteAccount`). Guards: `JwtGuard`,
+  `AuthOriginGuard`, `ThrottlerGuard` at 3 calls a minute per address. A bearer session needs no
+  Origin; a cookie session needs the web origin; a bearer request carrying a cookie is refused.
+  It answers 204 with `Cache-Control: no-store` and clears the web cookie.
+- In one transaction the user row is locked (`FOR UPDATE`, so in-flight writes finish first), every
+  session is revoked (`SessionsService.revokeAll`) and the user is deleted. Foreign keys cascade to
+  preferences, operations, attempts/XP, taps, progress, reactions, comments, helpful votes, reports and
+  blocks. `learning_questions.author_id` and `generated_for` already `SET NULL`, so **published
+  questions stay, detached from the person** (`author: null`). Replies others wrote under a deleted
+  learner's comment go with that comment (`parent_id` cascades). The integration suite asserts that
+  every foreign key to `users` is `CASCADE` or `SET NULL`, so a future table cannot block deletion.
+- Clients clear their token only after the 204. Web: Profile → "Delete account" with an inline
+  confirmation; iOS: Profile alert; Android: Profile dialog. All say what is deleted, that it cannot be
+  undone and that published questions remain without a name. ja/en.
+
+### N2 — user-generated content safety
+
+- Migration `1794400000000-AccountSafety`: `learning_comment_reports` (reasons `spam`, `harassment`,
+  `inappropriate`, `other`; one open report per user, comment and reason), `learning_user_blocks`
+  (`blocker_id`, `blocked_id`, no self-blocks) and an `inappropriate` reason for question reports.
+- `POST /learning/questions/:id/comments/:commentId/reports` mirrors the question report route.
+  You cannot report your own, a deleted or a misfiled comment. The server then **hides the reported
+  comment (and the replies under it) from the reporter**.
+- `GET /learning/blocks`, `PUT/DELETE /learning/blocks/:userId`. A block hides, for the blocker only,
+  the blocked learner's comments (and replies under their comments), published questions (every list,
+  the question URL answers 404, saved and practice lists) and public creator page (404). Server side
+  in `CommunityService` and a derived table in `QuestionsService.list`.
+- Clients: report sheet on each other learner's comment (web inline form, iOS sheet, Android inline
+  form), "Block" with confirmation on comments and on a community question's details, "Blocked
+  learners" list with Unblock in Profile. A block removes that learner's questions from the lists the
+  client already holds (web replaces feed slides with a notice so paging does not move).
+- Support contact: `SUPPORT_CONTACT` (web, via `GET /api/v1/config`), `WHYLINT_SUPPORT_CONTACT`
+  (iOS xcconfig, Android Gradle property), shown in Profile. Not done: the content filter the audit also
+  lists (comments are unfiltered; published questions pass the existing Gemini review), a moderation
+  review queue, and blocked learners still appear on the weekly ranking.
+
+### N3 — privacy policy and terms links
+
+- No policy text exists in the code. Links come from configuration: backend `LEGAL_BASE_URL` (web,
+  `GET /api/v1/config`, hidden while unset, HTTPS or localhost only), iOS `WHYLINT_LEGAL_URL` in
+  `Config.xcconfig` and Android `-PWHYLINT_LEGAL_URL`, both defaulting to the Cloud Run origin. Each
+  appends `/privacy` and `/terms`. Shown on the sign-in screen (web login and sign-up pages, iOS
+  `AuthView`, Android `AuthScreen`) and in Profile.
+- The Release support contact defaults to empty (hidden); Debug builds and the test stacks use the
+  reserved `support@example.test`.
+
+### Verified results — N1–N3
+
+- Backend: `tsc` clean; unit tests 292/292 (26 suites, +23); integration 64/64 on a disposable PostgreSQL
+  (13 new in `test/account-safety.e2e-spec.ts`: migration down/up keeping the older report reasons,
+  comment reports, blocking of comments/replies/questions/creator page/saved list, deletion of every
+  user-owned table through a bearer with no Origin and through a cookie with the web origin, the foreign-key
+  guard, the rate limit). The older `learning.e2e-spec.ts` lists migrations by hand and now includes the new one.
+- Web: unit tests 249/249 (22 files); production build 281.13 kB initial, no budget warning; Playwright
+  57 passed, 3 skipped, and the same 10 Google-fixture cases that need port 4200 failed (baseline). Six of
+  the passes are the new `tests/store-safety.spec.ts` on both projects.
+- iOS: builds for the Simulator; UI tests 11/11 on iPhone 17 against the disposable stack, three of them new
+  (legal links and support contact, deletion with cancel then confirm, report → block → unblock).
+- Android: `assembleDebug`, `assembleRelease` and `lintDebug` pass (0 errors, 42 warnings). **The UI was not
+  run**: the emulator would not start in this session. `qa/safety_smoke.py` covers the same flows and
+  needs a run before submission.
+- Run the stacks from a shell without `HTTP_PROXY`/`HTTPS_PROXY`; with them the Gemini fixture cannot
+  intercept calls and the assessment UI tests time out.
+- **Not verified:** physical devices, VoiceOver and TalkBack, a real Google or Gemini call, App Store
+  Connect and Play validation, the Docker image, the production Cloud Run service (the migration has not been
+  applied there; the apps and the web app need `AccountSafety1794400000000` deployed first).
+- **Owner decisions:** publish the documents and set `LEGAL_BASE_URL`/`WHYLINT_LEGAL_URL`; set the real
+  support contact; confirm that anonymising published questions (instead of deleting them) on account deletion
+  matches the privacy policy; review the privacy-manifest data types (unchanged by this work).
+
+## Account and app settings — 2026-11-09
+
+- On web, iOS and Android, the signed-in account card opens Account settings. The card keeps the
+  avatar, name, email and username, with a chevron to show that the whole row opens a screen.
+- Account settings holds the public profile link, username setup, learning interests, blocked
+  learners, sign-out and account deletion. Delete still requires explicit confirmation.
+- Appearance, text size and display language stay in App settings on Profile. Progress, saved
+  questions, legal links and support are still reachable from Profile. Guests keep sign-in and their
+  learning interests entry point.
+- The account screen closes when the signed-in account changes. Web moves focus to the screen title
+  on open and returns focus to the card on Back. iOS uses the navigation stack; Android supports
+  both its system Back action and an explicit Back to profile button.
+- No API or migration is needed. The UI continues to use the existing account, preferences and
+  blocking endpoints.
+
+Verification: the web production build, 249 unit tests and 10 focused Playwright cases passed.
+The browser cases covered mobile and desktop, including Back focus, sign-out, account deletion
+and unblocking. Four iPhone 17 simulator UI tests passed, covering session restore and sign-out,
+deletion with confirmation, legal and support links, and report, block and unblock. Android
+`assembleDebug` and `lintDebug` passed. The Android emulator hung during boot, so the Android
+UI smoke tests still need a device run.
+
+## Learning history in Account settings — 2026-11-09
+
+- Move the daily goal, learning stats and weekly highlight, mastery, achievements, and saved
+  questions from Profile into the signed-in Account settings screen on web, iOS and Android.
+- Keep the existing progress values, saved question navigation, and empty and retry states.
+  Profile still shows the account entry point, app preferences, and legal and support links.
+- Both native apps also show the daily reset note, correct answers out of attempts, the weekly
+  highlight when present, and the earned achievement count using the existing progress response.
+
+Verification: the web production build, 249 unit tests and six focused Playwright checks passed.
+At a 375 px mobile viewport, a saved question opened from Account settings. The iPhone 17
+simulator test passed through Profile, Account settings, and the saved question list. Android
+`assembleDebug` and `lintDebug` passed; Android UI was not run.
+
+## Separate Profile and Settings — 2026-11-09
+
+- Profile shows the signed-in identity, public profile link, goal, learning stats, mastery,
+  achievements, and saved questions.
+- Settings opens from the desktop sidebar or the gear in the phone Profile header. Keep the
+  five existing phone navigation tabs and let the user return to Profile from Settings.
+- Settings contains appearance, text size, language, legal and support links, and access to
+  Account settings. Keep username setup, learning interests, blocking, sign-out, and confirmed
+  deletion in Account settings.
+
+Verification: the web production build, 249 unit tests, and 18 focused browser checks passed.
+The desktop sidebar and phone gear were also checked with a saved question on Profile. Five
+iPhone 17 simulator tests passed across learning, account deletion, and display preferences.
+Android `assembleDebug` and `lintDebug` passed. Android UI was not exercised on a device.

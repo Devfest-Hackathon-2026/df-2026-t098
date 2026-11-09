@@ -140,4 +140,218 @@
     flex: 0 0 auto;
     min-width: 56px;
   }
+  :host(.paged) {
+    height: 100%;
+    min-height: 0;
+  }
+  :host(.paged) .question-card {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    height: 100%;
+    min-height: 0;
+    padding: 8px;
+  }
+  :host(.paged) .question-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    min-height: 0;
+    overflow: hidden;
+    touch-action: pinch-zoom;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* Scroll inside the card once text reaches the reading floor. */
+  :host([data-fit-overflow='true'].paged) .question-content {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding-bottom: 28px;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  }
+  :host([data-fit-overflow='true'].paged) .question-content::-webkit-scrollbar {
+    display: none;
+  }
+  :host(.paged) .question-stage-natural {
+    display: flow-root;
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  :host(.paged) .question-stage-natural h2 {
+    font-size: max(13px, calc(1.125rem * var(--question-density, 1)));
+    line-height: 1.25;
+    margin-block: max(2px, calc(6px * var(--question-density, 1)));
+    text-wrap: pretty;
+  }
+  :host(.paged) .question-stage-natural .question-meta,
+  :host(.paged) .question-stage-natural .question-summary,
+  :host(.paged) .question-stage-natural .question-credit,
+  :host(.paged) .question-stage-natural .code-head {
+    display: none;
+  }
+  :host(.paged) .card-actions {
+    margin: 0;
+    padding-block: 2px;
+  }
+  :host(.paged) .card-actions button {
+    min-height: 44px;
+    padding-block: 2px;
+  }
+  :host(.paged) .question-answer {
+    min-width: 0;
+  }
+  :host(.paged) .mobile-learning-actions .deeper-button {
+    min-height: 44px;
+    padding-block: 4px;
+  }
+  :host(.paged) .question-stage-natural .quiz-options {
+    gap: max(2px, calc(6px * var(--question-density, 1)));
+    margin-top: max(3px, calc(10px * var(--question-density, 1)));
+  }
+  :host(.paged) .question-stage-natural .quiz-option {
+    min-height: 44px;
+    padding: max(3px, calc(8px * var(--question-density, 1)));
+    gap: max(4px, calc(8px * var(--question-density, 1)));
+    border-radius: 8px;
+    font-size: max(13px, calc(0.875rem * var(--question-density, 1)));
+    line-height: 1.25;
+  }
+  :host(.paged) .question-stage-natural .option-letter {
+    width: max(18px, calc(26px * var(--question-density, 1)));
+    height: max(18px, calc(26px * var(--question-density, 1)));
+    font-size: max(10px, calc(12px * var(--question-density, 1)));
+    border-radius: 5px;
+  }
+  :host(.paged) .question-stage-natural .option-mark {
+    width: 16px;
+    height: 16px;
+  }
+  :host(.paged) .question-stage-natural .quiz-option.mono .option-text {
+    font-size: inherit;
+  }
+  :host(.paged) .question-stage-natural pre {
+    margin-top: 4px;
+    padding: max(3px, calc(10px * var(--question-density, 1)));
+    font-size: max(11px, calc(0.875rem * var(--question-density, 1)));
+    line-height: 1.3;
+    touch-action: pan-x pinch-zoom;
+  }
+  :host(.paged) .question-stage-natural .code-lines {
+    padding-block: max(2px, calc(6px * var(--question-density, 1)));
+    touch-action: pan-x pinch-zoom;
+  }
+  :host(.paged) .question-stage-natural .code-line {
+    min-height: 44px;
+    font-size: max(11px, calc(0.875rem * var(--question-density, 1)));
+    line-height: 1.3;
+  }
+  :host(.paged) .question-stage-natural .code-line.plain {
+    min-height: 0;
+  }
+  :host(.paged) .question-stage-natural .line-number {
+    width: max(24px, calc(36px * var(--question-density, 1)));
+    padding: max(1px, calc(4px * var(--question-density, 1))) 8px 0 0;
+  }
+  :host(.paged) .question-stage-natural .code-line code {
+    padding: max(1px, calc(4px * var(--question-density, 1))) 8px 0 2px;
+  }
+  /* Reserve the result row before the answer so the question stays put. */
+  :host(.paged) .question-stage-natural .reveal,
+  :host(.paged) .question-stage-natural .reveal-slot {
+    margin-top: 8px;
+    min-height: 56px;
+  }
+  :host(.paged) .question-stage-natural .reveal {
+    padding: 5px 8px;
+    border-radius: 8px;
+  }
+  :host(.paged) .question-stage-natural .reveal-heading {
+    display: contents;
+  }
+  :host(.paged) .question-stage-natural .reveal-heading strong {
+    margin-right: auto;
+  }
+  :host(.paged) .question-stage-natural .next-button {
+    order: 3;
+    margin-left: 0;
+  }
+  :host(.paged) .question-stage-natural .reveal-heading strong {
+    font-size: 0.875rem;
+  }
+  :host(.paged) .question-stage-natural .reveal-note,
+  :host(.paged) .question-stage-natural .xp-float {
+    display: none;
+  }
+  :host(.paged) .question-stage-natural .review-question {
+    min-height: 44px;
+    border: 0;
+    padding: 4px;
+    background: transparent;
+    color: var(--text);
+    text-decoration: underline;
+    font-size: 0.8125rem;
+  }
+  :host(.paged) .question-stage-natural .reveal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  :host(.paged) .question-stage-natural .next-button {
+    min-height: 44px;
+    padding: 6px 10px;
+  }
+  :host(.paged) .question-stage-natural .tap-recovery {
+    margin-top: 4px;
+    font-size: 0.75rem;
+  }
+  :host(.paged) .question-stage-natural .tap-recovery p {
+    margin-bottom: 2px;
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+  :host(.paged) .question-stage-natural .tap-recovery .secondary {
+    min-height: 44px;
+    padding: 6px;
+  }
+  .answer-summary {
+    display: grid;
+    gap: 6px;
+    margin: 10px 0;
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+  .answer-summary div {
+    display: grid;
+    gap: 2px;
+  }
+  .answer-summary dt {
+    font-weight: 600;
+  }
+  .answer-summary dd {
+    margin: 0;
+  }
+  .card-notice {
+    width: 100%;
+    min-height: 44px;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+  :host(.paged) .question-card > app-question-discussion {
+    display: contents;
+  }
+}
+
+@media (min-width: 560px) and (max-width: 959px) and (max-height: 500px) {
+  :host(.paged) .question-stage-natural .quiz-options:not(.binary) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  :host(.paged) .question-stage-natural pre {
+    line-height: 1.15;
+    padding-block: 2px;
+  }
 }

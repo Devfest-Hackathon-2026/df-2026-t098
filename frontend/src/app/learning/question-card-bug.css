@@ -1,4 +1,3 @@
-/* Spot the bug: the code lines are the answers. */
 .bug-hunt .code-head {
   display: flex;
   justify-content: space-between;
@@ -64,7 +63,12 @@ button.code-line.state-idle:not(:disabled):active {
   border-left-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 16%, transparent);
 }
-.code-line.state-dim {
+button.code-line:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.code-line.state-dim,
+button.code-line.state-dim:disabled {
   opacity: 0.6;
 }
 .line-number {

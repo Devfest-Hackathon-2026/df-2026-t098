@@ -114,7 +114,6 @@ const ALIASES: Record<string, string> = {
   'continuous integration': 'ci/cd',
 };
 
-/** Curated further reading, with no claim that a question has been reviewed. */
 export function learningReferences(topics: string[]): LearningReference[] {
   const references = topics
     .map((topic) => {

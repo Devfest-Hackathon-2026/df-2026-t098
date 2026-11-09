@@ -79,6 +79,16 @@ export class AuthService implements OnModuleInit {
       throw new BadGatewayException('Google sign-in is unavailable');
     }
 
+    return this.googleSession(idToken, clientId, accessToken);
+  }
+
+  async mobileGoogleLogin(idToken: string) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) throw new BadGatewayException('Google sign-in is unavailable');
+    return this.googleSession(idToken, clientId);
+  }
+
+  private async googleSession(idToken: string, clientId: string, accessToken?: string) {
     let data;
     try {
       const ticket = await this.googleClient.verifyIdToken({ idToken, audience: clientId });
@@ -111,7 +121,7 @@ export class AuthService implements OnModuleInit {
           if (!picture && typeof profile.data.picture === 'string') picture = profile.data.picture;
         }
       } catch {
-        /* Missing optional profile data must not prevent sign-in. */
+        // The profile lookup is optional.
       }
     }
 
@@ -126,7 +136,7 @@ export class AuthService implements OnModuleInit {
         });
       } catch (err) {
         if (!(err instanceof ConflictException)) throw err;
-        // Only retry by the verified Google subject, never by email.
+        // Find the account by Google subject. Email can change.
         user = await this.usersService.findByGoogleId(data.sub);
         if (!user) throw new UnauthorizedException('Unable to sign in with Google');
       }
@@ -177,6 +187,25 @@ export class AuthService implements OnModuleInit {
     const payload = await verifyToken(this.jwtService, token);
     if (!payload) return;
     await this.sessionsService.revoke(payload.sid, payload.sub);
+  }
+
+  /**
+   * Permanently deletes the account. Sessions are revoked first, then the user row is
+   * removed in the same transaction. Foreign keys do the rest: sessions, preferences,
+   * attempts, taps, XP, progress, reactions, comments, helpful votes, reports and blocks
+   * cascade; published questions stay but lose their author (`author_id` becomes NULL).
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      // Wait for in-flight writes of this user; they hold a key-share lock on the row.
+      const locked: unknown[] = await manager.query(
+        'SELECT id FROM users WHERE id = $1 FOR UPDATE',
+        [userId],
+      );
+      if (locked.length === 0) return;
+      await this.sessionsService.revokeAll(userId, manager);
+      await manager.query('DELETE FROM users WHERE id = $1', [userId]);
+    });
   }
 
   async getCurrentUser(userId: string) {

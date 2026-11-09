@@ -9,7 +9,9 @@
     }}
   </p>
   @if (session.status() !== 'authenticated') {
-    <a routerLink="/login">{{ text('ログインして質問を投稿', 'Sign in to post a question') }}</a>
+    <a class="signin-cta" routerLink="/login">{{
+      text('ログインして質問を投稿', 'Sign in to post a question')
+    }}</a>
   } @else if (published(); as question) {
     <section class="published" role="status">
       <h2>{{ text('質問を公開しました', 'Your question is published') }}</h2>
@@ -22,6 +24,14 @@
       </button>
     </section>
   } @else {
+    <p class="hint">
+      {{
+        text(
+          '編集中の内容は、アプリを開いている間、タブを切り替えても保持されます。',
+          'Your draft stays here when you change tabs while this app is open.'
+        )
+      }}
+    </p>
     <form (submit)="publish($event)">
       <label for="question-title">{{ text('タイトル', 'Title') }}</label
       ><input
@@ -156,17 +166,19 @@
         </p>
         @for (option of options(); track $index) {
           <div class="quiz-field">
-            <input
-              type="radio"
-              name="correct-option"
-              [id]="'correct-' + $index"
-              [checked]="correctOption() === $index"
-              (change)="correctOption.set($index)"
-              [disabled]="publishing()"
-              [attr.aria-label]="
-                text(letters[$index] + 'を正解にする', 'Mark ' + letters[$index] + ' correct')
-              "
-            />
+            <label class="correct-option-control">
+              <input
+                type="radio"
+                name="correct-option"
+                [id]="'correct-' + $index"
+                [checked]="correctOption() === $index"
+                (change)="correctOption.set($index)"
+                [disabled]="publishing()"
+                [attr.aria-label]="
+                  text(letters[$index] + 'を正解にする', 'Mark ' + letters[$index] + ' correct')
+                "
+              />
+            </label>
             <label class="sr-only" [for]="'option-' + $index"
               >{{ text('選択肢', 'Option') }} {{ letters[$index] }}</label
             >

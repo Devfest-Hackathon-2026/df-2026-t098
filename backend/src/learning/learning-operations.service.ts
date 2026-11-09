@@ -35,7 +35,7 @@ export class LearningOperationsService {
       .update(JSON.stringify(payload))
       .digest('hex');
     return this.database.transaction(async (manager) => {
-      // Serialize only short claim/limit checks. Gemini runs after this transaction.
+      // Release the lock before calling Gemini.
       await manager.query('SELECT pg_advisory_xact_lock(1101,hashtext($1))', [
         id,
       ]);

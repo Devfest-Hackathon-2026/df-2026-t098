@@ -1,4 +1,4 @@
-import { test, expect, browserRequest, origin } from "./fixtures";
+import { test, expect, browserRequest, openSettings, openProfile, origin } from "./fixtures";
 import {
   checkedJson,
   settledBox,
@@ -40,7 +40,6 @@ test("learning: instant pool, background Gemini batches, tap then explain, one-t
     expect(question).not.toHaveProperty("correctOption");
     expect(question.tap).toBeNull();
   }
-  // Ready-made questions are playable before Gemini finishes the personalized batch.
   await expect(
     page.locator(`[data-question-id="${pool.questions[0].id}"]`).first(),
   ).toBeVisible();
@@ -71,7 +70,6 @@ test("learning: instant pool, background Gemini batches, tap then explain, one-t
   });
   expect(generatedBatches).toBe(1);
   await expect(page.locator(".feed-controls")).toHaveCount(0);
-  // Nearing the end of the loaded cards prefetches the next personalized batch.
   const prefetch = learningResponse(page, "/feed/batches", "POST");
   const slides = page.locator(".feed-slide");
   await slides
@@ -104,7 +102,7 @@ test("learning: instant pool, background Gemini batches, tap then explain, one-t
 
   const question = initial.questions[2];
   const card = page.locator(`[data-question-id="${question.id}"]`).first();
-  // Reveal through a separate guest context so the learner's first tap is still unrecorded.
+  // Use a guest so this tap does not change the learner’s history.
   const guest = await browser.newContext();
   let correctIndex: number;
   try {
@@ -131,11 +129,22 @@ test("learning: instant pool, background Gemini batches, tap then explain, one-t
     correctOption: correctIndex,
     xpAwarded: 0,
   });
-  await expect(card.locator(".reveal")).toContainText(tap.quickExplanation);
+  const readFeedback = card.getByRole("button", {
+    name: "解説を見る",
+    exact: true,
+  });
+  if (await readFeedback.isVisible()) {
+    await readFeedback.click();
+    await expect(card.locator("dialog[open] .reveal")).toContainText(
+      tap.quickExplanation,
+    );
+    await closeLearningDetails(card);
+  } else {
+    await expect(card.locator(".reveal")).toContainText(tap.quickExplanation);
+  }
   await expect(card.locator(".quiz-option").nth(correctIndex)).toHaveClass(
     /state-correct/,
   );
-  // A missed card comes back a few cards later in the same session.
   await expect(page.locator(`[data-question-id="${question.id}"]`)).toHaveCount(
     2,
   );
@@ -172,7 +181,6 @@ test("learning: instant pool, background Gemini batches, tap then explain, one-t
 
   await page.goto(`/questions/${question.id}`);
   const retryCard = page.locator(`[data-question-id="${question.id}"]`);
-  // A question in Practice opens fresh so it can be answered again.
   await expect(retryCard.locator(".reason-chip")).toContainText("間違えた");
   await expect(retryCard.locator(".reveal")).toHaveCount(0);
   await expect(retryCard.locator(".quiz-option").first()).toBeEnabled();
@@ -250,13 +258,10 @@ test("learning: instant pool, background Gemini batches, tap then explain, one-t
     path: testInfo.outputPath("core-ranking.png"),
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "プロフィール", exact: true })
-    .first()
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "今日の目標", exact: true }),
-  ).toBeVisible();
+  await openProfile(page);
+  const goal = page.getByRole("heading", { name: "今日の目標", exact: true });
+  await expect(goal).toBeVisible();
+  await expect(page.locator(".profile-settings")).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath("core-progress.png"),
     fullPage: true,
@@ -402,7 +407,6 @@ test("learning: centered feed and responsive comments preserve drafts and questi
   );
 
   if (!desktop) {
-    // The sheet slides up; tap the backdrop once it has arrived.
     await expect(panel).toBeVisible();
     await settledBox(panel);
     await page.mouse.click(10, 10);
@@ -475,7 +479,6 @@ test("learning: centered feed and responsive comments preserve drafts and questi
     .first();
   await nextCard.getByRole("button", { name: "コメント", exact: true }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
-  // Wait for the previous panel to finish sliding out before addressing "the" panel.
   await expect(panel).toHaveCount(1);
   await expect(panel).toHaveAttribute(
     "id",
@@ -694,7 +697,6 @@ test("learning outage: setup and assessment errors recover without losing an ans
     }),
   );
   await page.goto("/");
-  // Learning continues with ready-made questions while Gemini is unavailable.
   await expect(page.locator(".feed-status")).toContainText("Gemini");
   await expect(page.locator("[data-question-id]").first()).toBeVisible();
   await page.unroute("**/api/v1/learning/feed/batches");
@@ -830,7 +832,7 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
     await route.continue();
   });
   const progressResponse = learningResponse(page, "/progress", "GET");
-  await page.getByRole("button", { name: "プロフィール", exact: true }).click();
+  await openProfile(page);
   try {
     await expect(
       page.locator(".profile-panel app-loading-skeleton").first(),
@@ -849,11 +851,12 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
   }
   expect((await progressResponse).ok()).toBe(true);
   await page.unroute("**/api/v1/learning/progress");
+  await openSettings(page);
   const saved = learningResponse(page, "/preferences/language", "PATCH");
   await page.getByRole("radio", { name: "English", exact: true }).check();
   expect((await checkedJson(await saved)).preferences.language).toBe("en");
   await expect(
-    page.getByRole("heading", { name: "Settings", exact: true }),
+    page.getByRole("heading", { name: "App settings", exact: true }),
   ).toBeVisible();
   await page.evaluate(() => {
     localStorage.removeItem("whylint-language");
@@ -862,12 +865,12 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
   });
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await page.getByRole("button", { name: "Profile", exact: true }).click();
+  await openSettings(page, "en");
   await expect(
     page.getByRole("radio", { name: "English", exact: true }),
   ).toBeChecked();
   await expect(
-    page.getByRole("heading", { name: "Settings", exact: true }),
+    page.getByRole("heading", { name: "App settings", exact: true }),
   ).toBeVisible();
 });
 

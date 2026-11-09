@@ -65,6 +65,23 @@ describe('SessionsService', () => {
     expect(values.revoked_at).toEqual(now);
   });
 
+  it('revokes every active session of one user, optionally inside a transaction', async () => {
+    repository.update.mockResolvedValue({ affected: 2 });
+    await service.revokeAll(userId);
+    const [criteria, values] = repository.update.mock.calls[0];
+    expect(criteria.user_id).toBe(userId);
+    expect(criteria).not.toHaveProperty('id');
+    expect(criteria.revoked_at.type).toBe('isNull');
+    expect(values.revoked_at).toEqual(now);
+
+    const scoped = { update: jest.fn().mockResolvedValue({ affected: 1 }) };
+    const manager = { getRepository: jest.fn().mockReturnValue(scoped) };
+    await service.revokeAll(userId, manager as never);
+    expect(manager.getRepository).toHaveBeenCalledWith(SessionEntity);
+    expect(scoped.update).toHaveBeenCalledTimes(1);
+    expect(repository.update).toHaveBeenCalledTimes(1);
+  });
+
   it('propagates repository failures', async () => {
     const databaseError = new Error('database unavailable');
     repository.findOne.mockRejectedValue(databaseError);

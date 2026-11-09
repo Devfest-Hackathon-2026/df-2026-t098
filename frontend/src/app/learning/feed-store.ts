@@ -1,7 +1,8 @@
 import { DOCUMENT } from '@angular/common';
-import { inject, Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { AuthSession } from '../auth/auth-session';
 import { OnboardingState } from '../onboarding/onboarding-state';
+import { BlockStore } from './block-store';
 import { DisplaySettings } from './display-settings';
 import { LearningApi, LearningError, learningError } from './learning-api';
 import { ProgressStore } from './progress-store';
@@ -26,7 +27,8 @@ export type FeedItem =
       daily?: boolean;
       tap?: QuestionTap;
     }
-  | { key: string; kind: 'signin' };
+  | { key: string; kind: 'signin' }
+  | { key: string; kind: 'blocked'; authorName: string };
 
 interface PendingBatch {
   requestId: string;
@@ -34,16 +36,9 @@ interface PendingBatch {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-/** Missed cards come back this many cards later in the same session. */
 export const RELEARN_GAP = 4;
-/** Guests are invited to sign in after this many taps. */
 export const GUEST_SIGNIN_AFTER = 3;
 
-/**
- * The scrolling feed. It lives outside the page component so switching tabs keeps the cards,
- * answers, and scroll position. The first cards come from the instant tap pool; personalized
- * Gemini batches stream in behind them, and the pool fills any gap or provider failure.
- */
 @Injectable({ providedIn: 'root' })
 export class FeedStore {
   private readonly api = inject(LearningApi);
@@ -51,6 +46,7 @@ export class FeedStore {
   private readonly settings = inject(DisplaySettings);
   private readonly onboarding = inject(OnboardingState);
   private readonly progress = inject(ProgressStore);
+  private readonly blocks = inject(BlockStore);
   private readonly document = inject(DOCUMENT);
   private controller = new AbortController();
   private identity = '';
@@ -58,7 +54,6 @@ export class FeedStore {
   private nextKey = 1;
   private readonly seen = new Set<string>();
   private readonly noveltyHistory: QuestionNovelty[] = [];
-  /** Practice reviews are tracked apart from seen cards: a morning review may repeat a card. */
   private readonly reviewed = new Set<string>();
   private readonly relearned = new Set<string>();
   private guestTaps = 0;
@@ -68,7 +63,6 @@ export class FeedStore {
   readonly items = signal<FeedItem[]>([]);
   readonly activeIndex = signal(0);
   readonly loading = signal(false);
-  /** True until the first cards of a fresh feed are in place. */
   readonly booting = signal(false);
   readonly generating = signal(false);
   readonly error = signal('');
@@ -77,10 +71,18 @@ export class FeedStore {
   readonly daily = signal<DailyChallenge | null>(null);
   readonly hasScrolled = signal(false);
   scrollTop = 0;
-  /** Lets the page keep the visible card in place while earlier cards are removed. */
   pruneHandler: ((removed: number, apply: () => void) => void) | null = null;
 
-  /** Starts or keeps the feed for the current account and language. */
+  constructor() {
+    effect(() => {
+      const blocked = this.blocks.lastBlocked();
+      if (blocked) untracked(() => this.hideAuthor(blocked.id, blocked.name));
+    });
+    effect(() => {
+      if (this.blocks.unblockCount() > 0) untracked(() => this.restart());
+    });
+  }
+
   sync(): void {
     const status = this.session.status();
     if (status === 'loading' || status === 'unavailable') return;
@@ -91,7 +93,6 @@ export class FeedStore {
     void this.start();
   }
 
-  /** Forces a fresh feed, e.g. after interests change. */
   restart(): void {
     this.identity = '';
     this.sync();
@@ -130,7 +131,6 @@ export class FeedStore {
 
   private async start(): Promise<void> {
     const signal = this.controller.signal;
-    // The daily card goes first, so load it before the pool to avoid shifting visible cards.
     this.booting.set(true);
     await this.loadDaily(signal);
     if (signal.aborted) return;
@@ -140,13 +140,11 @@ export class FeedStore {
     if (this.authenticated) void this.loadBatch();
   }
 
-  /** Called whenever the visible card changes. Keeps at least a few cards ahead. */
   setActive(index: number): void {
     if (index > 0) this.hasScrolled.set(true);
     this.activeIndex.set(index);
     const ahead = this.items().length - 1 - index;
     if (ahead > 2) return;
-    // While a Gemini batch is already being written, fill the gap with pool questions.
     const waiting = this.generating();
     if (this.authenticated && !waiting && !this.error()) void this.loadBatch();
     if ((!this.authenticated || waiting || this.error()) && !this.loading()) void this.loadPool();
@@ -158,7 +156,6 @@ export class FeedStore {
     else void this.loadPool();
   }
 
-  /** Records a tap: missed cards come back a few cards later, and guests get a sign-in card. */
   tapped(item: FeedItem, result: TapResult): void {
     if (item.kind !== 'question') return;
     const index = this.items().findIndex((candidate) => candidate.key === item.key);
@@ -198,6 +195,20 @@ export class FeedStore {
     if (item.daily) void this.loadDaily(this.controller.signal);
   }
 
+  /**
+   * Replaces a blocked learner's questions already in the feed with a notice. The slide
+   * stays, so paging and the active position do not move.
+   */
+  hideAuthor(authorId: string, authorName: string): void {
+    this.items.update((items) =>
+      items.map((item) =>
+        item.kind === 'question' && item.question.author?.id === authorId
+          ? { key: item.key, kind: 'blocked' as const, authorName }
+          : item,
+      ),
+    );
+  }
+
   private insertAt(position: number, item: FeedItem): void {
     this.items.update((items) => {
       const next = [...items];
@@ -227,7 +238,6 @@ export class FeedStore {
       kind: 'question',
       question,
     }));
-    // Due reviews are spaced through the new cards rather than stacked together.
     freshReviews.forEach((question, index) =>
       items.splice(Math.min(1 + index * 3, items.length), 0, {
         key: 'review-' + question.id,
@@ -264,14 +274,12 @@ export class FeedStore {
       if (signal.aborted) return;
       this.daily.set(daily);
       const question = daily.question;
-      // Open the session with today's shared challenge until it has been answered.
       if (question && !question.tap && !this.seen.has(question.id)) {
         this.seen.add(question.id);
         this.rememberNovelty(question);
         this.insertAt(0, { key: 'daily-' + question.id, kind: 'question', question, daily: true });
       }
     } catch {
-      /* The daily challenge is optional; the feed works without it. */
     }
   }
 
@@ -289,8 +297,7 @@ export class FeedStore {
           params.set('difficulty', preferences.difficulty);
         }
       }
-      // Keep the query string well under common 8 KB proxy limits (150 IDs ≈ 5.5 KB).
-      // Signed-in learners are also covered by server-side history.
+      // Cap the IDs so the query stays under proxy URL limits.
       const exclude = [...this.seen].filter((id) => UUID.test(id)).slice(-150);
       if (exclude.length) params.set('exclude', exclude.join(','));
       const result = await this.api.get<PoolResult>('/feed/pool?' + params, signal);
@@ -309,7 +316,6 @@ export class FeedStore {
     } finally {
       if (!signal.aborted) {
         this.loading.set(false);
-        // One fresh snapshot can replace a response overtaken by another source.
         if (needsRefill) void this.loadPool(false);
       }
     }
@@ -357,7 +363,6 @@ export class FeedStore {
         this.pendingBatch = null;
         this.savePendingBatch(storage, storageKey, null);
       }
-      // Keep learning with ready-made questions while Gemini is unavailable.
       this.notice.set('fallback');
       if (this.items().length - this.activeIndex() <= 3) void this.loadPool();
       if (!this.items().length) this.error.set(learningError(error, this.settings.language()));
@@ -370,7 +375,7 @@ export class FeedStore {
     try {
       const value = storage?.getItem(key);
       if (!value) return null;
-      // Earlier clients stored just the UUID. Preserve that request's original payload.
+      // Older clients saved only the ID. Reuse the original payload on retry.
       if (UUID.test(value)) return { requestId: value };
       const pending: unknown = JSON.parse(value);
       if (!pending || typeof pending !== 'object') return null;
@@ -399,7 +404,6 @@ export class FeedStore {
       if (pending) storage?.setItem(key, JSON.stringify(pending));
       else storage?.removeItem(key);
     } catch {
-      // The in-memory snapshot still makes retries stable when browser storage is unavailable.
     }
   }
 
@@ -411,7 +415,6 @@ export class FeedStore {
     }
   }
 
-  /** Bounds memory on long sessions by dropping cards far above the current one. */
   private prune(): void {
     const keepFrom = this.activeIndex() - 8;
     if (this.items().length <= 40 || keepFrom <= 0) return;

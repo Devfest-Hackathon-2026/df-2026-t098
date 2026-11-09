@@ -40,7 +40,6 @@ test("social learning: publish an explanation, reply, vote Helpful, visit its cr
   const poolResponse = learningResponse(page, "/feed/pool", "GET");
   await page.goto("/");
   const pool = await checkedJson(await poolResponse);
-  // Mobile and desktop runs share one database; pick a question nobody has discussed yet.
   let question = pool.questions[0];
   for (const candidate of pool.questions) {
     const existing = await browserRequest(
@@ -151,7 +150,6 @@ test("social learning: publish an explanation, reply, vote Helpful, visit its cr
       .click();
     const panel = reader.getByRole("dialog", { name: "コメント", exact: true });
     const entry = panel.locator(`[data-comment-id="${post.id}"]`);
-    // The reader has not answered yet, so the explanation is hidden as a spoiler.
     await expect(entry.getByText(explanation, { exact: true })).toHaveCount(0);
     await entry.getByRole("button", { name: /答えが含まれています/ }).click();
     await expect(entry.getByText(explanation, { exact: true })).toBeVisible();
@@ -252,7 +250,9 @@ test("learning regressions: beginner pool, retained tap state, one panel per ins
   await page.getByRole("button", { name: "プロフィール", exact: true }).click();
   await page.getByRole("button", { name: "フィード", exact: true }).click();
   const restored = page.locator(`[data-question-id="${question.id}"]`).first();
-  await expect(restored.locator(".reveal")).toBeVisible();
+  const fullQuestion = restored.locator(".full-question-button");
+  if (await fullQuestion.isVisible()) await fullQuestion.click();
+  await expect(restored.locator(".reveal:visible")).toBeVisible();
   await expect(
     restored.locator(
       ".quiz-option:not(:disabled), button.code-line:not(:disabled)",

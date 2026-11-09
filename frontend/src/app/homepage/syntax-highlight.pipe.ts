@@ -14,7 +14,7 @@ interface CodeToken {
   kind: string;
 }
 
-// Render tokens as text nodes rather than injecting highlighter-generated HTML.
+// Render the highlighted code as text to keep markup inert.
 @Pipe({ name: 'syntaxHighlight' })
 export class SyntaxHighlightPipe implements PipeTransform {
   transform(code: string, language: string): CodeToken[] {

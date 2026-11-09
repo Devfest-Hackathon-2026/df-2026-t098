@@ -16,6 +16,17 @@ import type { Question } from './learning.types';
     <header>
       <a routerLink="/">{{ text('フィードに戻る', 'Back to the feed') }}</a>
     </header>
+    @if (session.status() === 'unavailable') {
+      <p role="alert">
+        {{
+          text(
+            'アカウントを確認できませんでした。接続を確認して再試行してください。',
+            'Could not check your account. Check your connection and try again.'
+          )
+        }}
+      </p>
+      <button type="button" (click)="session.refresh()">{{ text('再試行', 'Try again') }}</button>
+    }
     @if (loading() || (session.status() === 'loading' && !question())) {
       <app-loading-skeleton
         variant="question"

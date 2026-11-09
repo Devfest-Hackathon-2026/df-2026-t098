@@ -11,6 +11,7 @@ describe('Reading display settings', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     localStorage.removeItem('whylint-reading-size');
     localStorage.removeItem('whylint-language');
     localStorage.removeItem('whylint-theme');
@@ -24,6 +25,42 @@ describe('Reading display settings', () => {
     expect(settings.readingSize()).toBe('standard');
     expect(document.documentElement.style.getPropertyValue('--reading-scale')).toBe('1');
     expect(document.documentElement.dataset['readingSize']).toBe('standard');
+  });
+
+  it('follows system appearance until the user chooses a theme', () => {
+    let onChange: (event: MediaQueryListEvent) => void = () => {};
+    const removeEventListener = vi.fn();
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+          onChange = listener;
+        },
+        removeEventListener,
+      } as unknown as MediaQueryList),
+    );
+    const settings = TestBed.inject(DisplaySettings);
+    onChange({ matches: true } as MediaQueryListEvent);
+    expect(settings.theme()).toBe('light');
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    settings.toggleTheme();
+    onChange({ matches: true } as MediaQueryListEvent);
+    expect(settings.theme()).toBe('dark');
+    expect(localStorage.getItem('whylint-theme')).toBe('dark');
+    TestBed.resetTestingModule();
+    expect(removeEventListener).toHaveBeenCalledWith('change', onChange);
+  });
+
+  it('switches theme in one frame, without colour transitions lagging behind', async () => {
+    const settings = TestBed.inject(DisplaySettings);
+    const root = document.documentElement;
+    settings.toggleTheme();
+    expect(root.classList.contains('theme-switching')).toBe(true);
+    expect(root.dataset['theme']).toBe(settings.theme());
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(root.classList.contains('theme-switching')).toBe(false);
   });
 
   it('persists and restores the chosen reading size', () => {

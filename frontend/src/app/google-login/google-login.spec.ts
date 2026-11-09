@@ -4,6 +4,7 @@ import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { AuthApi } from '../auth/auth-api';
+import { DisplaySettings } from '../learning/display-settings';
 import { GoogleLogin } from './google-login';
 import { AUTH_FETCH, AuthSession } from '../auth/auth-session';
 import type { AuthUser, SessionStatus } from '../auth/auth-session';
@@ -40,6 +41,19 @@ describe('Google sign-in screen', () => {
   });
 
   afterEach(() => vi.restoreAllMocks());
+
+  it('keeps the login theme in sync with the shared app setting', async () => {
+    const settings = TestBed.inject(DisplaySettings);
+    const fixture = TestBed.createComponent(GoogleLogin);
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.header .settings')).toBeNull();
+    settings.setTheme('light');
+    fixture.detectChanges();
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    settings.setTheme('dark');
+    fixture.detectChanges();
+    expect(document.documentElement.dataset['theme']).toBe('dark');
+  });
 
   it('shows identifier and password fields alongside the Google action', async () => {
     const fixture = TestBed.createComponent(GoogleLogin);
@@ -340,7 +354,7 @@ describe('Google sign-in callback', () => {
     const router = { navigateByUrl: vi.fn().mockResolvedValue(true) };
     const replaceState = vi.fn();
     const fakeDocument = {
-      documentElement: { dataset: {}, lang: '' },
+      documentElement: { dataset: {}, lang: '', style: { setProperty: vi.fn() } },
       querySelector: () => null,
       defaultView: {
         location: {
@@ -731,7 +745,7 @@ describe('Google sign-in initiation', () => {
     const assign = vi.fn();
     const stored = new Map<string, string>();
     const fakeDocument = {
-      documentElement: { dataset: {}, lang: '' },
+      documentElement: { dataset: {}, lang: '', style: { setProperty: vi.fn() } },
       querySelector: () => null,
       defaultView: {
         location: { origin, pathname: '/login', assign },

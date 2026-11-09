@@ -1,4 +1,15 @@
-import { Component, DestroyRef, inject, signal, viewChild } from '@angular/core';
+import { Brand } from '../brand/brand';
+import { DOCUMENT } from '@angular/common';
+import {
+  afterNextRender,
+  Component,
+  DestroyRef,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OnboardingState } from './onboarding-state';
@@ -12,7 +23,7 @@ import type { Catalog, Difficulty, Preferences } from '../learning/learning.type
 
 @Component({
   selector: 'app-onboarding',
-  imports: [FormsModule, UsernameSetup, LanguagePicker],
+  imports: [Brand, FormsModule, UsernameSetup, LanguagePicker],
   templateUrl: './onboarding.html',
   styleUrl: './onboarding.css',
 })
@@ -24,6 +35,9 @@ export class Onboarding {
   private readonly state = inject(OnboardingState);
   private readonly api = inject(LearningApi);
   private readonly usernameSetup = viewChild(UsernameSetup);
+  private readonly heading = viewChild<ElementRef<HTMLHeadingElement>>('stepHeading');
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
   private readonly controller = new AbortController();
   protected readonly editing = this.route.snapshot.queryParamMap.get('edit') === '1';
   private readonly initialLanguage = this.settings.language();
@@ -73,7 +87,6 @@ export class Onboarding {
           this.catalog.set(catalog);
       })
       .catch(() => {
-        /* The bundled selectable catalog remains available offline. */
       });
   }
 
@@ -92,6 +105,17 @@ export class Onboarding {
       items.includes(id) ? items.filter((item) => item !== id) : [...items, id],
     );
   }
+  protected changeStep(step: number): void {
+    if (this.starting()) return;
+    this.step.set(step);
+    afterNextRender(
+      () => {
+        this.heading()?.nativeElement.focus({ preventScroll: true });
+        this.document.defaultView?.scrollTo({ top: 0, behavior: 'instant' });
+      },
+      { injector: this.injector },
+    );
+  }
   protected toggleTechnology(value: string): void {
     if (this.technologies().includes(value))
       this.technologies.update((items) => items.filter((item) => item !== value));
@@ -106,11 +130,9 @@ export class Onboarding {
   }
   protected cancel(): void {
     this.settings.setLanguage(this.initialLanguage);
-    // Replace the entry: Back from the feed should leave the app, not reopen setup.
     void this.router.navigateByUrl('/', { replaceUrl: true });
   }
 
-  /** Skip setup and start tapping right away with every area at beginner level. */
   protected quickStart(): void {
     if (!this.interests().length)
       this.interests.set(this.catalog().interests.map((interest) => interest.id));
@@ -143,7 +165,6 @@ export class Onboarding {
         );
         return;
       }
-      // Replace the setup entry so Back from the feed does not return to it.
       await this.router.navigateByUrl('/', { replaceUrl: true });
     } catch (error) {
       if (!this.controller.signal.aborted) this.error.set(learningError(error, this.language));

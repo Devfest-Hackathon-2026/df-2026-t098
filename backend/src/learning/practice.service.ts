@@ -21,7 +21,6 @@ import type {
 import { QuestionsService } from './questions.service';
 import type { FollowUpDto } from './dto/learning.dto';
 
-/** XP for the first correct tap. A passed explanation adds the rest of the 20 XP cap. */
 export const TAP_XP = 5;
 
 export interface TapResult {
@@ -62,10 +61,6 @@ export class PracticeService {
     private readonly assessment: AssessmentService,
   ) {}
 
-  /**
-   * Grades a tap instantly from stored data. The first tap on a question earns XP and is
-   * final; a missed question can be retried while it is in review (spaced repetition).
-   */
   async tap(
     userId: string | null,
     questionId: string,
@@ -106,7 +101,7 @@ export class PracticeService {
     }
 
     const outcome = await this.database.transaction(async (manager) => {
-      // Serialize one learner's taps so XP, combos, and review boxes stay consistent.
+      // Lock the learner while updating XP and reviews.
       await manager.query('SELECT pg_advisory_xact_lock(1103,hashtext($1))', [
         userId,
       ]);
@@ -125,7 +120,6 @@ export class PracticeService {
         WHERE user_id = $1 AND question_id = $2 AND NOT review`,
         [userId, questionId],
       );
-      // A question in Practice can be retried at any time until it is answered correctly.
       const canReview = first && progress.needs_review;
       if (first && !canReview) {
         const [latest] = await manager.query(
@@ -159,7 +153,6 @@ export class PracticeService {
           learningDay(),
         ],
       );
-      // A correct first tap on a never-missed question needs no review.
       const schedule = nextSchedule(progress.box, correct);
       await manager.query(
         `UPDATE learning_question_progress SET ${SCHEDULE_SQL},
@@ -181,7 +174,6 @@ export class PracticeService {
     };
   }
 
-  /** "Still confused? Ask Gemini" — a short tutor answer grounded in the question. */
   async followUp(
     userId: string,
     questionId: string,
@@ -236,7 +228,6 @@ export class PracticeService {
     }
   }
 
-  /** Bug of the Day: one shared tap question per language and Tokyo calendar day. */
   async daily(language: LearningLanguage, userId: string | null) {
     const day = learningDay();
     await this.database.query(

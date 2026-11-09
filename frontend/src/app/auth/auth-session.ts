@@ -50,7 +50,7 @@ export class AuthSession {
   logout(): Promise<boolean> {
     if (this.pendingLogout) return this.pendingLogout;
     this.logoutPending.set(true);
-    // Invalidate any /me response that was already in flight.
+    // Ignore session reads started before sign-out.
     ++this.requestVersion;
     this.latestRefresh = null;
     this.activeController?.abort();
@@ -61,6 +61,43 @@ export class AuthSession {
       this.pendingLogout = null;
     });
     return this.pendingLogout;
+  }
+
+  /**
+   * Permanently deletes the signed-in account. The learner is signed out locally only
+   * after the server confirms with 204; on any other outcome the account is untouched.
+   */
+  async deleteAccount(): Promise<'deleted' | 'unauthorized' | 'rateLimit' | 'failed'> {
+    if (this.pendingLogout) await this.pendingLogout;
+    ++this.requestVersion;
+    this.latestRefresh = null;
+    this.activeController?.abort();
+    this.activeController = null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SESSION_TIMEOUT_MS);
+    try {
+      const response = await this.request('/api/v1/auth/me', {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: controller.signal,
+      });
+      if (response.status === 204) {
+        this.currentUser.set(null);
+        this.currentStatus.set('guest');
+        return 'deleted';
+      }
+      if (response.status === 401) {
+        void this.refresh();
+        return 'unauthorized';
+      }
+      return response.status === 429 ? 'rateLimit' : 'failed';
+    } catch {
+      return 'failed';
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async endSession(): Promise<boolean> {
