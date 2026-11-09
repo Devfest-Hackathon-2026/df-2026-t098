@@ -1,7 +1,6 @@
 # 秘密情報（コミットしない）
 .env
 .env.*
-**/google-signin.local.xcconfig
 !.env.example
 .dev.vars
 .dev.vars.*

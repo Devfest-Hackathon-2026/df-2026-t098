@@ -5,13 +5,15 @@ Reviewed on 8 November 2026 in `feat/core-learning-feed`.
 This document retains the original audit as a historical baseline. The resolution
 update below records the implementation and root-verified results from the fix
 pass. The provisional 12/20 score describes the pre-fix state.
+The packaged app was later removed from this repository. Its results below are
+historical; the shared UI findings still apply to the web project.
 
 ## Scope and evidence
 
 This is an audit and implementation plan. Application source was inspected without
-editing it. The review covers the supplied native iPhone screenshot, current
-Angular/Capacitor source, the installed iOS app bundle, and controlled rendering of
-the native bundle in a browser stand-in.
+editing it. The review covered the supplied native iPhone screenshot, the Angular
+source, the former iOS app bundle, and controlled rendering of that bundle in a
+browser stand-in.
 
 - The iPhone 16 Pro Max Simulator is booted. The available UI automation surface
   could not bind the Simulator, so this pass uses the user's native screenshot
@@ -68,21 +70,13 @@ and six P2 issues. Runtime-only uncertainties are identified in each finding.
 
 ### A01 — P0 — Installed app targets an unavailable backend
 
-Read-only inspection of the installed app's `nativeApiBaseUrl()` found
+Read-only inspection of the installed app's API configuration found
 `http://localhost:3101`. No backend was listening on 3101 when the audit began.
-The normal backend listens on 3000. Its responses currently omit matching CORS
-allowance for both `capacitor://localhost` and `https://localhost`.
+The normal backend listened on 3000 and did not allow the wrapper's origins.
 
 The app can display content retained in its current process while a subsequent
 answer request fails. The exact HTTP failure in the historical screenshot was
 not captured, but this audit confirmed an unreachable target in the installed app.
-
-Rebuild the local native bundle against the intended dev API and configure the
-two native origins for that backend. Recheck a signed native build through cold
-start, answer submission, restart, and API outage/recovery. Existing signed-build
-and secure-storage requirements still apply.
-
-[Native build configuration](/Users/kenzietann/code/hackathon/frontend/scripts/native-build.mjs), [runtime API adapter](/Users/kenzietann/code/hackathon/frontend/src/app/native/platform.ts), and [allowed origins](/Users/kenzietann/code/hackathon/backend/src/auth/allowed-origins.ts).
 
 ### A02 — P1 — The card contains too many interaction stages
 
@@ -114,16 +108,16 @@ owner and a clear Next action after answering.
 ### A03 — P1 — Reading-size accessibility lacks an app-level enlargement path
 
 The layout uses fixed pixel sizes, including 10px navigation, 12px metadata, and
-14px code/comment text. CSS fixes text-size adjustment at 100%. The current
-Capacitor config has no zoom override, and the installed iOS bridge defaults to
-disabled pinch zoom. No native Dynamic Type linkage was found.
+14px code/comment text. CSS fixes text-size adjustment at 100%. The installed
+iOS wrapper disabled pinch zoom at the time of the audit. No native Dynamic
+Type linkage was found.
 
 Adopt scalable text roles and support native reading-size preferences or an
 accessible app-level text-size control. Verify large accessibility sizes across
 questions, code, comments, navigation, and forms. Actual OS-level behavior was
 not exercised in this pass.
 
-[Text adjustment](/Users/kenzietann/code/hackathon/frontend/src/styles.css:85), [navigation type](/Users/kenzietann/code/hackathon/frontend/src/app/homepage/homepage.css:90), [card type](/Users/kenzietann/code/hackathon/frontend/src/app/learning/question-card.css), and [native configuration](/Users/kenzietann/code/hackathon/frontend/capacitor.config.ts).
+[Text adjustment](/Users/kenzietann/code/hackathon/frontend/src/styles.css:85), [navigation type](/Users/kenzietann/code/hackathon/frontend/src/app/homepage/homepage.css:90), and [card type](/Users/kenzietann/code/hackathon/frontend/src/app/learning/question-card.css).
 
 ### A04 — P1 — The screenshot's question does not contain its claimed SQL error
 

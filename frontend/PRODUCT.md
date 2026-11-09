@@ -6,7 +6,7 @@
 
 adaptive
 
-WhyLint uses Angular on the web and is intended to run in iOS and Android applications through Capacitor. Adapt the experience to the mobile OS where appropriate.
+WhyLint uses Angular for its mobile and desktop web experience. The native mobile app is planned as a separate project.
 
 ## Users and purpose
 
@@ -15,7 +15,7 @@ Students and early-career developers use WhyLint to understand technology. The c
 ## Constraints
 
 - The team is building WhyLint for the GDGoC Japan DevFest 2026 hackathon.
-- The app uses Angular, Capacitor, NestJS, PostgreSQL and TypeORM.
+- The app uses Angular, NestJS, PostgreSQL and TypeORM.
 - Japanese is the default interface language; English is also supported.
 - Language is selected during onboarding and in signed-in Profile Settings. Account
   preferences restore that choice across devices.

@@ -79,16 +79,6 @@ export class AuthService implements OnModuleInit {
       throw new BadGatewayException('Google sign-in is unavailable');
     }
 
-    return this.loginWithGoogleIdToken(idToken, clientId, accessToken);
-  }
-
-  async loginNative(idToken: string) {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    if (!clientId) throw new Error('Google login configuration is incomplete');
-    return this.loginWithGoogleIdToken(idToken, clientId);
-  }
-
-  private async loginWithGoogleIdToken(idToken: string, clientId: string, accessToken?: string) {
     let data;
     try {
       const ticket = await this.googleClient.verifyIdToken({ idToken, audience: clientId });

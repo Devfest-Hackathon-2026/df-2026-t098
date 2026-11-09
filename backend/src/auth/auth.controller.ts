@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Body,
   Controller,
   Get,
@@ -28,7 +27,6 @@ import { JsonBodyGuard } from './guards/json-body.guard';
 import { JwtGuard } from './jwt/jwt.guard';
 import { extractToken } from './jwt/jwt-token';
 import { SESSION_LIFETIME_MS } from './sessions/sessions.service';
-import { isNativeAppOrigin, webOrigin } from './allowed-origins';
 import type { AuthenticatedRequest } from './jwt/jwt.dto';
 
 const COOKIE_OPTIONS = {
@@ -52,46 +50,20 @@ export class AuthController {
   @Post('login')
   @Header('Cache-Control', 'no-store')
   @UseGuards(AuthOriginGuard, JsonBodyGuard, ThrottlerGuard)
-  async login(
-    @Body('code') code: unknown,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async login(@Body('code') code: unknown, @Res({ passthrough: true }) res: Response) {
     if (typeof code !== 'string' || code.trim().length === 0) {
       throw new BadRequestException('Google authorization code is required');
     }
 
-    return this.startSession(req, res, await this.authService.login(code));
-  }
-
-  @Post('google/native')
-  @Header('Cache-Control', 'no-store')
-  @HttpCode(200)
-  @UseGuards(AuthOriginGuard, JsonBodyGuard, ThrottlerGuard)
-  async nativeGoogleLogin(
-    @Body('idToken') idToken: unknown,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    if (req.headers.origin === webOrigin() || !isNativeAppOrigin(req.headers.origin)) {
-      throw new ForbiddenException('Request origin is not allowed');
-    }
-    if (typeof idToken !== 'string' || !idToken.trim() || idToken.length > 16384) {
-      throw new BadRequestException('Google ID token is required');
-    }
-    return this.startSession(req, res, await this.authService.loginNative(idToken));
+    return this.startSession(res, await this.authService.login(code));
   }
 
   @Post('signup')
   @Header('Cache-Control', 'no-store')
   @UseGuards(AuthOriginGuard, JsonBodyGuard, ThrottlerGuard)
   @UsePipes(bodyValidation)
-  async signup(
-    @Body() data: SignupDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    return this.startSession(req, res, await this.authService.signup(data));
+  async signup(@Body() data: SignupDto, @Res({ passthrough: true }) res: Response) {
+    return this.startSession(res, await this.authService.signup(data));
   }
 
   @Post('password/login')
@@ -101,10 +73,9 @@ export class AuthController {
   @UsePipes(bodyValidation)
   async passwordLogin(
     @Body() data: PasswordLoginDto,
-    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return this.startSession(req, res, await this.authService.passwordLogin(data));
+    return this.startSession(res, await this.authService.passwordLogin(data));
   }
 
   @Post('logout')
@@ -136,25 +107,8 @@ export class AuthController {
     return this.authService.setUsername(req.user.sub, data.username);
   }
 
-  /**
-   * Web: the session is an HttpOnly cookie that scripts never read. A native shell (an origin listed
-   * in NATIVE_APP_ORIGINS) is cross-origin, so a SameSite cookie does not follow its requests; it
-   * receives the token in the body, keeps it in the platform keystore, and sends it as a Bearer
-   * header. The web origin never receives the token in the body.
-   */
-  private startSession(
-    req: Request,
-    res: Response,
-    result: { message: string; token: string },
-  ): { message: string; token?: string } {
-    const origin = req.headers?.origin;
-    if (origin !== webOrigin() && isNativeAppOrigin(origin))
-      return { message: result.message, token: result.token };
-    this.setAuthCookie(res, result.token);
-    return { message: result.message };
-  }
-
-  private setAuthCookie(res: Response, token: string): void {
+  private startSession(res: Response, { message, token }: { message: string; token: string }) {
     res.cookie('access_token', token, { ...COOKIE_OPTIONS, maxAge: SESSION_LIFETIME_MS });
+    return { message };
   }
 }

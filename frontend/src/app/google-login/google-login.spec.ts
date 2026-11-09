@@ -12,9 +12,6 @@ import { routes } from '../app.routes';
 import { guestOnlyGuard } from '../auth/guest.guard';
 import { saveQuestionReturn } from '../auth/auth-return';
 
-const nativeGoogle = vi.hoisted(() => ({ initialize: vi.fn(), login: vi.fn() }));
-vi.mock('@capgo/capacitor-social-login', () => ({ SocialLogin: nativeGoogle }));
-
 describe('Google sign-in screen', () => {
   const passwordLogin = vi.fn();
   let session: {
@@ -730,17 +727,7 @@ describe('Google sign-in callback', () => {
 });
 
 describe('Google sign-in initiation', () => {
-  const nativeGoogleLogin = vi.fn();
-
-  beforeEach(() => {
-    nativeGoogle.initialize.mockReset().mockResolvedValue(undefined);
-    nativeGoogle.login.mockReset();
-    nativeGoogleLogin.mockReset();
-  });
-
-  afterEach(() => vi.unstubAllGlobals());
-
-  function setup(origin: string, native: boolean, status: SessionStatus = 'guest') {
+  function setup(origin: string, status: SessionStatus = 'guest') {
     const assign = vi.fn();
     const stored = new Map<string, string>();
     const fakeDocument = {
@@ -754,7 +741,6 @@ describe('Google sign-in initiation', () => {
           removeItem: (key: string) => stored.delete(key),
         },
         crypto: { getRandomValues: (bytes: Uint8Array) => bytes.fill(1) },
-        Capacitor: { isNativePlatform: () => native, getPlatform: () => 'ios' },
       },
     };
     TestBed.configureTestingModule({
@@ -762,7 +748,7 @@ describe('Google sign-in initiation', () => {
         { provide: DOCUMENT, useValue: fakeDocument },
         { provide: ActivatedRoute, useValue: { snapshot: { routeConfig: { path: 'login' } } } },
         { provide: Router, useValue: { navigateByUrl: vi.fn().mockResolvedValue(true) } },
-        { provide: AuthApi, useValue: { nativeGoogleLogin, passwordLogin: vi.fn() } },
+        { provide: AuthApi, useValue: { passwordLogin: vi.fn() } },
         {
           provide: AuthSession,
           useValue: { status: signal<SessionStatus>(status), refresh: vi.fn() },
@@ -788,7 +774,7 @@ describe('Google sign-in initiation', () => {
   }
 
   it('starts Google sign-in from the configured local browser origin', () => {
-    const { component, assign, stored } = setup('http://localhost:4200', false);
+    const { component, assign, stored } = setup('http://localhost:4200');
     component.startSignIn();
     expect(assign).toHaveBeenCalledOnce();
     const destination = new URL(assign.mock.calls[0][0]);
@@ -798,7 +784,7 @@ describe('Google sign-in initiation', () => {
 
   it('starts Google sign-in with the deployed callback on Cloud Run', () => {
     const origin = 'https://whylint-8715935974.asia-northeast1.run.app';
-    const { component, assign, stored } = setup(origin, false);
+    const { component, assign, stored } = setup(origin);
     component.startSignIn();
     expect(assign).toHaveBeenCalledOnce();
     const destination = new URL(assign.mock.calls[0][0]);
@@ -807,46 +793,17 @@ describe('Google sign-in initiation', () => {
   });
 
   it('does not initiate the incomplete flow on an unconfigured origin', () => {
-    const { component, assign, stored } = setup('https://example.com', false);
+    const { component, assign, stored } = setup('https://example.com');
     component.startSignIn();
     expect(assign).not.toHaveBeenCalled();
     expect(stored.has(STATE_KEY)).toBe(false);
     expect(component.error()).toBe('origin');
   });
 
-  it('does not launch the web flow inside a native app', () => {
-    const { component, assign } = setup('http://localhost:4200', true);
-    component.startSignIn();
-    expect(assign).not.toHaveBeenCalled();
-    expect(component.error()).toBe('native');
-  });
-
-  it('exchanges a native Google ID token through the existing session API', async () => {
-    vi.stubGlobal('__IOS_GOOGLE_CLIENT_ID__', 'test-ios-client-id');
-    nativeGoogle.login.mockResolvedValue({
-      provider: 'google', result: { responseType: 'online', idToken: 'test-google-id-token' },
-    });
-    nativeGoogleLogin.mockResolvedValue({ ok: true });
-    const { component, assign } = setup('capacitor://localhost', true);
-    component.startSignIn();
-    await vi.waitFor(() => expect(nativeGoogleLogin).toHaveBeenCalledWith('test-google-id-token'));
-    expect(nativeGoogle.initialize).toHaveBeenCalledOnce();
-    expect(assign).not.toHaveBeenCalled();
-  });
-
-  it('does not exchange a token when the native sign-in is cancelled', async () => {
-    vi.stubGlobal('__IOS_GOOGLE_CLIENT_ID__', 'test-ios-client-id');
-    nativeGoogle.login.mockRejectedValue({ code: 'USER_CANCELLED' });
-    const { component } = setup('capacitor://localhost', true);
-    component.startSignIn();
-    await vi.waitFor(() => expect(component.error()).toBe('cancelled'));
-    expect(nativeGoogleLogin).not.toHaveBeenCalled();
-  });
-
   it.each(['loading', 'unavailable', 'authenticated'] as const)(
     'ignores stale sign-in actions while session is %s',
     (status) => {
-      const { component, assign, stored } = setup('http://localhost:4200', false, status);
+      const { component, assign, stored } = setup('http://localhost:4200', status);
       component.startSignIn();
       const event = new Event('submit', { cancelable: true });
       const identifier = document.createElement('input');

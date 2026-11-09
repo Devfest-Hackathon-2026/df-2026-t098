@@ -189,15 +189,3 @@ textarea {
     opacity: 0;
   }
 }
-
-/* Native shell: the web view extends under the status bar, so a page that scrolls would run through
-   the clock. A strip in the page colour keeps the status bar readable. */
-html.native-app body::before {
-  content: '';
-  position: fixed;
-  inset: 0 0 auto 0;
-  height: env(safe-area-inset-top, 0px);
-  background: var(--canvas);
-  z-index: 1000;
-  pointer-events: none;
-}

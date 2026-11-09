@@ -9,8 +9,6 @@ import { authError } from '../auth/auth-copy';
 import { CALLBACK_PATH, createAuthorizationUrl, readCallback, STATE_KEY } from './oauth-flow';
 import { questionReturnTo, saveQuestionReturn, takeQuestionReturn } from '../auth/auth-return';
 
-declare const __IOS_GOOGLE_CLIENT_ID__: string | undefined;
-
 // Google OAuth client IDs are public. Never put a client secret in the frontend.
 const GOOGLE_WEB_CLIENT_ID =
   '8715935974-egdfj9tf8e1p71jjr2befadf47cne86l.apps.googleusercontent.com';
@@ -23,7 +21,7 @@ const GOOGLE_EXCHANGE_TIMEOUT_MS = 10_000;
 type Language = 'ja' | 'en';
 type Theme = 'light' | 'dark';
 type Phase = 'ready' | 'working' | 'signed-in' | 'error';
-type ErrorKey = 'origin' | 'native' | 'cancelled' | 'invalid' | 'storage' | 'api' | 'restart';
+type ErrorKey = 'origin' | 'cancelled' | 'invalid' | 'storage' | 'api' | 'restart';
 type PasswordStatus =
   'missingIdentifier' | 'missingPassword' | 'invalidPassword' | 'passwordFailed' | null;
 
@@ -52,7 +50,6 @@ const COPY = {
     done: 'ログインできました',
     doneDetail: '学習を続けましょう。',
     origin: 'この環境ではGoogleログインを利用できません。',
-    native: 'アプリでのGoogleログインは準備中です。',
     cancelled: 'Googleでのログインがキャンセルされました。',
     invalid: 'ログインを確認できませんでした。もう一度お試しください。',
     storage: 'ログインを開始できませんでした。ブラウザの設定を確認してください。',
@@ -85,7 +82,6 @@ const COPY = {
     done: 'You’re signed in',
     doneDetail: 'Ready to keep learning?',
     origin: 'Google sign-in is not available in this environment.',
-    native: 'Google sign-in in the app is coming soon.',
     cancelled: 'Google sign-in was cancelled.',
     invalid: 'We could not verify this sign-in. Please try again.',
     storage: 'Could not start sign-in. Check your browser settings and try again.',
@@ -262,15 +258,6 @@ export class GoogleLogin implements OnInit {
       return;
     }
     this.error.set(null);
-    if (this.isNativeApp()) {
-      const capacitor = this.win as Window & { Capacitor?: { getPlatform?: () => string } };
-      if (capacitor.Capacitor?.getPlatform?.() !== 'ios') {
-        this.showError('native');
-        return;
-      }
-      void this.startNativeGoogleSignIn();
-      return;
-    }
     if (!this.isSupportedOrigin()) {
       this.showError('origin');
       return;
@@ -289,43 +276,6 @@ export class GoogleLogin implements OnInit {
     }
   }
 
-  private async startNativeGoogleSignIn(): Promise<void> {
-    const iosClientId =
-      typeof __IOS_GOOGLE_CLIENT_ID__ === 'string' ? __IOS_GOOGLE_CLIENT_ID__ : '';
-    if (!iosClientId) {
-      this.showError('native');
-      return;
-    }
-    this.phase.set('working');
-    try {
-      const { SocialLogin } = await import('@capgo/capacitor-social-login');
-      await SocialLogin.initialize({
-        google: {
-          iOSClientId: iosClientId,
-          iOSServerClientId: GOOGLE_WEB_CLIENT_ID,
-          webClientId: GOOGLE_WEB_CLIENT_ID,
-          mode: 'online',
-        },
-      });
-      const login = await SocialLogin.login({ provider: 'google', options: {} });
-      if (login.result.responseType !== 'online' || !login.result.idToken) {
-        this.showError('invalid');
-        return;
-      }
-      const result = await this.api.nativeGoogleLogin(login.result.idToken);
-      if (this.destroyed) return;
-      if (!result.ok) {
-        this.showError('api');
-        return;
-      }
-      this.phase.set('signed-in');
-    } catch (error) {
-      if (this.destroyed) return;
-      const cancelled = (error as { code?: string } | null)?.code === 'USER_CANCELLED';
-      this.showError(cancelled ? 'cancelled' : 'api');
-    }
-  }
-
   private async finishSignIn(): Promise<void> {
     if (!this.win) return;
     const search = this.win.location.search;
@@ -338,10 +288,6 @@ export class GoogleLogin implements OnInit {
       intendedReturn = takeQuestionReturn(this.win.sessionStorage, expectedState);
     } catch {
       await this.finishCallbackWithError('storage');
-      return;
-    }
-    if (this.isNativeApp()) {
-      await this.finishCallbackWithError('native');
       return;
     }
     if (!this.isSupportedOrigin()) {
@@ -470,12 +416,6 @@ export class GoogleLogin implements OnInit {
     } finally {
       this.redirecting = false;
     }
-  }
-
-  private isNativeApp(): boolean {
-    const windowWithCapacitor = this.win as
-      (Window & { Capacitor?: { isNativePlatform?: () => boolean } }) | null;
-    return windowWithCapacitor?.Capacitor?.isNativePlatform?.() === true;
   }
 
   private isSupportedOrigin(): boolean {

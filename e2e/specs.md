@@ -14,7 +14,7 @@
   completion and weekly ranking, community visibility to another user, likes,
   bookmarks, comments and share URLs. Inject transient browser response failures
   to prove answer preservation and recovery without turning errors into scores.
-- Keep live Gemini and actual mobile/Capacitor behavior separate from these results.
+- Keep live Gemini and physical device behavior separate from these results.
 
 ## Username and signup regression extension
 
@@ -127,7 +127,7 @@ preparation. Keep the persisted session entity and JWT verification unchanged.
 
 ## Validation limits
 
-Browser emulation does not verify a Capacitor WebView, device keyboard, native
-Google flow, deployed cross-origin behavior, Google consent, production OAuth
+Browser emulation does not verify device keyboard behavior, deployed cross-origin
+behavior, Google consent, production OAuth
 state/PKCE or real Google token exchange. Report these limits and any pre-existing
 warnings/failures explicitly. Do not publish, merge, switch branches or commit.

@@ -54,9 +54,9 @@ Googleログイン、メール・ユーザー名での認証、取り消し可�
 
 Geminiの実接続はAPIキーとモデルの設定後に検証します。自動テストでは外部AIの応答を
 テスト用フィクスチャに置き換え、実際のバックエンドと一時的なPostgreSQLを使用します。
-Capacitor実機とGoogle Cloud Runへのデプロイは別途検証が必要です。
+Google Cloud Runへのデプロイは別途検証が必要です。
 コンテナ（アプリとAPIを同一オリジンで配信）の手順は [docs/deployment.md](docs/deployment.md) を参照してください。
-iOS/AndroidアプリはCapacitorで動作します。手順と検証状況は [docs/mobile.md](docs/mobile.md) を参照してください。
+iOS/Android向けのネイティブアプリは別プロジェクトで開発する予定です。
 
 ### ローカル起動
 
@@ -121,13 +121,12 @@ the revised text you explicitly submit.
 
 ### Stack and setup
 
-Angular, Capacitor, NestJS, PostgreSQL, and TypeORM. Cloud Run is the intended backend deployment
-platform. Deployment and actual Capacitor device behavior require separate verification.
+Angular, NestJS, PostgreSQL, and TypeORM. Cloud Run is the intended deployment platform.
 The repository root `Dockerfile` builds one image that serves the Angular app and the API from the same
 origin; see [docs/deployment.md](docs/deployment.md) for its environment, release job, and probes.
-The iOS and Android apps are the same Angular code in a Capacitor shell; see [docs/mobile.md](docs/mobile.md).
+The native iOS and Android apps are planned as a separate project.
 
-Both applications live in this repository. Use the backend and frontend commands above.
+The web frontend and API live in this repository. Use the backend and frontend commands above.
 Backend environment setup is in [backend/README.md](backend/README.md). Gemini generation,
 assessment, and publication review require server-side `GEMINI_API_KEY` and `GEMINI_MODEL`.
 An unavailable AI provider produces a retryable error. Provider failures do not create failing grades.

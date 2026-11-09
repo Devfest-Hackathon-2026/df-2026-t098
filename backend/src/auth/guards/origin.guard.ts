@@ -1,19 +1,18 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { isNativeAppOrigin, webOrigin } from '../allowed-origins';
+import { webOrigin } from '../allowed-origins';
 
 @Injectable()
 export class AuthOriginGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     const origin = request.headers.origin;
-    // Without a valid FRONTEND_URL nothing is trusted, native origins included.
     const expectedOrigin = webOrigin();
     if (!expectedOrigin) throw new ForbiddenException('Request origin is not allowed');
 
     if (origin === undefined && isBearerOnlyLogout(request)) return true;
 
-    if (typeof origin !== 'string' || (origin !== expectedOrigin && !isNativeAppOrigin(origin))) {
+    if (origin !== expectedOrigin) {
       throw new ForbiddenException('Request origin is not allowed');
     }
 
