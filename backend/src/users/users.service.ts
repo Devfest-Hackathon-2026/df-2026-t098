@@ -16,6 +16,8 @@ export class UsersService {
         name: this.googleDisplayName(userData.name),
         avatar_url: this.googleAvatarUrl(userData.picture),
         google_id: userData.googleId,
+        // Google issues ID tokens only for verified addresses (checked in AuthService).
+        email_verified_at: new Date(),
       });
 
       return await this.usersRepository.save(newAccount);

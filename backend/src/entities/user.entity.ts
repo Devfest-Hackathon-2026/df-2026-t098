@@ -32,6 +32,9 @@ export class UserEntity {
   @Column({ type: 'varchar', nullable: true })
   avatar_url!: string | null;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  email_verified_at!: Date | null;
+
   @CreateDateColumn({ nullable: false })
   created_at!: Date;
 

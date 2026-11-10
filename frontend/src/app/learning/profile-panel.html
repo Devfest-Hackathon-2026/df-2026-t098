@@ -45,6 +45,33 @@
               }
             </span>
           </div>
+          @if (account.emailVerified === false) {
+            <div class="verify-banner" role="status">
+              <p>
+                {{
+                  text(
+                    'メールアドレスがまだ確認されていません。届いたメールのリンクを開いてください。',
+                    'Your email is not confirmed yet. Open the link we emailed you.'
+                  )
+                }}
+              </p>
+              @if (verificationNotice()) {
+                <p class="verify-notice">{{ verificationNotice() }}</p>
+              }
+              <button
+                type="button"
+                class="secondary"
+                [disabled]="sendingVerification()"
+                (click)="resendVerification()"
+              >
+                {{
+                  sendingVerification()
+                    ? text('送信中…', 'Sending…')
+                    : text('確認メールを再送する', 'Resend confirmation email')
+                }}
+              </button>
+            </div>
+          }
           <div class="account-settings-links">
             <a [routerLink]="['/creators', account.id]">{{
               text('公開プロフィールを見る', 'View public profile')

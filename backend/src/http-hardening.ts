@@ -9,6 +9,31 @@ export function rejectPollutionKeys(key: string, value: unknown): unknown {
   return value;
 }
 
+/**
+ * The page's Content Security Policy, sent with the Angular shell and every API response.
+ *
+ * Scripts: only our own bundle. The production build no longer inlines critical CSS (that
+ * added an inline loader script), so no 'unsafe-inline' or nonce is needed for scripts.
+ * Styles: Angular injects component styles at runtime, which needs 'unsafe-inline' for
+ * style-src; that cannot run script. Fonts come from Google Fonts; avatars from Google.
+ * Sign-in with Google is a top-level redirect, so it needs no frame or connect allowance.
+ */
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: https://*.googleusercontent.com",
+  "connect-src 'self'",
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-src 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 export function securityHeaders(
   _request: Request,
   response: Response,
@@ -17,9 +42,10 @@ export function securityHeaders(
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('Referrer-Policy', 'no-referrer');
   response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
   response.setHeader(
-    'Content-Security-Policy',
-    "base-uri 'self'; object-src 'none'; frame-ancestors 'none'",
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
   );
   response.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   if (process.env.NODE_ENV === 'production')

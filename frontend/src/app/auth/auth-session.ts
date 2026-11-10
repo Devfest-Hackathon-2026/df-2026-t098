@@ -6,6 +6,8 @@ export interface AuthUser {
   name: string | null;
   avatarUrl: string | null;
   username: string | null;
+  /** False for a password account that has not opened its verification link yet. */
+  emailVerified?: boolean;
 }
 
 export type SessionStatus = 'loading' | 'authenticated' | 'guest' | 'unavailable';

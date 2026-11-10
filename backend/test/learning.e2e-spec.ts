@@ -24,6 +24,7 @@ import { FixIPv4OctetQuestion1794310000000 } from '../migrations/1794310000000-F
 import { ClarifyIPv4OctetExplanation1794410000000 } from '../migrations/1794410000000-ClarifyIPv4OctetExplanation';
 import { GuestAnswerImport1794420000000 } from '../migrations/1794420000000-GuestAnswerImport';
 import { CorrectPythonIndexQuestion1794430000000 } from '../migrations/1794430000000-CorrectPythonIndexQuestion';
+import { AccountEmail1794500000000 } from '../migrations/1794500000000-AccountEmail';
 import { SocialLearningCommunity1794200000000 } from '../migrations/1794200000000-SocialLearningCommunity';
 import { AccountSafety1794400000000 } from '../migrations/1794400000000-AccountSafety';
 import type { GeneratedQuestion } from '../src/learning/gemini/gemini.types';
@@ -180,6 +181,7 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
         ClarifyIPv4OctetExplanation1794410000000,
         GuestAnswerImport1794420000000,
         CorrectPythonIndexQuestion1794430000000,
+        AccountEmail1794500000000,
       ],
     });
     await migrations.initialize();

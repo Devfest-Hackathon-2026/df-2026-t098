@@ -489,10 +489,13 @@ export class QuestionCard {
       ? hostHeight - (cardHeight - viewport.offsetHeight)
       : viewport.clientHeight;
     const size = { width: viewport.clientWidth, height: available, font };
+    // Sub-pixel and 1-2px jitter is the card reacting to its own density change. Treating it as
+    // a new viewport restarted the search forever at large reading sizes, so the card never
+    // settled and never became scrollable. Only a real size change restarts the fit.
     if (
       reset ||
-      size.width !== this.fitViewport.width ||
-      size.height !== this.fitViewport.height ||
+      Math.abs(size.width - this.fitViewport.width) > 2 ||
+      Math.abs(size.height - this.fitViewport.height) > 2 ||
       font !== this.fitViewport.font
     ) {
       this.fitViewport = size;
@@ -516,9 +519,13 @@ export class QuestionCard {
       const wide = !!code && code.scrollWidth > code.clientWidth + 1;
       this.codeOverflow.set(wide);
       const overflow = required > available + 1 || (wide && this.density() > 1);
+      // The space estimate can miss chrome that grows with the reading size (the action rows
+      // below the stage). Whatever the estimate says, content the stage actually clips must
+      // become scrollable, or the last lines of code can never be reached or tapped.
+      const clipped = viewport.scrollHeight > viewport.clientHeight + 1;
       if (this.fitComplete) {
         if (!overflow || this.density() <= FIT_MIN + 0.001) {
-          this.fitOverflow.set(overflow);
+          this.fitOverflow.set(overflow || clipped);
           return;
         }
         this.fitComplete = false;
@@ -528,7 +535,7 @@ export class QuestionCard {
       }
       if (this.fitPasses === 0 && !overflow) {
         this.fitComplete = true;
-        this.fitOverflow.set(false);
+        this.fitOverflow.set(clipped);
         return;
       }
       if (overflow) this.fitUpper = this.density();

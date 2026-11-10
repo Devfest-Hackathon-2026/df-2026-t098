@@ -22,6 +22,8 @@ import type { Request, Response } from 'express';
 import { SignupDto } from './dto/signup.dto';
 import { PasswordLoginDto } from './dto/password-login.dto';
 import { UsernameDto } from './dto/username.dto';
+import { EmailTokenDto, ForgotPasswordDto, ResetPasswordDto } from './dto/account-email.dto';
+import { AccountEmailService } from './account-email.service';
 import { DatabaseErrorFilter } from './filters/database-error.filter';
 import { AuthOriginGuard } from './guards/origin.guard';
 import { JsonBodyGuard } from './guards/json-body.guard';
@@ -46,7 +48,10 @@ const bodyValidation = new ValidationPipe({
 @Controller('auth')
 @UseFilters(DatabaseErrorFilter)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly accountEmail: AccountEmailService,
+  ) {}
 
   @Post('login')
   @Header('Cache-Control', 'no-store')
@@ -79,16 +84,62 @@ export class AuthController {
     return this.startSession(res, await this.authService.passwordLogin(data));
   }
 
+  /** Emails a reset link when the account exists; the answer never says whether it does. */
+  @Post('password/forgot')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(202)
+  @UseGuards(AuthOriginGuard, JsonBodyGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @UsePipes(bodyValidation)
+  async forgotPassword(@Body() data: ForgotPasswordDto) {
+    await this.accountEmail.requestPasswordReset(data.identifier);
+    return { message: 'If an account matches, a reset link is on its way.' };
+  }
+
+  @Post('password/reset')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(204)
+  @UseGuards(AuthOriginGuard, JsonBodyGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @UsePipes(bodyValidation)
+  async resetPassword(@Body() data: ResetPasswordDto, @Res({ passthrough: true }) res: Response) {
+    await this.accountEmail.resetPassword(data.token, data.password);
+    // Every session was revoked, including this browser's, so sign in again.
+    res.clearCookie('access_token', COOKIE_OPTIONS);
+  }
+
+  @Post('email/verify')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @UseGuards(AuthOriginGuard, JsonBodyGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @UsePipes(bodyValidation)
+  verifyEmail(@Body() data: EmailTokenDto) {
+    return this.accountEmail.verifyEmail(data.token);
+  }
+
+  @Post('email/verification')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @UseGuards(JwtGuard, AuthOriginGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  resendVerification(@Req() req: AuthenticatedRequest) {
+    if (!req.user) throw new UnauthorizedException('User not authenticated');
+    return this.accountEmail.sendVerification(req.user.sub);
+  }
+
   @Post('logout')
   @Header('Cache-Control', 'no-store')
   @HttpCode(204)
-  @UseGuards(AuthOriginGuard)
+  @UseGuards(AuthOriginGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     await this.authService.logout(extractToken(req));
     res.clearCookie('access_token', COOKIE_OPTIONS);
   }
 
-  @UseGuards(JwtGuard)
+  @UseGuards(ThrottlerGuard, JwtGuard)
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   @Get('me')
   @Header('Cache-Control', 'no-store')
   me(@Req() req: AuthenticatedRequest) {

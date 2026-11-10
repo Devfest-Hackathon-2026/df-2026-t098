@@ -1,4 +1,5 @@
-import { Controller, Get, Header, Req } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Controller, UseGuards, Get, Header, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { localeDefault } from './locale-default';
 
@@ -41,6 +42,8 @@ export function publicConfig(env: NodeJS.ProcessEnv = process.env): PublicConfig
 }
 
 @Controller('config')
+@UseGuards(ThrottlerGuard)
+@Throttle({ default: { limit: 60, ttl: 60000 } })
 export class PublicConfigController {
   @Get()
   @Header('Cache-Control', 'public, max-age=300')
