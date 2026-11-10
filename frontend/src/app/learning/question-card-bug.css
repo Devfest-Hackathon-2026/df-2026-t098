@@ -5,6 +5,12 @@
 }
 .code-hint {
   color: var(--accent);
+  font:
+    600 0.875rem/1.3 'DM Sans',
+    system-ui,
+    sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .code-lines {
   display: flex;
