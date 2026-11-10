@@ -695,19 +695,22 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         else loadFeed()
     }
 
-    private fun update(q: Question) {
-        questions = questions.map { if (it.id == q.id) q else it }
-        collection = collection.map { if (it.id == q.id) q else it }
-        if (focused?.id == q.id) focused = q
+    private fun updateQuestion(id: String, transform: (Question) -> Question) {
+        questions = questions.map { if (it.id == id) transform(it) else it }
+        collection = collection.map { if (it.id == id) transform(it) else it }
+        focused?.takeIf { it.id == id }?.let { focused = transform(it) }
     }
 
     fun answer(q: Question, choice: Int) = action(onFailure = { answerFailure = q.id to it }) {
+        val owner = identity
         answerFailure = null
         pendingAnswerId = q.id
         try {
             val result =
                 api.request("/learning/questions/${q.id}/taps", "POST", json("choice" to choice))
-            update(q.copy(tap = QuizAnswer.parse(result)))
+            if (owner != identity) return@action
+            val answer = QuizAnswer.parse(result)
+            updateQuestion(q.id) { it.copy(tap = answer) }
             result.optJSONObject("progress")?.let { progress = it }
                 ?: run {
                     guestAnswered++
@@ -730,22 +733,27 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     fun like(q: Question) {
         if (!requireLogin("like")) return
         action("like:${q.id}") {
+            val owner = identity
             val result =
                 api.request("/learning/questions/${q.id}/like", "PUT", json("liked" to !q.liked))
-            update(
-                q.copy(
+            if (owner != identity) return@action
+            updateQuestion(q.id) { current ->
+                current.copy(
                     liked = result.optBoolean("liked", !q.liked),
-                    likes = result.optInt("likes", q.likes + if (q.liked) -1 else 1),
+                    likes = result.optInt("likes", current.likes + if (q.liked) -1 else 1),
                 )
-            )
+            }
         }
     }
 
     fun save(q: Question) {
         if (!requireLogin("save")) return
         action("save:${q.id}") {
-            api.request("/learning/questions/${q.id}/save", "PUT", json("saved" to !q.saved))
-            update(q.copy(saved = !q.saved))
+            val owner = identity
+            val result =
+                api.request("/learning/questions/${q.id}/save", "PUT", json("saved" to !q.saved))
+            if (owner != identity) return@action
+            updateQuestion(q.id) { it.copy(saved = result.optBoolean("saved", !q.saved)) }
         }
     }
 

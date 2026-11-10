@@ -23,10 +23,11 @@ import { QuestionConcepts1794300000000 } from '../migrations/1794300000000-Quest
 import { FixIPv4OctetQuestion1794310000000 } from '../migrations/1794310000000-FixIPv4OctetQuestion';
 import { ClarifyIPv4OctetExplanation1794410000000 } from '../migrations/1794410000000-ClarifyIPv4OctetExplanation';
 import { GuestAnswerImport1794420000000 } from '../migrations/1794420000000-GuestAnswerImport';
+import { CorrectPythonIndexQuestion1794430000000 } from '../migrations/1794430000000-CorrectPythonIndexQuestion';
 import { SocialLearningCommunity1794200000000 } from '../migrations/1794200000000-SocialLearningCommunity';
 import { AccountSafety1794400000000 } from '../migrations/1794400000000-AccountSafety';
 import type { GeneratedQuestion } from '../src/learning/gemini/gemini.types';
-import { readPoolFile } from '../src/learning/question-pool.seeder';
+import { QuestionPoolSeeder, readPoolFile } from '../src/learning/question-pool.seeder';
 import { learningWeek } from '../src/learning/learning-calendar';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -178,6 +179,7 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
         AccountSafety1794400000000,
         ClarifyIPv4OctetExplanation1794410000000,
         GuestAnswerImport1794420000000,
+        CorrectPythonIndexQuestion1794430000000,
       ],
     });
     await migrations.initialize();
@@ -1656,6 +1658,35 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
       format: 'choice',
       options: ['1', '2', '3', '4'],
       tap: { choice: 3, correct: true, correctOption: 3, quickExplanation: seed.quickExplanation },
+    });
+    const [stored] = await database.query('SELECT xp_awarded FROM learning_taps WHERE question_id = $1', [id]);
+    expect(stored.xp_awarded).toBe(5);
+  });
+
+  it('corrects the existing Python index prompt without changing its answer or earned XP', async () => {
+    const id = 'eff5dc29-46a1-49a1-bce4-cf8154a96db7';
+    const pool = readPoolFile()!;
+    const seed = pool.questions.find((question) => question.id === id)!;
+    await new QuestionPoolSeeder(database).seed({ ...pool, questions: [seed] });
+    const oldPrompt =
+      'Which line causes an IndexError when trying to print the first item? Select the buggy line number and explain how list indices start.';
+    await database.query('UPDATE learning_questions SET prompt = $1 WHERE id = $2', [oldPrompt, id]);
+    await database.query(
+      `INSERT INTO learning_taps (user_id,question_id,choice,correct,xp_awarded,day)
+       VALUES ($1,$2,1,true,5,$3)`,
+      [users[0], id, learningWeek()],
+    );
+    const runner = database.createQueryRunner();
+    try {
+      await new CorrectPythonIndexQuestion1794430000000().up(runner);
+    } finally {
+      await runner.release();
+    }
+    const result = (await read('/questions/' + id).expect(200)).body.question;
+    expect(result).toMatchObject({
+      prompt: seed.prompt,
+      format: 'spot_bug',
+      tap: { choice: 1, correct: true, correctOption: 1 },
     });
     const [stored] = await database.query('SELECT xp_awarded FROM learning_taps WHERE question_id = $1', [id]);
     expect(stored.xp_awarded).toBe(5);

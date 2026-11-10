@@ -2759,7 +2759,7 @@
     {
       "id": "eff5dc29-46a1-49a1-bce4-cf8154a96db7",
       "title": "Spotting an Index Bug in Python",
-      "prompt": "Which line causes an IndexError when trying to print the first item? Select the buggy line number and explain how list indices start.",
+      "prompt": "Which line makes this code print the second item instead of the first? Tap the buggy line and explain how Python list indices start.",
       "code": "items = [\"apple\", \"banana\"]\nfirst_item = items[1]\nprint(\"First:\", first_item)",
       "codeLanguage": "python",
       "topics": [

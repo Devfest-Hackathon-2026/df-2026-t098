@@ -13,6 +13,8 @@ screens. The original audit below records the earlier implementation.
 | P1. The compact layout hid the quiz format, source, and supporting context, and stacked binary answers even where they fit side by side. | The reason and format lead the card, followed by the prompt, metadata, code, and answers. True/false uses two columns when space and text size allow. Other choices stay stacked. |
 | P1. Unknown web links showed an indefinite loading skeleton. Malformed and missing shared questions lacked a dedicated recovery state. | The web app shows a page or question not found state with a route back to the feed. Android question links have distinct missing and retryable error states. |
 | P2. References and reporting were hidden in Details on the native cards. | The native cards expose Further reading and Report a problem near the lesson controls. Social actions and answer feedback retain native interactions. |
+| P1. The English Python index lesson claimed that a valid index raised an error. | The prompt now asks why the code prints the second item. The migration keeps the existing question ID, answer, and progress. |
+| P2. Overlapping Android answers, likes, and saves could replace newer card state with a stale copy. | Each response now updates its own fields on the current card and is ignored after an account change. |
 
 The layout review covers visual hierarchy, light and dark appearance, long
 content, tap targets, accessible labels, and recovery states.
