@@ -172,8 +172,8 @@ export class AuthService implements OnModuleInit {
       );
       return { userId: user.id, session: await this.createSession(user.id, 'Account created!', manager) };
     });
-    // After the commit, so the verification token can reference the new user.
-    void this.accountEmail.sendVerificationQuietly(created.userId);
+    // Wait inside the request because Cloud Run can throttle CPU after the response.
+    await this.accountEmail.sendVerificationQuietly(created.userId);
     return created.session;
   }
 
