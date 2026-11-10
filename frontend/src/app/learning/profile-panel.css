@@ -379,3 +379,31 @@ progress::-moz-progress-bar {
   font-size: 0.875rem;
   text-underline-offset: 4px;
 }
+.verify-banner {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--control-selected, transparent);
+}
+.verify-banner p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+.verify-banner .verify-notice {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.verify-banner button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+.verify-banner button:disabled {
+  opacity: 0.6;
+}

@@ -11,11 +11,13 @@ import axios from 'axios';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { AuthModule } from '../src/auth/auth.module';
 import { AuthService } from '../src/auth/auth.service';
+import { EmailService } from '../src/email/email.service';
 import { UserEntity } from '../src/entities/user.entity';
 import { UsersService } from '../src/users/users.service';
 import { SessionEntity } from '../src/auth/sessions/session.entity';
 import { Migrations1793888259896 } from '../migrations/1793888259896-Migrations';
 import { PasswordAuthSessions1793930000000 } from '../migrations/1793930000000-PasswordAuthSessions';
+import { AccountEmail1794500000000 } from '../migrations/1794500000000-AccountEmail';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const origin = 'http://localhost:4200';
@@ -122,7 +124,11 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
       type: 'postgres',
       url: databaseUrl,
       entities: [UserEntity, SessionEntity],
-      migrations: [Migrations1793888259896, PasswordAuthSessions1793930000000],
+      migrations: [
+        Migrations1793888259896,
+        PasswordAuthSessions1793930000000,
+        AccountEmail1794500000000,
+      ],
       synchronize: false,
       logging: false,
     });
@@ -676,6 +682,53 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
     await request(server()).get('/api/v1/auth/me').set('Authorization', auth).expect(401);
     await request(server()).get('/api/v1/auth/me')
       .set('Authorization', `Bearer ${login.body.token as string}`).expect(200);
+  });
+
+  it('verifies email and resets a password using emailed links', async () => {
+    const delivery = jest.spyOn(app!.get(EmailService), 'send').mockResolvedValue();
+    const address = `links-${suffix}@example.test`;
+    const newPassword = 'a different long test password';
+    const signup = await request(server()).post('/api/v1/auth/signup')
+      .set('Origin', origin)
+      .send({ email: address, username: `links_${suffix}`, password })
+      .expect(201);
+    const cookie = cookieFrom(signup);
+    const tokenFor = (path: string) => {
+      const text = delivery.mock.lastCall?.[0].text;
+      const link = text?.split('\n').find((line) => line.startsWith(origin + path));
+      if (!link) throw new Error('Expected an email link');
+      return new URL(link).searchParams.get('token');
+    };
+    try {
+      const verification = tokenFor('/verify-email');
+      await request(server()).post('/api/v1/auth/email/verify')
+        .set('Origin', origin).send({ token: verification }).expect(200);
+      await request(server()).post('/api/v1/auth/email/verify')
+        .set('Origin', origin).send({ token: verification }).expect(400);
+      await request(server()).get('/api/v1/auth/me')
+        .set('Cookie', cookie).expect(200)
+        .expect(({ body }) => expect(body.emailVerified).toBe(true));
+
+      const forgot = (identifier: string) => request(server()).post('/api/v1/auth/password/forgot')
+        .set('Origin', origin).send({ identifier }).expect(202);
+      const known = await forgot(address);
+      const unknown = await forgot(`missing-${suffix}@example.test`);
+      expect(known.body).toEqual(unknown.body);
+      const reset = tokenFor('/reset-password');
+      await request(server()).post('/api/v1/auth/password/reset')
+        .set('Origin', origin).send({ token: reset, password: newPassword }).expect(204);
+      await request(server()).post('/api/v1/auth/password/reset')
+        .set('Origin', origin).send({ token: reset, password: password }).expect(400);
+      await request(server()).get('/api/v1/auth/me').set('Cookie', cookie).expect(401);
+
+      delivery.mockRejectedValue(new Error('fixture provider outage'));
+      const attempts = delivery.mock.calls.length;
+      const unavailable = await forgot(email);
+      expect(delivery.mock.calls).toHaveLength(attempts + 1);
+      expect(unavailable.body).toEqual(unknown.body);
+    } finally {
+      delivery.mockRestore();
+    }
   });
 
   it('rate limits repeated password attempts', async () => {

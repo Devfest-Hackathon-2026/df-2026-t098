@@ -6,6 +6,7 @@ import axios from 'axios';
 import type { DataSource, EntityManager } from 'typeorm';
 import type { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import type { AccountEmailService } from './account-email.service';
 import type { SessionsService } from './sessions/sessions.service';
 
 describe('AuthService', () => {
@@ -30,6 +31,7 @@ describe('AuthService', () => {
     marker: 'transaction-manager',
   } as unknown as EntityManager;
   const dataSource = {
+    query: jest.fn(),
     transaction: jest.fn(async (callback: (manager: EntityManager) => Promise<unknown>) =>
       callback(transactionManager),
     ),
@@ -50,6 +52,7 @@ describe('AuthService', () => {
       users as unknown as UsersService,
       sessions as unknown as SessionsService,
       dataSource as unknown as DataSource,
+      { sendVerificationQuietly: jest.fn() } as unknown as AccountEmailService,
     );
     await service.onModuleInit();
     passwordHash = await argon2.hash(password, {
@@ -249,6 +252,7 @@ describe('AuthService', () => {
       name: null,
       avatarUrl: null,
       username: null,
+      emailVerified: false,
     });
     users.findById.mockResolvedValue(null);
     await expect(service.getCurrentUser(userId)).rejects.toBeInstanceOf(UnauthorizedException);

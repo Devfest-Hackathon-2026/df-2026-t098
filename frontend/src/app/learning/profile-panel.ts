@@ -17,7 +17,7 @@ import { RouterLink } from '@angular/router';
 import { LegalLinks } from '../config/legal-links';
 import { BlockStore } from './block-store';
 import { PublishDraftStore } from './publish-draft';
-import { AuthSession } from '../auth/auth-session';
+import { AUTH_FETCH, AuthSession } from '../auth/auth-session';
 import { UsernameSetup } from '../auth/username-setup';
 import { LearningApi, LearningError, learningError } from './learning-api';
 import { Icon } from './icon';
@@ -79,6 +79,9 @@ export class ProfilePanel {
   protected readonly deleting = signal(false);
   protected readonly deleteError = signal('');
   protected readonly accountDeleted = signal(false);
+  protected readonly sendingVerification = signal(false);
+  protected readonly verificationNotice = signal('');
+  private readonly authFetch = inject(AUTH_FETCH);
   protected readonly blockError = signal('');
   protected readonly unblocking = signal<string | null>(null);
   protected readonly selectedLanguage = signal<Language>(this.settings.language());
@@ -194,6 +197,41 @@ export class ProfilePanel {
     this.confirmingDelete.set(false);
     this.deleteError.set('');
     afterNextRender(() => this.accountCard()?.nativeElement.focus(), { injector: this.injector });
+  }
+
+  protected async resendVerification(): Promise<void> {
+    if (this.sendingVerification()) return;
+    this.sendingVerification.set(true);
+    this.verificationNotice.set('');
+    try {
+      const response = await this.authFetch('/api/v1/auth/email/verification', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+      });
+      const result: { sent?: boolean; verified?: boolean } = response.ok ? await response.json() : {};
+      if (result.verified) {
+        await this.session.refresh();
+        return;
+      }
+      this.verificationNotice.set(
+        response.status === 429
+          ? this.text('少し待ってから再送してください。', 'Please wait a moment before resending.')
+          : result.sent
+            ? this.text('確認メールを送りました。', 'Confirmation email sent.')
+            : response.ok
+              ? this.text(
+                  '少し前に送ったメールを確認してください。',
+                  'Check the email we sent a moment ago.',
+                )
+              : this.text('送信できませんでした。', 'Could not send the email.'),
+      );
+    } catch {
+      this.verificationNotice.set(this.text('送信できませんでした。', 'Could not send the email.'));
+    } finally {
+      this.sendingVerification.set(false);
+    }
   }
 
   protected async loadBlocks(): Promise<void> {

@@ -14,6 +14,8 @@ import { AuthOriginGuard } from './guards/origin.guard';
 import { JsonBodyGuard } from './guards/json-body.guard';
 import { JwtGuard } from './jwt/jwt.guard';
 import { SessionsService } from './sessions/sessions.service';
+import { AccountEmailService } from './account-email.service';
+import { EmailService } from '../email/email.service';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { SessionsService } from './sessions/sessions.service';
   ],
   providers: [
     AuthService,
+    AccountEmailService,
+    EmailService,
     MobileClientGuard,
     SessionsService,
     JwtGuard,

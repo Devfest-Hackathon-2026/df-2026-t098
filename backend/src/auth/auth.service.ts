@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
+import { PASSWORD_OPTIONS } from './password-options';
+import { AccountEmailService } from './account-email.service';
 import * as argon2 from 'argon2';
 import axios from 'axios';
 import { DataSource } from 'typeorm';
@@ -17,12 +19,7 @@ import { SignupDto } from './dto/signup.dto';
 import { verifyToken } from './jwt/jwt-token';
 import { SessionsService } from './sessions/sessions.service';
 
-const PASSWORD_OPTIONS: argon2.HashOptions = {
-  type: argon2.argon2id,
-  memoryCost: 19456,
-  timeCost: 2,
-  parallelism: 1,
-};
+
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -31,6 +28,7 @@ export class AuthService implements OnModuleInit {
     private readonly usersService: UsersService,
     private readonly sessionsService: SessionsService,
     private readonly dataSource: DataSource,
+    private readonly accountEmail: AccountEmailService,
   ) {}
 
   private readonly googleClient = new OAuth2Client();
@@ -142,6 +140,17 @@ export class AuthService implements OnModuleInit {
       }
     }
 
+    // Google verified this address; prove it for an account that predates the check.
+    if (
+      !user.email_verified_at &&
+      typeof user.email === 'string' &&
+      user.email.toLowerCase() === data.email.toLowerCase()
+    ) {
+      await this.dataSource.query(
+        'UPDATE users SET email_verified_at = now() WHERE id = $1 AND email_verified_at IS NULL',
+        [user.id],
+      );
+    }
     if (name && name !== user.name) {
       await this.usersService.updateGoogleName(user.id, data.sub, name);
     }
@@ -155,14 +164,17 @@ export class AuthService implements OnModuleInit {
 
   async signup(data: SignupDto) {
     const passwordHash = await argon2.hash(data.password, PASSWORD_OPTIONS);
-    return this.dataSource.transaction(async (manager) => {
+    const created = await this.dataSource.transaction(async (manager) => {
       const user = await this.usersService.createPasswordUser(
         { email: data.email, username: data.username },
         passwordHash,
         manager,
       );
-      return this.createSession(user.id, 'Account created!', manager);
+      return { userId: user.id, session: await this.createSession(user.id, 'Account created!', manager) };
     });
+    // After the commit, so the verification token can reference the new user.
+    void this.accountEmail.sendVerificationQuietly(created.userId);
+    return created.session;
   }
 
   async passwordLogin(data: PasswordLoginDto) {
@@ -218,6 +230,7 @@ export class AuthService implements OnModuleInit {
       name: user.name,
       avatarUrl: user.avatar_url,
       username: user.username ?? null,
+      emailVerified: Boolean(user.email_verified_at),
     };
   }
 

@@ -158,6 +158,7 @@ describe('UsersService', () => {
       google_id: 'google-subject',
       name: 'Learner',
       avatar_url: null,
+      email_verified_at: expect.any(Date),
     });
     expect(repository.findOne).not.toHaveBeenCalled();
     expect(repository.createQueryBuilder).not.toHaveBeenCalled();

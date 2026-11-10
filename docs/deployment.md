@@ -31,6 +31,8 @@ What is verified and what is not is listed at the end of this page.
 | `LEARNING_POOL_SEED` | no | `off` skips the seed at startup once the release job owns it. The seed is idempotent either way. |
 | `SUPPORT_CONTACT` | for public support | Email address or HTTPS contact page, visible to signed-out visitors on the legal pages and in Settings. For WhyLint, use `kenzie@whylint.com` once forwarding is tested. |
 | `ADMIN_USER_IDS` | for report moderation | Comma-separated WhyLint account UUIDs permitted to use `/admin`. An empty or missing value denies admin access. Configure this outside source control. |
+| `RESEND_API_KEY` | for email | Resend API key for the verification and password-reset emails. Store in Secret Manager. Without it production cannot send account emails. Sign-up and the generic password-reset request response still work. |
+| `MAIL_FROM` | for email | Sender, for example `WhyLint <noreply@whylint.com>`. The domain must be verified in Resend (DNS records), or Resend rejects the message. |
 
 `NODE_ENV=production` is baked into the image (it enables HSTS). Never commit real values; `.env*`
 files are excluded from the Docker build context.
@@ -109,10 +111,9 @@ this deployment behaves:
 - The web Google sign-in flow permits `https://whylint.com`, the Cloud Run origin, and localhost. A different
   public domain requires updating the frontend allowlist and the Google OAuth redirect URI.
 - **Rate limits are per instance** (in-memory throttler), and Gemini spend has no global budget.
-- Password reset and email verification remain open. The app has self-serve account deletion and
-  publishes its privacy policy and terms.
-- The baseline Content Security Policy restricts base URLs, object embeds, and framing. A
-  script and style policy still needs browser compatibility testing.
+- Password reset and email verification need a configured mail provider and a verified sender.
+  Native clients open account email links in the browser.
+- The Content Security Policy limits scripts to the app origin and allows Google Fonts and Google avatars.
 - Verify automated Cloud SQL backups and point-in-time recovery before a public rollout.
 
 ## What has been verified

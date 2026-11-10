@@ -26,6 +26,21 @@ export const routes: Routes = [
     canActivate: [guestOnlyGuard],
   },
   {
+    path: 'forgot-password',
+    data: { mode: 'forgot' },
+    loadComponent: () => import('./account-email/account-email').then((m) => m.AccountEmailPage),
+  },
+  {
+    path: 'reset-password',
+    data: { mode: 'reset' },
+    loadComponent: () => import('./account-email/account-email').then((m) => m.AccountEmailPage),
+  },
+  {
+    path: 'verify-email',
+    data: { mode: 'verify' },
+    loadComponent: () => import('./account-email/account-email').then((m) => m.AccountEmailPage),
+  },
+  {
     path: 'auth/google/callback',
     loadComponent: () => import('./google-login/google-login').then((m) => m.GoogleLogin),
   },

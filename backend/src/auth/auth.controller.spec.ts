@@ -2,6 +2,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthController } from './auth.controller';
 import type { AuthService } from './auth.service';
+import type { AccountEmailService } from './account-email.service';
 
 describe('AuthController', () => {
   const authService = {
@@ -9,7 +10,16 @@ describe('AuthController', () => {
     signup: jest.fn(),
     deleteAccount: jest.fn(),
   };
-  const controller = new AuthController(authService as unknown as AuthService);
+  const accountEmail = {
+    requestPasswordReset: jest.fn(),
+    resetPassword: jest.fn(),
+    verifyEmail: jest.fn(),
+    sendVerification: jest.fn(),
+  };
+  const controller = new AuthController(
+    authService as unknown as AuthService,
+    accountEmail as unknown as AccountEmailService,
+  );
   const response = { cookie: jest.fn(), clearCookie: jest.fn() } as unknown as Response;
   beforeEach(() => jest.clearAllMocks());
 

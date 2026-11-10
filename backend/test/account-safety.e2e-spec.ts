@@ -25,6 +25,7 @@ import { SocialLearningCommunity1794200000000 } from '../migrations/179420000000
 import { QuestionConcepts1794300000000 } from '../migrations/1794300000000-QuestionConcepts';
 import { FixIPv4OctetQuestion1794310000000 } from '../migrations/1794310000000-FixIPv4OctetQuestion';
 import { AccountSafety1794400000000 } from '../migrations/1794400000000-AccountSafety';
+import { AccountEmail1794500000000 } from '../migrations/1794500000000-AccountEmail';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (databaseUrl) {
@@ -165,6 +166,7 @@ describeDatabase('Account deletion, reports and blocks (HTTP and disposable Post
         QuestionConcepts1794300000000,
         FixIPv4OctetQuestion1794310000000,
         AccountSafety1794400000000,
+        AccountEmail1794500000000,
       ],
     });
     await migrations.initialize();

@@ -119,6 +119,7 @@ test('UI signup: protected cookie, safe profile and guest-page redirects to onbo
   expect(Object.keys(profile.body).sort()).toEqual([
     'avatarUrl',
     'email',
+    'emailVerified',
     'id',
     'name',
     'username',
