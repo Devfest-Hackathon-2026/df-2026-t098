@@ -121,12 +121,12 @@ internal fun WhyLint(m: AppModel) {
         ) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                    when (m.screen) {
-                        "login",
-                        "signup" -> AuthScreen(m)
-                        "onboarding" -> Onboarding(m)
-                        "creator" -> Creator(m)
-                        "question" ->
+                    when {
+                        m.localeLoading -> Loading(m.text("画面を読み込み中…", "Loading WhyLint…"))
+                        m.screen == "login" || m.screen == "signup" -> AuthScreen(m)
+                        m.screen == "onboarding" -> Onboarding(m)
+                        m.screen == "creator" -> Creator(m)
+                        m.screen == "question" ->
                             Column {
                                 BackRow(m)
                                 m.focused?.let {

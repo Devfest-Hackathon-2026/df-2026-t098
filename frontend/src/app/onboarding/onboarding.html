@@ -31,6 +31,12 @@
             (changed)="settings.setLanguage($event)"
           />
         </div>
+        @if (settings.usesLocationLanguage()) {
+          <p class="note">
+            {{ text('国に合わせて表示言語を提案しています。', 'Language suggested from your country.') }}
+            <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">IP Geolocation by DB-IP</a>
+          </p>
+        }
         <h1 #stepHeading tabindex="-1">
           {{ text('何を学びたいですか？', 'What would you like to learn?') }}
         </h1>

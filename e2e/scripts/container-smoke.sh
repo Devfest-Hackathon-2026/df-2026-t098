@@ -58,4 +58,21 @@ if ! curl -sf "http://localhost:$PORT/api/v1/health" >/dev/null; then
   exit 1
 fi
 
+echo "Bundled country lookup"
+for test_case in '133.242.0.1 ja' '8.8.8.8 en' '192.168.1.10 null'; do
+  read -r address language <<<"$test_case"
+  result=$(curl -fsS --max-time 10 -H "X-Forwarded-For: $address" \
+    "http://localhost:$PORT/api/v1/config/locale")
+  if [ "$language" = null ]; then
+    expected='{"defaultLanguage":null}'
+  else
+    expected="{\"defaultLanguage\":\"$language\"}"
+  fi
+  if [ "$result" != "$expected" ]; then
+    echo "  FAIL  $address returned $result (expected $expected)"
+    exit 1
+  fi
+done
+echo "  PASS  Japan, US, and private address defaults"
+
 "$HERE/smoke-http.sh" "http://localhost:$PORT"

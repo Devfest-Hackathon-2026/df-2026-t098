@@ -118,6 +118,7 @@ internal class Api(context: Context) {
         path: String,
         method: String = "GET",
         body: JSONObject? = null,
+        timeoutMs: Int? = null,
     ): JSONObject =
         withContext(Dispatchers.IO) {
             val session = if (path.startsWith("/auth/mobile/")) null else token
@@ -127,16 +128,17 @@ internal class Api(context: Context) {
             try {
                 connection.requestMethod = method
                 connection.instanceFollowRedirects = false
-                connection.connectTimeout = 10_000
+                connection.connectTimeout = timeoutMs ?: 10_000
                 connection.readTimeout =
-                    if (
-                        path.contains("/batches") ||
-                            path.endsWith("/attempts") ||
-                            path.endsWith("/follow-ups") ||
-                            (path == "/learning/questions" && method == "POST")
-                    )
-                        75_000
-                    else if (path == "/learning/guest-answers") 30_000 else 15_000
+                    timeoutMs
+                        ?: if (
+                            path.contains("/batches") ||
+                                path.endsWith("/attempts") ||
+                                path.endsWith("/follow-ups") ||
+                                (path == "/learning/questions" && method == "POST")
+                        )
+                            75_000
+                        else if (path == "/learning/guest-answers") 30_000 else 15_000
                 connection.setRequestProperty("Accept", "application/json")
                 connection.setRequestProperty("Cache-Control", "no-store")
                 session?.let { connection.setRequestProperty("Authorization", "Bearer $it") }

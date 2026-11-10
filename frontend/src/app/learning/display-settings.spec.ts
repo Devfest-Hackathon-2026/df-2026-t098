@@ -119,6 +119,7 @@ describe('First language', () => {
   afterEach(() => {
     setBrowser('ja-JP');
     localStorage.removeItem('whylint-language');
+    localStorage.removeItem('whylint-language-detected');
   });
 
   it.each([
@@ -137,5 +138,55 @@ describe('First language', () => {
     setBrowser('en-US');
     TestBed.configureTestingModule({});
     expect(TestBed.inject(DisplaySettings).language()).toBe('ja');
+  });
+
+  it('uses a country suggestion once and remembers it on the next launch', async () => {
+    setBrowser('en-US');
+    TestBed.configureTestingModule({});
+    const request = vi.fn(async () => Response.json({ defaultLanguage: 'ja' }));
+    const settings = TestBed.inject(DisplaySettings);
+    await Promise.all([settings.resolveDefaultLanguage(request), settings.resolveDefaultLanguage(request)]);
+    expect(request).toHaveBeenCalledOnce();
+    expect(settings.language()).toBe('ja');
+    expect(localStorage.getItem('whylint-language')).toBeNull();
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const relaunched = TestBed.inject(DisplaySettings);
+    expect(relaunched.language()).toBe('ja');
+    expect(relaunched.resolveDefaultLanguage(request)).toBeUndefined();
+  });
+
+  it('does not look up a country when a saved preference already exists', () => {
+    localStorage.setItem('whylint-language', 'en');
+    localStorage.setItem('whylint-language-detected', 'ja');
+    TestBed.configureTestingModule({});
+    const request = vi.fn();
+    const settings = TestBed.inject(DisplaySettings);
+    expect(settings.language()).toBe('en');
+    expect(settings.resolveDefaultLanguage(request)).toBeUndefined();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('keeps a language chosen while the lookup is pending', async () => {
+    TestBed.configureTestingModule({});
+    let reply!: (response: Response) => void;
+    const request = () => new Promise<Response>((resolve) => { reply = resolve; });
+    const settings = TestBed.inject(DisplaySettings);
+    const pending = settings.resolveDefaultLanguage(request);
+    settings.setLanguage('en');
+    reply(Response.json({ defaultLanguage: 'ja' }));
+    await pending;
+    expect(settings.language()).toBe('en');
+    expect(localStorage.getItem('whylint-language-detected')).toBeNull();
+  });
+
+  it('keeps the device fallback when the country is unavailable', async () => {
+    setBrowser('ja-JP');
+    TestBed.configureTestingModule({});
+    const settings = TestBed.inject(DisplaySettings);
+    await settings.resolveDefaultLanguage(async () => Response.json({ defaultLanguage: null }));
+    expect(settings.language()).toBe('ja');
+    expect(localStorage.getItem('whylint-language-detected')).toBeNull();
   });
 });

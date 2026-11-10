@@ -69,6 +69,9 @@ export function legalBlocks(section: LegalSection): Block[] {
             }
           </section>
         }
+        @if (kind === 'privacy') {
+          <p><a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">IP Geolocation by DB-IP</a></p>
+        }
         <section class="contact">
           <h2>{{ ui().contact }}</h2>
           @if (config.supportContact(); as contact) {
@@ -197,7 +200,7 @@ export class LegalPage {
   protected readonly settings = inject(DisplaySettings);
   protected readonly config = inject(PublicConfig);
   private readonly route = inject(ActivatedRoute);
-  private readonly kind = (this.route.snapshot.data['kind'] as LegalKind) ?? 'terms';
+  protected readonly kind = (this.route.snapshot.data['kind'] as LegalKind) ?? 'terms';
   protected readonly language = this.settings.language;
   protected readonly doc = computed(() => LEGAL_DOCUMENTS[this.kind][this.language()]);
   protected readonly blocks = legalBlocks;
