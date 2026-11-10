@@ -6,7 +6,7 @@ T={
   https='HTTPS', sock='Unixソケット', verify='IDトークン検証', api='API', secret='取得'),
 'en':dict(title='WhyLint architecture', users='Users', web='Web browser', web2='Angular', ios='iOS app', ios2='SwiftUI', android='Android app', android2='Jetpack Compose',
   gcp='Google Cloud (Tokyo, asia-northeast1)', run='Cloud Run', run2='One container: Angular + NestJS API', sql='Cloud SQL', sql2='PostgreSQL (learning data)', sec='Secret Manager', sec2='API keys, JWT secret, DB URL', job='Release job', job2='Migrations + question pool seed',
-  gem='Gemini API', gem2='Question generation, grading, follow-ups', gid='Sign in with Google', gid2='Google Identity / OAuth 2.0', fonts='Google Fonts', fonts2='Web fonts',
+  gem='Gemini API', gem2='Generate, grade, and follow up', gid='Google sign-in', gid2='Google Identity / OAuth 2.0', fonts='Google Fonts', fonts2='Web fonts',
   https='HTTPS', sock='Unix socket', verify='ID token check', api='API', secret='Read'),
 }
 def box(x,y,w,h,fill,stroke,title,sub,tc='#1f2937',ts=22,ss=15):
