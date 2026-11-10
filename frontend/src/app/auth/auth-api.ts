@@ -10,7 +10,7 @@ export class AuthApi {
   private readonly session = inject(AuthSession);
 
   signup(data: { email: string; username: string; password: string }): Promise<AuthResult> {
-    return this.mutate('/api/v1/auth/signup', 'POST', data);
+    return this.mutate('/api/v1/auth/signup', 'POST', data, 25_000);
   }
 
   passwordLogin(identifier: string, password: string): Promise<AuthResult> {
@@ -21,14 +21,19 @@ export class AuthApi {
     return this.mutate('/api/v1/auth/me/username', 'PATCH', { username });
   }
 
-  private async mutate(path: string, method: string, data: unknown): Promise<AuthResult> {
+  private async mutate(
+    path: string,
+    method: string,
+    data: unknown,
+    timeoutMs = 10_000,
+  ): Promise<AuthResult> {
     const controller = new AbortController();
     let onAbort: (() => void) | undefined;
     const cancelled = new Promise<null>((resolve) => {
       onAbort = () => resolve(null);
       controller.signal.addEventListener('abort', onAbort, { once: true });
     });
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await Promise.race([
         this.request(path, {

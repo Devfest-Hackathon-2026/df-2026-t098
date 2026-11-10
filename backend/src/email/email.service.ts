@@ -53,7 +53,7 @@ export class EmailService {
           text: message.text,
           html: message.html,
         },
-        { headers: { Authorization: `Bearer ${key}` }, timeout: 10_000 },
+        { headers: { Authorization: `Bearer ${key}` }, timeout: 5_000 },
       );
     } catch (error) {
       const status = axios.isAxiosError(error)
