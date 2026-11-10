@@ -156,6 +156,8 @@ struct BlockedUser: Identifiable, Hashable {
         case "like": return text("ログインすると、問題にいいねできます。", "Sign in to like questions.")
         case "comment":
             return text("ログインすると、コメントできます。", "Sign in to join the discussion.")
+        case "report":
+            return text("ログインすると、問題を報告できます。", "Sign in to report a problem.")
         case "practice":
             return text(
                 "ログインすると、間違えた問題を毎朝復習できます。",
@@ -504,6 +506,8 @@ struct BlockedUser: Identifiable, Hashable {
             questions = (pool.objects("reviewQuestions") + pool.objects("questions")).compactMap(
                 Question.init
             ).filter(isVisible)
+            dailyID = nil
+            dailySolved = 0
             let daily = try? await api.request("/learning/daily?language=" + language)
             guard version == generationVersion else { return }
             if let object = daily?["question"] as? [String: Any], let question = Question(object) {
@@ -513,7 +517,9 @@ struct BlockedUser: Identifiable, Hashable {
                 questions.insert(question, at: 0)
             }
             if signedIn && !preferences.isEmpty { await loadMore() }
-        } catch { message = errorMessage(error) }
+        } catch {
+            if version == generationVersion { message = errorMessage(error) }
+        }
     }
     func loadMore() async {
         guard signedIn, !generating, !preferences.isEmpty else { return }

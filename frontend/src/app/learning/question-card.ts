@@ -53,6 +53,7 @@ const FIT_MAX = 1.2;
   host: {
     '[class.paged]': 'paged()',
     '[attr.data-fit-overflow]': 'fitOverflow() ? "true" : null',
+    '[attr.data-code-overflow]': 'codeOverflow() ? "true" : null',
   },
   styleUrls: [
     './question-card.css',
@@ -83,6 +84,7 @@ export class QuestionCard {
   private readonly router = inject(Router);
   private readonly progressStore = inject(ProgressStore);
   private readonly document = inject(DOCUMENT);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly detailPanel = viewChild<ElementRef<HTMLDialogElement>>('detailPanel');
   private readonly detailHeading = viewChild<ElementRef<HTMLHeadingElement>>('detailHeading');
@@ -94,6 +96,7 @@ export class QuestionCard {
   protected readonly pagedCompact = computed(() => this.paged() && this.compact());
   protected readonly density = signal(FIT_MAX);
   protected readonly fitOverflow = signal(false);
+  protected readonly codeOverflow = signal(false);
   private fitFrame = 0;
   private fitPasses = 0;
   private fitLower = FIT_MIN;
@@ -169,15 +172,6 @@ export class QuestionCard {
     return question.format !== 'explain' && !!question.options?.length;
   });
   protected readonly revealed = computed(() => this.tap() !== null);
-  protected readonly twoColumnChoices = computed(() => {
-    const question = this.question();
-    const limit = question.format === 'predict_output' ? 24 : question.code ? 60 : 0;
-    return (
-      this.pagedCompact() &&
-      limit > 0 &&
-      question.options?.every((option) => option.length <= limit && !option.includes('\n'))
-    );
-  });
   protected readonly codeLines = computed(() => {
     const question = this.question();
     if (question.format !== 'spot_bug' || !question.code) return null;
@@ -202,6 +196,7 @@ export class QuestionCard {
       const natural = this.stageMeasure()?.nativeElement;
       if (!viewport || !natural || typeof ResizeObserver === 'undefined') return;
       const observer = new ResizeObserver(() => this.measureStage());
+      observer.observe(this.host.nativeElement);
       observer.observe(viewport);
       observer.observe(natural);
       destroy.onDestroy(() => observer.disconnect());
@@ -486,7 +481,14 @@ export class QuestionCard {
     if (!viewport || !natural) return;
     const font =
       this.document.defaultView?.getComputedStyle(this.document.documentElement).fontSize ?? '';
-    const size = { width: viewport.clientWidth, height: viewport.clientHeight, font };
+    // A short card takes its content height. Measure the space it could grow into,
+    // so fitting the card doesn't reset the density search on each resize.
+    const hostHeight = this.host.nativeElement.clientHeight;
+    const cardHeight = viewport.parentElement?.offsetHeight ?? viewport.offsetHeight;
+    const available = hostHeight
+      ? hostHeight - (cardHeight - viewport.offsetHeight)
+      : viewport.clientHeight;
+    const size = { width: viewport.clientWidth, height: available, font };
     if (
       reset ||
       size.width !== this.fitViewport.width ||
@@ -503,20 +505,17 @@ export class QuestionCard {
     }
     cancelAnimationFrame(this.fitFrame);
     this.fitFrame = requestAnimationFrame(() => {
-      if (!this.pagedCompact() || viewport.clientHeight <= 0) {
+      if (!this.pagedCompact() || available <= 0) {
         this.density.set(1);
         this.fitOverflow.set(false);
+        this.codeOverflow.set(false);
         return;
       }
-      const available = viewport.clientHeight;
       const required = natural.getBoundingClientRect().height;
-      // Keep larger code within the card width.
-      const wide =
-        this.density() > 1 &&
-        [...natural.querySelectorAll<HTMLElement>('pre, .code-lines')].some(
-          (code) => code.scrollWidth > code.clientWidth + 1,
-        );
-      const overflow = required > available + 1 || wide;
+      const code = natural.querySelector<HTMLElement>('pre, .code-lines');
+      const wide = !!code && code.scrollWidth > code.clientWidth + 1;
+      this.codeOverflow.set(wide);
+      const overflow = required > available + 1 || (wide && this.density() > 1);
       if (this.fitComplete) {
         if (!overflow || this.density() <= FIT_MIN + 0.001) {
           this.fitOverflow.set(overflow);

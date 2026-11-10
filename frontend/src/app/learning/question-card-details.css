@@ -1,6 +1,3 @@
-.question-summary {
-  display: none;
-}
 .learning-details {
   position: fixed;
   inset: auto 0 0;
@@ -86,28 +83,15 @@
     padding: 16px;
     border-radius: 16px;
   }
-  .question-meta .format-chip {
-    display: none;
-  }
-  .question-card:not(.is-daily):not(.has-review) .question-meta {
-    display: none;
-  }
   h2 {
     margin-top: 8px;
     line-height: 1.4;
     text-wrap: pretty;
   }
-  .question-summary {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 8px 0 12px;
-    color: var(--muted);
-    font-size: 0.75rem;
+  .question-credit {
+    gap: 4px 10px;
     line-height: 1.5;
-  }
-  .question-summary span:last-child {
-    flex-shrink: 0;
+    margin: 0 0 12px;
   }
   .code-head {
     padding: 10px 12px;
@@ -140,6 +124,9 @@
     flex: 0 0 auto;
     min-width: 56px;
   }
+  .mobile-learning-actions .deeper-button small {
+    font-size: 0.6875rem;
+  }
   :host(.paged) {
     height: 100%;
     min-height: 0;
@@ -147,9 +134,9 @@
   :host(.paged) .question-card {
     display: grid;
     grid-template-rows: minmax(0, 1fr) auto auto;
-    height: 100%;
+    max-height: 100%;
     min-height: 0;
-    padding: 8px;
+    padding: 12px;
   }
   :host(.paged) .question-content {
     display: flex;
@@ -184,10 +171,10 @@
     margin-block: max(2px, calc(6px * var(--question-density, 1)));
     text-wrap: pretty;
   }
-  :host(.paged) .question-stage-natural .question-meta,
-  :host(.paged) .question-stage-natural .question-summary,
-  :host(.paged) .question-stage-natural .question-credit,
   :host(.paged) .question-stage-natural .code-head {
+    padding: 6px 10px;
+  }
+  :host(.paged) .reason-daily {
     display: none;
   }
   :host(.paged) .card-actions {
@@ -231,14 +218,18 @@
     font-size: inherit;
   }
   :host(.paged) .question-stage-natural pre {
-    margin-top: 4px;
     padding: max(3px, calc(10px * var(--question-density, 1)));
     font-size: max(11px, calc(0.875rem * var(--question-density, 1)));
     line-height: 1.3;
-    touch-action: pan-x pinch-zoom;
   }
   :host(.paged) .question-stage-natural .code-lines {
     padding-block: max(2px, calc(6px * var(--question-density, 1)));
+  }
+  /* Hand off horizontal pans only when the code can actually scroll. */
+  :host(.paged) .question-stage-natural :is(pre, .code-lines) {
+    touch-action: pinch-zoom;
+  }
+  :host(.paged[data-code-overflow='true']) .question-stage-natural :is(pre, .code-lines) {
     touch-action: pan-x pinch-zoom;
   }
   :host(.paged) .question-stage-natural .code-line {
@@ -256,9 +247,7 @@
   :host(.paged) .question-stage-natural .code-line code {
     padding: max(1px, calc(4px * var(--question-density, 1))) 8px 0 2px;
   }
-  /* Reserve the result row before the answer so the question stays put. */
-  :host(.paged) .question-stage-natural .reveal,
-  :host(.paged) .question-stage-natural .reveal-slot {
+  :host(.paged) .question-stage-natural .reveal {
     margin-top: 8px;
     min-height: 56px;
   }

@@ -3,6 +3,7 @@ import SwiftUI
 struct QuestionCard: View {
     @Environment(AppStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let question: Question
     var onNext: (() -> Void)? = nil
     @State private var tap: Tap?
@@ -12,95 +13,26 @@ struct QuestionCard: View {
     @State private var liked = false
     @State private var saved = false
     @State private var likes = 0
+    @State private var reactionPending: String?
     @State private var sheet: QuestionSheet?
     enum QuestionSheet: String, Identifiable {
-        case details, explain, ask, comments
+        case feedback, report, explain, ask, comments
         var id: String { rawValue }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            GeometryReader { geometry in
-                ViewThatFits(in: .vertical) {
-                    stage(promptSize: 20, codeSize: 16).frame(width: geometry.size.width).fixedSize(
-                        horizontal: false, vertical: true)
-                    stage(promptSize: 18, codeSize: 14).frame(width: geometry.size.width).fixedSize(
-                        horizontal: false, vertical: true)
-                    stage(promptSize: 16, codeSize: 12).frame(width: geometry.size.width).fixedSize(
-                        horizontal: false, vertical: true)
-                    stage(promptSize: 13, codeSize: 11).frame(width: geometry.size.width).fixedSize(
-                        horizontal: false, vertical: true)
-                    ScrollView { stage(promptSize: 13, codeSize: 11) }.scrollIndicators(.hidden)
-                }.frame(
-                    width: geometry.size.width, height: geometry.size.height, alignment: .topLeading
-                )
-            }
-            HStack(spacing: 0) {
-                socialButton(
-                    "heart" + (liked ? ".fill" : ""), label: "\(likes)",
-                    accessibility: store.text("いいね", "Like")
-                ) { toggle("like") }
-                socialButton(
-                    "bubble", label: store.text("コメント", "Comments"),
-                    accessibility: store.text("コメント", "Comments")
-                ) { sheet = .comments }
-                ShareLink(
-                    item: URL(
-                        string: "https://whylint-8715935974.asia-northeast1.run.app/questions/"
-                            + question.id)!
-                ) {
-                    HStack(spacing: 5) {
-                        Image("web-share").renderingMode(.template).resizable().frame(
-                            width: 20, height: 20)
-                        Text(store.text("共有", "Share"))
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                socialButton(
-                    saved ? "bookmark.fill" : "bookmark",
-                    label: store.text(saved ? "保存済み" : "保存", saved ? "Saved" : "Save"),
-                    accessibility: store.text("保存", "Save")
-                ) { toggle("save") }
-            }.font(.custom("DMSans-9ptRegular", size: 12, relativeTo: .body)).foregroundStyle(
-                store.palette.muted)
-            HStack(spacing: 8) {
-                Button {
-                    if store.signedIn { sheet = .explain } else { store.promptSignIn("explain") }
-                } label: {
-                    HStack {
-                        Image("web-pencil").renderingMode(.template).resizable().frame(
-                            width: 20, height: 20
-                        ).foregroundStyle(store.palette.accent)
-                        Text(store.text("なぜ？", "Explain why"))
-                    }.frame(maxWidth: .infinity)
-                }.buttonStyle(OutlineButton()).overlay(
-                    RoundedRectangle(cornerRadius: 10).stroke(store.palette.accent.opacity(0.7))
-                ).accessibilityIdentifier("explain-open")
-                if tap != nil {
-                    Button {
-                        if store.signedIn { sheet = .ask } else { store.promptSignIn("ask") }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image("web-comment").renderingMode(.template).resizable().frame(
-                                width: 18, height: 18)
-                            Text(store.text("質問する", "Ask Gemini"))
-                        }
-                    }.buttonStyle(OutlineButton()).accessibilityLabel(
-                        store.text("質問する", "Ask Gemini"))
-                }
-                Button(store.text("詳細", "Details")) { sheet = .details }.buttonStyle(
-                    OutlineButton())
-            }.font(.custom("DMSans-9ptRegular", size: 13, relativeTo: .body)).fontWeight(.semibold)
+        ViewThatFits(in: .vertical) {
+            content.fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                content
+            }.scrollBounceBehavior(.basedOnSize)
+                .accessibilityIdentifier("question-card-scroll")
         }
-        .padding(9).background {
-            RoundedRectangle(cornerRadius: 16).fill(store.palette.surface).shadow(
-                color: store.palette.light ? Color(hex: 0x131811).opacity(0.16) : .clear,
-                radius: 12, y: 5)
+        .background(store.palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16).strokeBorder(store.palette.border)
+                .allowsHitTesting(false)
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 16).stroke(
-                store.palette.accent.opacity(0.9), lineWidth: store.palette.light ? 1.5 : 1)
-        )
         .onAppear {
             tap = question.tap
             liked = question.liked
@@ -114,7 +46,8 @@ struct QuestionCard: View {
                     case .comments: CommentsView(question: question)
                     case .explain: ExplanationView(question: question, asking: false)
                     case .ask: ExplanationView(question: question, asking: true)
-                    case .details: QuestionDetails(question: question, answer: tap)
+                    case .feedback: QuestionDetails(question: question, answer: tap)
+                    case .report: QuestionDetails(question: question)
                     }
                 }.background(store.palette.canvas).foregroundStyle(store.palette.text)
                     .toolbar {
@@ -125,42 +58,263 @@ struct QuestionCard: View {
             }.environment(store).preferredColorScheme(store.theme == "light" ? .light : .dark)
         }
     }
-    private func stage(promptSize: CGFloat, codeSize: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(question.prompt).font(
-                .custom("DMSans-9ptRegular", size: promptSize, relativeTo: .headline)
-            ).fontWeight(.bold)
-                .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            headerChips
+            Text(question.prompt)
+                .font(.custom("DMSans-9ptRegular", size: 20, relativeTo: .headline))
+                .bold().accessibilityAddTraits(.isHeader)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(metadata)
+                .font(.custom("DMSans-9ptRegular", size: 13, relativeTo: .subheadline))
+                .foregroundStyle(store.palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("question-metadata")
             if let code = question.code {
-                if question.format == "spot_bug", tap == nil {
-                    // The lines are the answers, so say so: nothing else on the card is tappable
-                    // before the answer.
-                    Label(
-                        store.text("バグのある行をタップ", "Tap the buggy line"), systemImage: "hand.tap"
-                    ).font(.custom("DMSans-9ptRegular", size: 14, relativeTo: .subheadline))
-                        .fontWeight(.semibold).foregroundStyle(store.palette.accent)
-                        .accessibilityIdentifier("spot-bug-hint")
-                }
-                codeView(code, fontSize: codeSize)
+                VStack(alignment: .leading, spacing: 0) {
+                    codeHeader
+                    Divider().overlay(store.palette.border)
+                    codeView(code)
+                }.background(store.palette.code, in: RoundedRectangle(cornerRadius: 12))
             }
-            if question.format != "spot_bug" {
-                ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
-                    choice(index, title: option, fontSize: max(13, promptSize - 3))
-                }
-            }
-            answerOutcome(correct: tap?.correct ?? false)
-                .opacity(tap == nil ? 0 : 1)
-                .animation(reveal, value: tap)
-                .allowsHitTesting(tap != nil)
-                .accessibilityHidden(tap == nil)
+            if question.format != "spot_bug", !question.options.isEmpty { choices }
+            if let tap { answerOutcome(correct: tap.correct) }
             if let error {
                 ErrorNotice(message: error)
-                if let selected {
-                    Button(store.text("回答を再試行", "Retry answer")) { answer(selected) }.buttonStyle(
-                        OutlineButton())
+                if let selected, tap == nil {
+                    Button(store.text("回答を再試行", "Retry answer")) { answer(selected) }
+                        .buttonStyle(OutlineButton())
                 }
             }
-        }.frame(maxWidth: .infinity, alignment: .leading)
+            explainAction
+            if tap != nil {
+                Button {
+                    if store.signedIn { sheet = .ask } else { store.promptSignIn("ask") }
+                } label: {
+                    Label(store.text("質問する", "Ask Gemini"), systemImage: "bubble.left")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }.buttonStyle(OutlineButton())
+            }
+            socialActions
+            if !question.references.isEmpty {
+                Divider().overlay(store.palette.border)
+                references
+            }
+            Button {
+                if store.signedIn { sheet = .report } else { store.promptSignIn("report") }
+            } label: {
+                Label(store.text("問題を報告", "Report a problem"), systemImage: "flag")
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }.buttonStyle(.plain).foregroundStyle(store.palette.muted)
+                .accessibilityIdentifier("report-question-open")
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var metadata: String {
+        let source: String
+        if question.source == "community" {
+            source = question.authorID == nil
+                ? store.text("コミュニティ", "Community") : question.authorName
+        } else {
+            source = store.text("Gemini が作成", "Created by Gemini")
+        }
+        let difficulty = switch question.difficulty {
+        case "beginner": store.text("初級", "Beginner")
+        case "intermediate": store.text("中級", "Intermediate")
+        case "advanced": store.text("上級", "Advanced")
+        default: question.difficulty
+        }
+        let topics = question.topics.filter { $0 != "general" }.prefix(3).map(topicLabel)
+        let title = question.title == question.prompt ? [] : [question.title]
+        return (title + [source, difficulty] + topics).filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    private func topicLabel(_ topic: String) -> String {
+        let interest = store.catalog.objects("interests").first { $0.text("id") == topic }
+        let labels = interest?["label"] as? [String: String]
+        if let label = labels?[store.language] { return label }
+        return switch topic.lowercased() {
+        case "frontend": store.text("フロントエンド", "Frontend")
+        case "backend": store.text("バックエンド", "Backend")
+        case "html", "css", "sql", "api": topic.uppercased()
+        case "javascript": "JavaScript"
+        case "typescript": "TypeScript"
+        case "python": "Python"
+        default: topic
+        }
+    }
+
+    private var formatLabel: String {
+        switch question.format {
+        case "true_false": store.text("○か×か", "True or false")
+        case "predict_output": store.text("出力を予想", "Predict the output")
+        case "spot_bug": store.text("バグを探せ", "Spot the bug")
+        case "choice": store.text("選んで答える", "Pick one")
+        default: store.text("説明してみよう", "Explain it")
+        }
+    }
+
+    private var reasonLabel: (icon: String, title: String)? {
+        if store.dailyID == question.id { return ("ladybug", store.text("今日のバグ", "Bug of the Day")) }
+        guard let reason = question.reason else { return nil }
+        let topic = reason.topic.map(topicLabel) ?? ""
+        switch reason.kind {
+        case "interest" where !topic.isEmpty:
+            return ("sparkles", store.text("\(topic)に興味があるから", "Because you like \(topic)"))
+        case "weak" where !topic.isEmpty:
+            return ("scope", store.text("\(topic)を克服しよう", "Because you missed \(topic)"))
+        case "challenge" where !topic.isEmpty:
+            return ("bolt", store.text("\(topic)の応用に挑戦", "Level up: \(topic)"))
+        case "review": return ("arrow.counterclockwise", store.text("復習の問題", "Review question"))
+        case "community": return ("person.2", store.text("コミュニティの問題", "From the community"))
+        case "general": return ("book", store.text("みんなが知っておきたい基礎", "Core concept"))
+        default: return nil
+        }
+    }
+
+    private var headerChips: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                chips.fixedSize(horizontal: true, vertical: false)
+            }
+            VStack(alignment: .leading, spacing: 8) { chips }
+        }.font(.custom("DMSans-9ptRegular", size: 12, relativeTo: .subheadline))
+    }
+
+    @ViewBuilder private var chips: some View {
+        if let reason = reasonLabel {
+            Label(reason.title, systemImage: reason.icon)
+                .fontWeight(.semibold)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(store.palette.accent.opacity(0.16), in: Capsule())
+        }
+        Text(formatLabel).foregroundStyle(store.palette.muted)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .overlay(Capsule().strokeBorder(store.palette.border))
+            .accessibilityIdentifier("question-format")
+    }
+
+    private var codeHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { codeLabels.fixedSize(horizontal: true, vertical: false) }
+            VStack(alignment: .leading, spacing: 4) { codeLabels }
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.vertical, 8)
+    }
+
+    @ViewBuilder private var codeLabels: some View {
+        Text(question.codeLanguage.isEmpty ? store.text("コード", "Code") : question.codeLanguage)
+            .font(.custom("DMMono-Regular", size: 12, relativeTo: .caption))
+            .foregroundStyle(store.palette.muted)
+        if question.format == "spot_bug", tap == nil {
+            Label(store.text("バグのある行をタップ", "Tap the buggy line"), systemImage: "hand.tap")
+                .font(.custom("DMSans-9ptRegular", size: 14, relativeTo: .subheadline))
+                .fontWeight(.semibold).foregroundStyle(store.palette.accent)
+                .accessibilityIdentifier("spot-bug-hint")
+        }
+    }
+
+    @ViewBuilder private var choices: some View {
+        if question.format == "true_false", question.options.count == 2,
+            !dynamicTypeSize.isAccessibilitySize
+        {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(question.options.indices, id: \.self) { index in
+                        choice(index, title: question.options[index], centered: true)
+                    }
+                }
+                stackedChoices
+            }
+        } else {
+            stackedChoices
+        }
+    }
+
+    private var stackedChoices: some View {
+        VStack(spacing: 8) {
+            ForEach(question.options.indices, id: \.self) { index in
+                choice(index, title: question.options[index])
+            }
+        }
+    }
+
+    private var explainAction: some View {
+        Button {
+            if store.signedIn { sheet = .explain } else { store.promptSignIn("explain") }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "pencil").foregroundStyle(store.palette.accent)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(store.text("なぜ？", "Explain why")).fontWeight(.semibold)
+                    Text(store.text("Gemini が採点 · +15 XP", "Graded by Gemini · +15 XP"))
+                        .font(.custom("DMSans-9ptRegular", size: 12, relativeTo: .caption))
+                        .foregroundStyle(store.palette.muted)
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
+        }.buttonStyle(OutlineButton())
+            .overlay {
+                RoundedRectangle(cornerRadius: 10).strokeBorder(store.palette.accent.opacity(0.7))
+                    .allowsHitTesting(false)
+            }.accessibilityIdentifier("explain-open")
+    }
+
+    private var references: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(store.text("参考資料", "Further reading")).fontWeight(.semibold)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("question-further-reading")
+            ForEach(question.references, id: \.url) { reference in
+                Link(destination: reference.url) {
+                    Label(reference.title, systemImage: "arrow.up.right")
+                        .foregroundStyle(store.palette.accent)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+            }
+        }
+    }
+
+    private var socialActions: some View {
+        LazyVGrid(
+            columns: Array(
+                repeating: GridItem(.flexible(minimum: 44), spacing: 4),
+                count: dynamicTypeSize.isAccessibilitySize ? 2 : 4
+            ), spacing: 6
+        ) {
+            Button { toggle("like") } label: {
+                socialLabel(liked ? "heart.fill" : "heart", title: "\(likes)")
+            }.accessibilityLabel(store.text("いいね", "Like"))
+                .accessibilityValue("\(likes)")
+                .accessibilityAddTraits(liked ? .isSelected : [])
+                .disabled(reactionPending != nil)
+            Button { sheet = .comments } label: {
+                socialLabel("bubble.left", title: store.text("コメント", "Comments"))
+            }
+            ShareLink(item: URL(string: "https://whylint.com")!
+                .appendingPathComponent("questions").appendingPathComponent(question.id))
+            {
+                socialLabel("square.and.arrow.up", title: store.text("共有", "Share"))
+            }
+            Button { toggle("save") } label: {
+                socialLabel(
+                    saved ? "bookmark.fill" : "bookmark",
+                    title: store.text(saved ? "保存済み" : "保存", saved ? "Saved" : "Save"))
+            }.accessibilityAddTraits(saved ? .isSelected : [])
+                .disabled(reactionPending != nil)
+        }.buttonStyle(.plain).foregroundStyle(store.palette.muted)
+    }
+
+    private func socialLabel(_ icon: String, title: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon).font(.body).accessibilityHidden(true)
+            Text(title)
+                .font(.custom("DMSans-9ptRegular", size: 12, relativeTo: .caption))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
     }
 
     private func answerOutcome(correct: Bool) -> some View {
@@ -210,7 +364,7 @@ struct QuestionCard: View {
 
     private var feedbackAction: some View {
         Button {
-            sheet = .details
+            sheet = .feedback
         } label: {
             Text(store.text("解説を読む", "Read feedback"))
                 .font(.custom("DMSans-9ptRegular", size: 13, relativeTo: .body))
@@ -232,22 +386,7 @@ struct QuestionCard: View {
         }
     }
 
-    private func socialButton(
-        _ icon: String, label: String, accessibility: String, action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(
-                    icon.hasPrefix("heart")
-                        ? (liked ? "web-like-filled" : "web-like")
-                        : icon.hasPrefix("bookmark")
-                            ? (saved ? "web-save-filled" : "web-save") : "web-comment"
-                ).renderingMode(.template).resizable().frame(width: 20, height: 20)
-                Text(label).lineLimit(1).minimumScaleFactor(0.8)
-            }.frame(maxWidth: .infinity, minHeight: 44)
-        }.accessibilityLabel(accessibility)
-    }
-    private func codeView(_ code: String, fontSize: CGFloat) -> some View {
+    private func codeView(_ code: String) -> some View {
         ScrollView(.horizontal) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(code.components(separatedBy: "\n").enumerated()), id: \.offset) {
@@ -259,7 +398,7 @@ struct QuestionCard: View {
                             width: 22, alignment: .trailing)
                         Text(highlight(line))
                         Spacer(minLength: 0)
-                    }.font(.custom("DMMono-Regular", size: fontSize, relativeTo: .body))
+                    }.font(.custom("DMMono-Regular", size: 13, relativeTo: .body))
                         .padding(.horizontal, 12).frame(
                             minHeight: question.format == "spot_bug" && option != nil ? 44 : 22,
                             alignment: .leading
@@ -282,6 +421,7 @@ struct QuestionCard: View {
                             }
                         }
                         .animation(reveal, value: tap)
+                        .contentShape(Rectangle())
                     if question.format == "spot_bug", let option {
                         Button {
                             answer(option)
@@ -297,8 +437,8 @@ struct QuestionCard: View {
                         row
                     }
                 }
-            }.padding(.vertical, 6).frame(minWidth: 300, alignment: .leading)
-        }.background(store.palette.code, in: RoundedRectangle(cornerRadius: 12)).fixedSize(
+            }.padding(.vertical, 6)
+        }.fixedSize(
             horizontal: false, vertical: true)
     }
     private func highlight(_ line: String) -> AttributedString {
@@ -323,7 +463,7 @@ struct QuestionCard: View {
         }
         return result
     }
-    private func choice(_ index: Int, title: String, fontSize: CGFloat) -> some View {
+    private func choice(_ index: Int, title: String, centered: Bool = false) -> some View {
         let mark = mark(index)
         return Button {
             answer(index)
@@ -335,9 +475,20 @@ struct QuestionCard: View {
                     } else {
                         Text(String(UnicodeScalar(65 + index)!))
                     }
-                }.font(.custom("DMMono-Regular", size: 13)).foregroundStyle(store.palette.accent)
-                Text(title).font(.custom("DMSans-9ptRegular", size: fontSize, relativeTo: .body))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                }.font(.custom("DMMono-Regular", size: 13, relativeTo: .caption))
+                    .foregroundStyle(store.palette.muted)
+                    .frame(width: 26, height: 26)
+                    .background(store.palette.code, in: RoundedRectangle(cornerRadius: 6))
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(
+                        question.format == "predict_output" || question.code != nil
+                            ? .custom("DMMono-Regular", size: 14, relativeTo: .body)
+                            : .custom("DMSans-9ptRegular", size: 16, relativeTo: .body)
+                    )
+                    .fontWeight(centered ? .semibold : .regular)
+                    .fixedSize(horizontal: centered, vertical: true)
+                    .frame(maxWidth: centered ? nil : .infinity, alignment: .leading)
                 // Fixed slot so the text does not re-wrap when the result arrives.
                 ZStack {
                     if pending && selected == index {
@@ -347,7 +498,8 @@ struct QuestionCard: View {
                             .accessibilityHidden(true)
                     }
                 }.frame(width: 20, height: 20)
-            }.padding(12).frame(minHeight: 48).background {
+            }.padding(.horizontal, 10).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 48).background {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10).fill(store.palette.control)
                     RoundedRectangle(cornerRadius: 10).fill(markTint(mark))
@@ -415,6 +567,8 @@ struct QuestionCard: View {
                     store.text(
                         result.correct ? "正解！" : "おしい！", result.correct ? "Correct!" : "Not quite")
                 ).post()
+            } catch is CancellationError {
+                return
             } catch { self.error = store.errorMessage(error) }
         }
     }
@@ -423,20 +577,36 @@ struct QuestionCard: View {
             store.promptSignIn(action == "save" ? "save" : "like")
             return
         }
+        guard reactionPending == nil else { return }
+        reactionPending = action
+        error = nil
+        let owner = store.api.token
         Task {
+            defer { reactionPending = nil }
             do {
                 let key = action == "like" ? "liked" : "saved"
                 let value = action == "like" ? !liked : !saved
                 let response = try await store.api.request(
                     "/learning/questions/\(question.id)/\(action)", method: "PUT",
                     body: [key: value])
+                guard owner == store.api.token else { return }
                 if action == "like" {
                     liked = response["liked"] as? Bool ?? value
                     likes = response.number("likes")
                 } else {
                     saved = response["saved"] as? Bool ?? value
                 }
-            } catch { self.error = store.errorMessage(error) }
+                if let index = store.questions.firstIndex(where: { $0.id == question.id }) {
+                    if action == "like" {
+                        store.questions[index].liked = liked
+                        store.questions[index].likes = likes
+                    } else {
+                        store.questions[index].saved = saved
+                    }
+                }
+            } catch {
+                if owner == store.api.token { self.error = store.errorMessage(error) }
+            }
         }
     }
 }
@@ -449,21 +619,17 @@ struct QuestionDetails: View {
     @State private var reason = "incorrect"
     @State private var details = ""
     @State private var notice: String?
+    @State private var reporting = false
     @State private var confirmingBlock = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if let answer { Text(answer.explanation).textSelection(.enabled) }
                 Text(question.title).font(
                     .custom("DMSans-9ptRegular", size: 22, relativeTo: .title2)
-                ).bold()
-                Text(question.topics.joined(separator: " · ")).foregroundStyle(store.palette.accent)
-                Text(question.authorName + " · " + question.difficulty).foregroundStyle(
-                    store.palette.muted)
-                ForEach(question.references, id: \.url) { reference in
-                    Link(reference.title, destination: reference.url).frame(minHeight: 44)
-                }
-                if store.signedIn {
+                ).bold().accessibilityAddTraits(.isHeader)
+                if let answer {
+                    Text(answer.explanation).textSelection(.enabled)
+                } else if store.signedIn {
                     Divider()
                     Text(store.text("問題を報告", "Report question")).font(
                         .custom("DMSans-9ptRegular", size: 17, relativeTo: .headline)
@@ -479,15 +645,17 @@ struct QuestionDetails: View {
                         store.text("詳細（任意）", "Details (optional)"), text: $details, axis: .vertical
                     ).textFieldStyle(.roundedBorder)
                     Button(store.text("報告を送信", "Send report")) {
+                        reporting = true
                         Task {
+                            defer { reporting = false }
                             do {
                                 _ = try await store.api.request(
                                     "/learning/questions/\(question.id)/reports", method: "POST",
-                                    body: ["reason": reason, "details": details])
+                                    body: ["reason": reason, "details": details.trimmingCharacters(in: .whitespacesAndNewlines)])
                                 notice = store.text("報告を受け付けました。", "Report received.")
                             } catch { notice = store.errorMessage(error) }
                         }
-                    }.buttonStyle(OutlineButton())
+                    }.buttonStyle(OutlineButton()).disabled(reporting || details.count > 1000)
                     if let notice { Text(notice) }
                     if question.source == "community", let authorID = question.authorID,
                         authorID != store.user?.text("id"),
@@ -522,8 +690,9 @@ struct QuestionDetails: View {
                     }
                 }
             }.padding(24)
-        }.navigationTitle(store.text("問題の詳細", "Question details")).navigationBarTitleDisplayMode(
-            .inline)
+        }.navigationTitle(
+            answer == nil ? store.text("問題を報告", "Report a problem") : store.text("回答の解説", "Answer feedback")
+        ).navigationBarTitleDisplayMode(.inline)
     }
 }
 

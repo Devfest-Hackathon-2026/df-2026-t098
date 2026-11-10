@@ -214,6 +214,9 @@ internal data class Question(
     val references: List<JSONObject>,
     val tap: QuizAnswer?,
     val daily: Boolean = false,
+    val source: String = "",
+    val reasonKind: String = "",
+    val reasonTopic: String = "",
 ) {
     companion object {
         fun parse(j: JSONObject, daily: Boolean = false) =
@@ -234,6 +237,9 @@ internal data class Question(
                 j.objects("references"),
                 j.optJSONObject("tap")?.let(QuizAnswer::parse),
                 daily,
+                j.text("source"),
+                j.optJSONObject("reason")?.text("kind").orEmpty(),
+                j.optJSONObject("reason")?.text("topic").orEmpty(),
             )
     }
 }

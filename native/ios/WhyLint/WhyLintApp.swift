@@ -229,7 +229,10 @@ struct AppRoot: View {
         .sheet(isPresented: $store.showingOnboarding) { OnboardingView().environment(store) }
         .sheet(item: $store.selectedQuestion) { question in
             NavigationStack {
-                QuestionCard(question: question).padding(16).background(store.palette.canvas)
+                QuestionCard(question: question)
+                    .frame(maxWidth: 760).padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .background(store.palette.canvas)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button(store.text("閉じる", "Close")) { store.selectedQuestion = nil }
@@ -285,7 +288,9 @@ struct AppRoot: View {
 
 struct FeedView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var currentID: String?
+    private let moreID = "feed-more"
     var body: some View {
         GeometryReader { geometry in
             if store.loading && store.questions.isEmpty {
@@ -310,16 +315,21 @@ struct FeedView: View {
                                     if let index = store.questions.firstIndex(where: {
                                         $0.id == question.id
                                     }), store.questions.indices.contains(index + 1) {
-                                        withAnimation(.easeOut(duration: 0.2)) {
+                                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                                             currentID = store.questions[index + 1].id
                                         }
                                     } else {
-                                        Task { await store.loadMore() }
+                                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                                            currentID = moreID
+                                        }
                                     }
                                 }
                             ).frame(maxWidth: 760)
                                 .padding(.horizontal, 16).padding(.vertical, 8)
-                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .frame(
+                                    width: geometry.size.width, height: geometry.size.height,
+                                    alignment: .top
+                                )
                                 .id(question.id)
                         }
                         VStack(spacing: 16) {
@@ -338,6 +348,7 @@ struct FeedView: View {
                             }.buttonStyle(OutlineButton())
                         }.padding(24).frame(
                             width: geometry.size.width, height: geometry.size.height)
+                            .id(moreID)
                     }.scrollTargetLayout()
                 }.scrollTargetBehavior(.paging).scrollPosition(id: $currentID).scrollIndicators(
                     .hidden

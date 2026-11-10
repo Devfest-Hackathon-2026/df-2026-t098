@@ -118,6 +118,53 @@ test("short touch swipes page one lesson and never submit an answer", async ({
   await cdp.detach();
 });
 
+test("short phone cards keep their controls beside the lesson", async ({
+  page,
+  context,
+}, info) => {
+  test.skip(info.project.name !== "mobile-chromium", "Phone feed layout");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "whylint-onboarding-v1",
+      JSON.stringify({ domain: "frontend", stack: "javascript", onboardingCompleted: true }),
+    ),
+  );
+  const questionIds = [
+    "f7937fee-cb4d-4aa8-8400-4f06c629635a",
+    "9e683fcb-8946-44b5-b409-d72b5704afc8",
+  ];
+  let question: { id: string; title: string; format: string };
+  await page.route("**/api/v1/learning/daily?*", (route) =>
+    route.fulfill({
+      json: { day: "2026-11-10", question, solved: 0, answered: 0, solvers: [], you: null },
+    }),
+  );
+  for (const id of questionIds) {
+    const response = await context.request.get(`${origin}/api/v1/learning/questions/${id}`);
+    expect(response.ok()).toBe(true);
+    question = (await response.json()).question;
+    await page.goto("/");
+    const card = page.locator(".feed-slide").first().locator(".question-card");
+    await expect(card).toHaveAttribute("data-question-id", id);
+    await expect(card.locator(".format-chip")).toBeVisible();
+    await expect(card.locator(".question-credit")).toContainText(question.title);
+    if (question.format === "predict_output") await expect(card.locator(".code-head")).toBeVisible();
+    await expect.poll(() =>
+      card.evaluate((element) => {
+        const choices = [...element.querySelectorAll(".quiz-option")].map((option) =>
+          option.getBoundingClientRect(),
+        );
+        const actions = element.querySelector(".card-actions")!.getBoundingClientRect();
+        return {
+          gap: Math.round(actions.top - Math.max(...choices.map((option) => option.bottom))),
+          rows: new Set(choices.map((option) => Math.round(option.top))).size,
+        };
+      }),
+    ).toEqual({ gap: 0, rows: question.format === "true_false" ? 1 : 4 });
+  }
+});
+
 test("real long lessons stay complete and readable inline across phone sizes", async ({
   page,
   context,
@@ -338,6 +385,16 @@ test("thumb arcs page, and a touch during the glide never leaves the feed betwee
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await prepareLearningAccount(page, context, info.project.name, "paging-arcs");
+  const response = await context.request.get(
+    `${origin}/api/v1/learning/questions/0496a538-bc5e-4a4c-afa9-86e3ff19e614`,
+  );
+  expect(response.ok()).toBe(true);
+  const { question } = await response.json();
+  await page.route("**/api/v1/learning/daily?*", (route) =>
+    route.fulfill({
+      json: { day: "2026-11-10", question, solved: 0, answered: 0, solvers: [], you: null },
+    }),
+  );
   let submitted = 0;
   page.on("request", (request) => {
     if (request.method() === "POST" && request.url().endsWith("/taps"))

@@ -3,11 +3,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthSession } from '../auth/auth-session';
 import { DisplaySettings } from './display-settings';
-import { LearningApi, learningError } from './learning-api';
+import { LearningApi, LearningError, learningError } from './learning-api';
 import { QuestionCard } from './question-card';
 import { LoadingSkeleton } from './loading-skeleton';
 import { ProgressStore } from './progress-store';
 import type { Question } from './learning.types';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Component({
   selector: 'app-shared-question',
@@ -17,7 +19,10 @@ import type { Question } from './learning.types';
     <header>
       <a routerLink="/">{{ text('フィードに戻る', 'Back to the feed') }}</a>
     </header>
-    @if (session.status() === 'unavailable') {
+    @if (!questionId() || missing()) {
+      <h1>{{ text('問題が見つかりません', 'Question not found') }}</h1>
+      <p>{{ text('リンクを確認するか、フィードに戻ってください。', 'Check the link or go back to the feed.') }}</p>
+    } @else if (session.status() === 'unavailable') {
       <p role="alert">
         {{
           text(
@@ -28,13 +33,16 @@ import type { Question } from './learning.types';
       </p>
       <button type="button" (click)="session.refresh()">{{ text('再試行', 'Try again') }}</button>
     }
-    @if (loading() || (session.status() === 'loading' && !question())) {
+    @if (
+      questionId() && !missing() && session.status() !== 'unavailable' &&
+      (loading() || (session.status() === 'loading' && !question() && !error()))
+    ) {
       <app-loading-skeleton
         variant="question"
         [label]="text('問題を読み込み中…', 'Loading question…')"
       />
     }
-    @if (question(); as question) {
+    @if (questionId() && !missing() && question(); as question) {
       <app-question-card
         [question]="question"
         [language]="settings.language()"
@@ -43,7 +51,7 @@ import type { Question } from './learning.types';
         (discussionChange)="discussion.set($event)"
       />
     }
-    @if (error()) {
+    @if (questionId() && !missing() && session.status() !== 'unavailable' && error()) {
       <p role="alert">{{ error() }}</p>
       <button type="button" (click)="load()">{{ text('再試行', 'Try again') }}</button>
     }
@@ -99,6 +107,10 @@ export class SharedQuestion {
   protected readonly session = inject(AuthSession);
   private controller = new AbortController();
   private readonly params = toSignal(this.route.paramMap, { requireSync: true });
+  protected readonly questionId = computed(() => {
+    const id = this.params().get('id');
+    return id && UUID.test(id) ? id : null;
+  });
   private readonly query = toSignal(this.route.queryParamMap, { requireSync: true });
   protected readonly explainOnOpen = computed(
     () => this.query().get('explain') === '1' && this.session.status() === 'authenticated',
@@ -107,14 +119,15 @@ export class SharedQuestion {
   protected readonly question = signal<Question | null>(null);
   protected readonly discussion = signal(false);
   protected readonly error = signal('');
+  protected readonly missing = signal(false);
   protected readonly loading = signal(false);
   constructor() {
     inject(DestroyRef).onDestroy(() => this.controller.abort());
     effect(() => {
-      const id = this.params().get('id');
+      const id = this.questionId();
       const status = this.session.status();
-      if (status === 'loading' || status === 'unavailable') return;
-      const identity = (this.session.user()?.id ?? 'guest') + ':' + id;
+      if (id && (status === 'loading' || status === 'unavailable')) return;
+      const identity = id ? (this.session.user()?.id ?? 'guest') + ':' + id : '';
       untracked(() => {
         if (identity === this.identity) return;
         this.identity = identity;
@@ -122,8 +135,10 @@ export class SharedQuestion {
         this.controller = new AbortController();
         this.question.set(null);
         this.discussion.set(false);
+        this.error.set('');
+        this.missing.set(false);
         this.loading.set(false);
-        void this.load();
+        if (id) void this.load();
       });
     });
   }
@@ -131,7 +146,8 @@ export class SharedQuestion {
     return this.settings.language() === 'ja' ? ja : en;
   }
   protected async load(): Promise<void> {
-    if (this.loading()) return;
+    const id = this.questionId();
+    if (!id || this.loading()) return;
     const signal = this.controller.signal;
     this.loading.set(true);
     this.error.set('');
@@ -139,14 +155,18 @@ export class SharedQuestion {
       const transfer = this.progress.syncGuestAnswers();
       if (transfer) await transfer;
       if (signal.aborted) return;
-      const id = this.route.snapshot.paramMap.get('id');
       const result = await this.api.get<{ question: Question }>(
-        '/questions/' + encodeURIComponent(id ?? ''),
+        '/questions/' + encodeURIComponent(id),
         signal,
       );
+      if (!result?.question) throw new Error('Missing question response');
       if (!signal.aborted) this.question.set(result.question);
     } catch (error) {
-      if (!signal.aborted) this.error.set(learningError(error, this.settings.language()));
+      if (!signal.aborted) {
+        if (error instanceof LearningError && (error.status === 400 || error.status === 404))
+          this.missing.set(true);
+        else this.error.set(learningError(error, this.settings.language()));
+      }
     } finally {
       if (!signal.aborted) this.loading.set(false);
     }
