@@ -4,7 +4,7 @@ Requires the APK copied to qa/builds/whylint-fixture-debug.apk by the documented
 Resets ONLY app.whylint.nativeapp on WHYLINT_EMULATOR (an emulator serial).
 """
 from ui_capture import *
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 import time
 import json
 from zipfile import ZipFile
@@ -15,8 +15,24 @@ with ZipFile(apk) as archive:
     assert any(b'http://10.0.2.2:3130' in archive.read(name) for name in archive.namelist() if name.endswith('.dex')), 'This is not a fixture-targeting APK.'
 with urlopen('http://127.0.0.1:3130/api/v1/learning/catalog',timeout=4) as response:
     assert response.status==200
+base='http://127.0.0.1:3130/api/v1/learning'
+with urlopen(base+'/daily?language=ja',timeout=4) as response:
+    daily=json.load(response)['question']
+with urlopen(Request(
+    f"{base}/questions/{daily['id']}/taps",
+    data=b'{"choice":0}',
+    headers={'Content-Type':'application/json'},
+    method='POST',
+),timeout=4) as response:
+    correct=daily['options'][json.load(response)['correctOption']]
 adb('install','-r',str(apk))
 adb('shell','pm','clear','app.whylint.nativeapp')
+subprocess.run(
+    [ADB,'-s',SERIAL,'shell',
+     "run-as app.whylint.nativeapp sh -c 'mkdir -p shared_prefs && cat > shared_prefs/display.xml'"],
+    input=b'<?xml version="1.0" encoding="utf-8" standalone="yes" ?><map><string name="language">ja</string></map>',
+    check=True,
+)
 adb('shell','cmd','uimode','night','yes')
 adb('shell','am','start','-n','app.whylint.nativeapp/.MainActivity')
 time.sleep(2)
@@ -24,7 +40,7 @@ shot('android-onboarding-dark')
 tap('スキップしてすぐ始める →')
 time.sleep(2)
 shot('android-feed-dark')
-tap('3行目:',True)
+tap(f'{correct}行目:' if daily['format']=='spot_bug' else correct, daily['format']=='spot_bug')
 time.sleep(.7)
 assert '正解！' in labels()
 shot('android-feed-answered-dark')
