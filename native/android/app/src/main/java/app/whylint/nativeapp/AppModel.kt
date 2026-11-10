@@ -28,6 +28,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     var language by
         mutableStateOf(
             storage.getString("language", null)
+                ?: storage.getString("locationLanguage", null)
                 ?: if (java.util.Locale.getDefault().language == "ja") "ja" else "en"
         )
         private set
@@ -40,6 +41,10 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     var tab by mutableIntStateOf(0)
     var user by mutableStateOf<JSONObject?>(null)
     var sessionLoading by mutableStateOf(true)
+    var localeLoading by mutableStateOf(needsLocationLanguage())
+        private set
+
+    private var localeLookupAttempted = false
     var sessionError by mutableStateOf(false)
     var questions by mutableStateOf<List<Question>>(emptyList())
     var collection by mutableStateOf<List<Question>>(emptyList())
@@ -127,7 +132,11 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun changeLanguage(value: String) {
-        if (busy || value == language) return
+        if (busy) return
+        if (value == language) {
+            applyLanguage(value)
+            return
+        }
         if (user == null) {
             applyLanguage(value)
             resetFeed()
@@ -143,6 +152,31 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     private fun applyLanguage(value: String) {
         language = value
         storage.edit().putString("language", value).apply()
+    }
+
+    private fun needsLocationLanguage(): Boolean =
+        api.token == null && !storage.contains("language") && !storage.contains("locationLanguage")
+
+    private suspend fun resolveDefaultLanguage() {
+        if (localeLookupAttempted) return
+        if (!needsLocationLanguage()) {
+            localeLoading = false
+            return
+        }
+        localeLookupAttempted = true
+        try {
+            val detected = api.request("/config/locale", timeoutMs = 1_200).text("defaultLanguage")
+            if ((detected == "ja" || detected == "en") && needsLocationLanguage()) {
+                storage.edit().putString("locationLanguage", detected).apply()
+                language = detected
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // The device language is already available.
+        } finally {
+            localeLoading = false
+        }
     }
 
     fun message(e: Exception): String {
@@ -218,6 +252,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         val hadToken = api.token != null
         viewModelScope.launch {
             try {
+                resolveDefaultLanguage()
                 catalog = api.request("/learning/catalog")
                 if (api.token != null) {
                     user = api.request("/auth/me")

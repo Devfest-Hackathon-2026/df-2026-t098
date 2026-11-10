@@ -1,4 +1,6 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Header, Req } from '@nestjs/common';
+import type { Request } from 'express';
+import { localeDefault } from './locale-default';
 
 export interface PublicConfig {
   /** Base URL of the published legal pages; clients append `/privacy` and `/terms`. */
@@ -44,5 +46,11 @@ export class PublicConfigController {
   @Header('Cache-Control', 'public, max-age=300')
   get(): PublicConfig {
     return publicConfig();
+  }
+
+  @Get('locale')
+  @Header('Cache-Control', 'private, no-store')
+  locale(@Req() request: Request) {
+    return { defaultLanguage: localeDefault(request.ip) };
   }
 }

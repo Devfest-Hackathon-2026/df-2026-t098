@@ -28,6 +28,7 @@ COPY --from=backend-deps --chown=node:node /build/node_modules ./node_modules
 COPY --from=backend-build --chown=node:node /build/dist ./dist
 COPY --chown=node:node backend/package.json ./package.json
 COPY --chown=node:node backend/seed ./seed
+COPY --chown=node:node backend/data ./data
 COPY --from=frontend-build --chown=node:node /build/dist/frontend/browser ./public
 USER node
 EXPOSE 8080

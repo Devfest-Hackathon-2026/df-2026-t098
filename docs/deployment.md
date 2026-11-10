@@ -34,6 +34,11 @@ What is verified and what is not is listed at the end of this page.
 `NODE_ENV=production` is baked into the image (it enables HSTS). Never commit real values; `.env*`
 files are excluded from the Docker build context.
 
+First-launch language uses the bundled [DB-IP Country Lite data](../backend/data/README.md) and
+the client IP resolved by Express. Keep `TRUST_PROXY` matched to the actual ingress path. If
+you change the load balancer or proxy chain, verify the resolved IP before rollout. Direct
+local requests fall back to the browser or device language.
+
 ## Build and try it locally
 
 ```bash

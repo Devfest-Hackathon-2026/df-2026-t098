@@ -1229,3 +1229,26 @@ web production build passed.
 - Not done: Sign in with Apple, release signing, crash reporting and CI test steps (they need
   the owner's accounts); the Android header still shows the guest "Save progress" chip while the
   session cannot be checked offline.
+
+## First language by country
+
+- `GET /api/v1/config/locale` returns `{ defaultLanguage }` as `ja` for Japan, `en` for
+  another known country, or `null` if there is no country result. The response is private and
+  never cached by HTTP intermediaries.
+- Look up the address Express resolves using the deployment's existing trusted proxy setting.
+  Ignore country headers and private or reserved addresses. Use a pinned DB-IP Country Lite
+  database in the server image. The lookup requests no device location, sends no IP to a provider,
+  and stores no country or lookup input. Credit DB-IP on the language setup and Privacy pages.
+- Web, iOS and Android use a saved learner or account language before a saved location default.
+  With neither, attempt one bounded lookup per launch and save only a known result. Use the
+  browser or device language when the lookup is unavailable. A language chosen during startup
+  takes precedence, and the feed uses the resolved default on first load.
+- Verify a Japanese address, a non-Japanese address, missing geolocation, trusted proxy handling,
+  and that a saved or newly selected language wins. Run web, iOS and Android builds and focused
+  locale tests before preparing this for deployment.
+
+Verified against the bundled database and a disposable backend. Web showed Japanese for a
+Japanese address, English for a US address, and browser fallback for an unknown address. An
+account language overrode the suggestion. The iPhone 17 simulator and Android emulator opened
+in Japanese for the same fixture address and relaunched without another lookup. Android also
+kept a manually selected English preference after relaunch.

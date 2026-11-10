@@ -474,6 +474,12 @@
           <p role="alert">{{ languageError() }}</p>
         }
       }
+      @if (settings.usesLocationLanguage()) {
+        <p class="hint">
+          {{ text('国に合わせて表示言語を提案しています。', 'Language suggested from your country.') }}
+          <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">IP Geolocation by DB-IP</a>
+        </p>
+      }
     </section>
     @if (session.status() === 'guest') {
       <a class="preferences-link" routerLink="/onboarding" [queryParams]="{ edit: '1' }">{{

@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import type { Language } from './learning.types';
 
 export type ReadingSize = 'standard' | 'large' | 'larger';
@@ -9,6 +9,7 @@ const READING_SCALE: Record<ReadingSize, number> = {
   large: 1.15,
   larger: 1.3,
 };
+const LOCATION_LANGUAGE_KEY = 'whylint-language-detected';
 
 @Injectable({ providedIn: 'root' })
 export class DisplaySettings {
@@ -17,6 +18,10 @@ export class DisplaySettings {
     '(prefers-color-scheme: light)',
   );
   private hasThemePreference = ['light', 'dark'].includes(this.read('whylint-theme') ?? '');
+  private readonly chosenLanguage = signal(this.readLanguage('whylint-language'));
+  private readonly locationLanguage = signal(this.readLanguage(LOCATION_LANGUAGE_KEY));
+  private locationLookup?: Promise<void>;
+  readonly usesLocationLanguage = computed(() => !this.chosenLanguage() && !!this.locationLanguage());
   readonly language = signal<Language>(this.initialLanguage());
   readonly theme = signal<'light' | 'dark'>(
     this.read('whylint-theme') === 'light' ? 'light' : 'dark',
@@ -40,9 +45,40 @@ export class DisplaySettings {
   }
 
   setLanguage(language: Language): void {
+    this.chosenLanguage.set(language);
     this.language.set(language);
     this.save('whylint-language', language);
     this.apply();
+  }
+  resolveDefaultLanguage(request: typeof fetch): Promise<void> | undefined {
+    if (this.chosenLanguage() || this.locationLanguage()) return;
+    this.locationLookup ??= this.fetchLocationLanguage(request);
+    return this.locationLookup;
+  }
+
+  private async fetchLocationLanguage(request: typeof fetch): Promise<void> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    try {
+      const response = await request('/api/v1/config/locale', {
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+      const { defaultLanguage }: { defaultLanguage?: unknown } = await response.json();
+      if (controller.signal.aborted || this.chosenLanguage()) return;
+      if (defaultLanguage !== 'ja' && defaultLanguage !== 'en') return;
+      this.locationLanguage.set(defaultLanguage);
+      this.save(LOCATION_LANGUAGE_KEY, defaultLanguage);
+      this.language.set(defaultLanguage);
+      this.apply();
+    } catch {
+      // The browser language is already available.
+    } finally {
+      clearTimeout(timeout);
+    }
   }
   toggleTheme(): void {
     this.setTheme(this.theme() === 'light' ? 'dark' : 'light');
@@ -58,12 +94,15 @@ export class DisplaySettings {
     this.save('whylint-reading-size', size);
     this.apply();
   }
-  /** The saved choice, else the browser's language: Japanese for ja, English for anything else. */
   private initialLanguage(): Language {
-    const saved = this.read('whylint-language');
-    if (saved === 'en' || saved === 'ja') return saved;
+    const saved = this.chosenLanguage() ?? this.locationLanguage();
+    if (saved) return saved;
     const browser = this.document.defaultView?.navigator?.language ?? 'ja';
     return browser.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+  }
+  private readLanguage(key: string): Language | null {
+    const value = this.read(key);
+    return value === 'en' || value === 'ja' ? value : null;
   }
   private read(key: string): string | null {
     try {

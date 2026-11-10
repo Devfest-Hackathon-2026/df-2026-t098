@@ -37,8 +37,12 @@ struct BlockedUser: Identifiable, Hashable {
 
 @Observable @MainActor final class AppStore {
     let api = API()
+    private var applyingLocationLanguage = false
+    private var localeLookupAttempted = false
     var language: String {
-        didSet { UserDefaults.standard.set(language, forKey: "language") }
+        didSet {
+            if !applyingLocationLanguage { UserDefaults.standard.set(language, forKey: "language") }
+        }
     }
     /// Why the sign-in screen is showing, so it can say what signing in unlocks.
     var loginReason: String?
@@ -92,6 +96,7 @@ struct BlockedUser: Identifiable, Hashable {
     init() {
         language =
             UserDefaults.standard.string(forKey: "language")
+            ?? UserDefaults.standard.string(forKey: "locationLanguage")
             ?? (Locale.preferredLanguages.first?.lowercased().hasPrefix("ja") == true ? "ja" : "en")
         theme =
             UserDefaults.standard.string(forKey: "theme")
@@ -208,6 +213,7 @@ struct BlockedUser: Identifiable, Hashable {
     }
     func start() async {
         await restoreSession()
+        await resolveDefaultLanguage()
         await loadFeed()
         if !didOnboard { showingOnboarding = true }
         #if DEBUG
@@ -216,6 +222,26 @@ struct BlockedUser: Identifiable, Hashable {
                 showingOnboarding = true
             }
         #endif
+    }
+    private func resolveDefaultLanguage() async {
+        let defaults = UserDefaults.standard
+        guard !localeLookupAttempted, api.token == nil,
+            defaults.string(forKey: "language") == nil,
+            defaults.string(forKey: "locationLanguage") == nil
+        else { return }
+        #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--ui-testing") { return }
+        #endif
+        localeLookupAttempted = true
+        guard let response = try? await api.request("/config/locale", timeout: 1.2),
+            let detected = response["defaultLanguage"] as? String,
+            ["ja", "en"].contains(detected),
+            api.token == nil, defaults.string(forKey: "language") == nil
+        else { return }
+        defaults.set(detected, forKey: "locationLanguage")
+        applyingLocationLanguage = true
+        language = detected
+        applyingLocationLanguage = false
     }
     func restoreSession() async {
         guard let sessionToken = api.token else {
