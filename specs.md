@@ -1206,7 +1206,7 @@ web production build passed.
 - **Spot-the-bug cards say the lines are the answers.** iOS and Android had no hint and nothing
   that looked tappable; a first-time guest tapped "Explain why" and hit the sign-in wall. They now
   show "Tap the buggy line" above the code and an accent stripe on tappable lines (as the web
-  already did). (The audit's "first card is an Explain
+  already did); the web hint is larger and bolder. (The audit's "first card is an Explain
   question" was wrong: it is a spot-the-bug quiz.)
 - **Native sign-in screens** explain what the locked action unlocks (same texts as the web), say
   "Back to learning", have a consent line with Terms and Privacy links, name the missing field
@@ -1225,7 +1225,9 @@ web production build passed.
   it is disabled.
 - Tests: iOS `testGuestChoicesAndProgressCarryIntoANewAccount` and
   `testGuestProgressCarriesIntoAnExistingAccount` (`--reset-guest` clears guest data between tests),
-  plus Android `guest_progress_smoke.py` and the native API smoke checks.
+  `verify-api.mjs` covers guest-answer import. The Playwright spec "language settings: skeleton
+  feed…" now holds the progress request from page load, because progress has been requested
+  at sign-in since the guest-progress change (it failed on an unmodified copy of HEAD too).
 - Not done: Sign in with Apple, release signing, crash reporting and CI test steps (they need
   the owner's accounts); the Android header still shows the guest "Save progress" chip while the
   session cannot be checked offline.
