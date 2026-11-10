@@ -685,9 +685,12 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
   });
 
   it('verifies email and resets a password using emailed links', async () => {
-    const firstDelivery = Promise.withResolvers<void>();
+    let resolveFirstDelivery!: () => void;
+    const firstDelivery = new Promise<void>((resolve) => {
+      resolveFirstDelivery = resolve;
+    });
     const delivery = jest.spyOn(app!.get(EmailService), 'send').mockImplementation(async () => {
-      firstDelivery.resolve();
+      resolveFirstDelivery();
     });
     const address = `links-${suffix}@example.test`;
     const newPassword = 'a different long test password';
@@ -703,7 +706,7 @@ describeWithDatabase('Password and Google sessions (HTTP + PostgreSQL)', () => {
       return new URL(link).searchParams.get('token');
     };
     try {
-      await firstDelivery.promise;
+      await firstDelivery;
       const verification = tokenFor('/verify-email');
       await request(server()).post('/api/v1/auth/email/verify')
         .set('Origin', origin).send({ token: verification }).expect(200);
