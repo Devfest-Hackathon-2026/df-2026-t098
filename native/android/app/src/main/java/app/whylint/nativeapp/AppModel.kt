@@ -37,8 +37,9 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     var readingSize by mutableFloatStateOf(storage.getFloat("readingSize", 1f))
         private set
 
+    // A saved session takes priority over the device-only completion flag on launch.
     var screen by
-        mutableStateOf(if (storage.getBoolean("onboarded", false)) "home" else "onboarding")
+        mutableStateOf(if (api.token != null || storage.getBoolean("onboarded", false)) "home" else "onboarding")
     var tab by mutableIntStateOf(0)
     var user by mutableStateOf<JSONObject?>(null)
     var sessionLoading by mutableStateOf(true)
@@ -317,9 +318,10 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         val prefs = result.optJSONObject("preferences")
         preferences = prefs ?: JSONObject()
         if (prefs != null) {
-            preferences = prefs
             applyLanguage(prefs.optString("language", language))
-            storage.edit().putString("preferences", prefs.toString()).apply()
+            val saved = storage.edit().putString("preferences", prefs.toString())
+            if (prefs.strings("interests").isNotEmpty()) saved.putBoolean("onboarded", true)
+            saved.apply()
         }
         if (!importedProgress) {
             val refreshed = api.request("/learning/progress")

@@ -105,7 +105,9 @@ struct BlockedUser: Identifiable, Hashable {
         didOnboard = UserDefaults.standard.bool(forKey: "didOnboard")
         #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
-            if arguments.contains("--ui-testing") { didOnboard = true }
+            if arguments.contains("--ui-testing") {
+                didOnboard = !arguments.contains("--without-local-onboarding")
+            }
             // A test that signs up as a brand-new guest starts without choices left by another.
             if arguments.contains("--reset-guest") {
                 UserDefaults.standard.removeObject(forKey: "guestPreferences")
@@ -217,7 +219,7 @@ struct BlockedUser: Identifiable, Hashable {
         await restoreSession()
         await resolveDefaultLanguage()
         await loadFeed()
-        if !didOnboard { showingOnboarding = true }
+        if api.token == nil && !didOnboard { showingOnboarding = true }
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--screen-login") { showingLogin = true }
             if ProcessInfo.processInfo.arguments.contains("--screen-onboarding") {
@@ -246,13 +248,17 @@ struct BlockedUser: Identifiable, Hashable {
         applyingLocationLanguage = false
     }
     func restoreSession() async {
+        _ = await restoreAccount()
+    }
+    /// Returns true only when the server confirms that this account has no saved preferences.
+    private func restoreAccount() async -> Bool {
         guard let sessionToken = api.token else {
             clearSession()
-            return
+            return false
         }
         do {
             let restoredUser = try await api.request("/auth/me")
-            guard api.token == sessionToken else { return }
+            guard api.token == sessionToken else { return false }
             if user?["id"] as? String != restoredUser["id"] as? String {
                 guestImportFailed = false
                 guestImportSkipped = 0
@@ -260,19 +266,21 @@ struct BlockedUser: Identifiable, Hashable {
             user = restoredUser
             sessionUnavailable = false
             let importedProgress = await importGuestAnswers()
-            guard api.token == sessionToken else { return }
+            guard api.token == sessionToken else { return false }
             let result = try await api.request("/learning/preferences")
-            guard api.token == sessionToken else { return }
+            guard api.token == sessionToken else { return false }
             preferences = result["preferences"] as? [String: Any] ?? [:]
             if let lang = preferences["language"] as? String { language = lang }
             if !importedProgress {
                 let restoredProgress = try await api.request("/learning/progress")
-                guard api.token == sessionToken else { return }
+                guard api.token == sessionToken else { return false }
                 progress = restoredProgress
             }
             await loadBlocked()
+            return api.token == sessionToken && result["preferences"] is NSNull
         } catch {
-            if api.token == nil { user = nil } else { sessionUnavailable = true }
+            if api.token == sessionToken { sessionUnavailable = true }
+            return false
         }
     }
     func signIn(identifier: String, password: String, email: String?, username: String?)
@@ -296,19 +304,24 @@ struct BlockedUser: Identifiable, Hashable {
     }
     /// Everything that follows a successful password or Google sign-in.
     func finishSignIn() async throws {
+        let owner = api.token
         let guestChoices = guestPreferences()
-        await restoreSession()
-        guard signedIn else { throw APIError(status: 0, code: "SESSION_UNAVAILABLE") }
+        let missingPreferences = await restoreAccount()
+        guard api.token == owner, signedIn else {
+            throw APIError(status: 0, code: "SESSION_UNAVAILABLE")
+        }
         showingLogin = false
         // What a guest picked in onboarding becomes the new account's choices, so they are not
         // asked again; the account's own choices win when it already has them.
-        if preferences.isEmpty, !guestChoices.isEmpty,
+        if missingPreferences, !guestChoices.isEmpty,
             let saved = try? await api.request(
                 "/learning/preferences", method: "PUT", body: guestChoices)
         {
+            guard api.token == owner else { return }
             preferences = saved["preferences"] as? [String: Any] ?? guestChoices
         }
-        if preferences.isEmpty { showingOnboarding = true }
+        guard api.token == owner else { return }
+        showingOnboarding = missingPreferences && preferences.isEmpty
         await loadFeed()
     }
     private struct GuestAnswer: Codable {

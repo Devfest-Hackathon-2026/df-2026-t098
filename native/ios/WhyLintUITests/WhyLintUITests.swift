@@ -355,14 +355,19 @@ final class WhyLintAccountUITests: XCTestCase {
         start.tap()
         XCTAssertTrue(app.buttons["public-profile"].waitForExistence(timeout: 15))
         app.terminate()
+        // Reinstalling or changing build identity can leave the Keychain session
+        // intact while the device's onboarding preference is absent.
+        app.launchArguments.append("--without-local-onboarding")
         app.launch()
         XCTAssertTrue(app.buttons["public-profile"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["login-topbar"].exists)
+        XCTAssertFalse(next.waitForExistence(timeout: 6))
         app.buttons["open-settings"].tap()
         app.buttons["account-settings"].tap()
         app.buttons["logout"].tap()
         XCTAssertTrue(app.buttons["login-topbar"].waitForExistence(timeout: 10))
         app.terminate()
+        app.launchArguments.removeAll { $0 == "--without-local-onboarding" }
         app.launch()
         XCTAssertTrue(app.buttons["login-topbar"].waitForExistence(timeout: 10))
     }
