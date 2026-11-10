@@ -25,7 +25,11 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         )
         private set
 
-    var language by mutableStateOf(storage.getString("language", "ja") ?: "ja")
+    var language by
+        mutableStateOf(
+            storage.getString("language", null)
+                ?: if (java.util.Locale.getDefault().language == "ja") "ja" else "en"
+        )
         private set
 
     var readingSize by mutableFloatStateOf(storage.getFloat("readingSize", 1f))
@@ -61,12 +65,52 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     var publishDraft by mutableStateOf(JSONObject())
     var blocked by mutableStateOf<List<JSONObject>>(emptyList())
     var accountDeleted by mutableStateOf(false)
+    /** What the sign-in screen says signing in unlocks; set by whatever sent the learner there. */
+    var loginReason by mutableStateOf<String?>(null)
+    private var refreshedAt = 0L
+    private val inFlight = mutableSetOf<String>()
     private var identity = 0
     private var batchId = UUID.randomUUID().toString()
     private var seen = linkedSetOf<String>()
     private var feedEpoch = 0
 
     fun text(ja: String, en: String) = if (language == "ja") ja else en
+
+    fun loginReasonText(): String? =
+        when (loginReason) {
+            "explain" ->
+                text(
+                    "ログインすると、あなたの説明をGeminiが採点し、+15 XPを獲得できます。",
+                    "Sign in to get your explanation graded by Gemini and earn +15 XP.",
+                )
+            "ask" -> text("ログインすると、Geminiに質問できます。", "Sign in to ask Gemini a follow-up question.")
+            "save" ->
+                text(
+                    "ログインすると、問題を保存して、プロフィールからいつでも見返せます。",
+                    "Sign in to save this question and find it again in your Profile.",
+                )
+            "like" -> text("ログインすると、問題にいいねできます。", "Sign in to like questions.")
+            "comment" -> text("ログインすると、コメントできます。", "Sign in to join the discussion.")
+            "practice" ->
+                text(
+                    "ログインすると、間違えた問題を毎朝復習できます。",
+                    "Sign in to review the questions you missed every morning.",
+                )
+            "post" -> text("ログインすると、あなたの問題を投稿できます。", "Sign in to post a question of your own.")
+            "progress" ->
+                text(
+                    "ログインすると、進捗・XP・連続記録をすべての端末で保存できます。",
+                    "Sign in to keep your progress, XP and streak on every device.",
+                )
+            else -> null
+        }
+
+    fun openLogin(reason: String? = "progress", signup: Boolean = false) {
+        loginReason = reason
+        error = ""
+        sheet = ""
+        screen = if (signup) "signup" else "login"
+    }
 
     init {
         refreshSession()
@@ -108,6 +152,11 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
                 text("ログインを確認できませんでした。もう一度ログインしてください。", "Sign in again to continue.")
             a?.status == 409 ->
                 text("このメールアドレスまたはユーザー名は利用できません。", "This email or username is unavailable.")
+            a?.status == 404 ->
+                text(
+                    "見つかりませんでした。すでに削除または非表示になっている可能性があります。",
+                    "Not found. It may have been removed or hidden.",
+                )
             a?.status == 429 ->
                 text(
                     "リクエストが多いため、少し待ってから再試行してください。",
@@ -128,9 +177,15 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun action(block: suspend () -> Unit) {
-        if (busy) return
-        busy = true
+    /**
+     * Runs one request at a time. A like or save passes its own [key], so it never blocks, or is
+     * silently dropped behind, an answer in flight; it only waits for itself.
+     */
+    fun action(key: String = "", block: suspend () -> Unit) {
+        if (key.isEmpty()) {
+            if (busy) return
+            busy = true
+        } else if (!inFlight.add(key)) return
         error = ""
         notice = ""
         val owner = identity
@@ -144,12 +199,18 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
                     if (api.token == null && user != null) invalidateSession()
                 }
             } finally {
-                busy = false
+                if (key.isEmpty()) busy = false else inFlight.remove(key)
             }
         }
     }
 
+    /** Refreshes when the app returns from the background, but not on every quick switch. */
+    fun refreshIfStale() {
+        if (System.currentTimeMillis() - refreshedAt > 60_000) refreshSession()
+    }
+
     fun refreshSession() {
+        refreshedAt = System.currentTimeMillis()
         sessionLoading = true
         sessionError = false
         val previousUser = user?.text("id")
@@ -180,7 +241,11 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun loadAccount() {
+        val token = api.token ?: return
+        val importedProgress = importGuestAnswers()
+        if (api.token != token) return
         val result = api.request("/learning/preferences")
+        if (api.token != token) return
         val prefs = result.optJSONObject("preferences")
         preferences = prefs ?: JSONObject()
         if (prefs != null) {
@@ -188,7 +253,11 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
             applyLanguage(prefs.optString("language", language))
             storage.edit().putString("preferences", prefs.toString()).apply()
         }
-        progress = api.request("/learning/progress")
+        if (!importedProgress) {
+            val refreshed = api.request("/learning/progress")
+            if (api.token != token) return
+            progress = refreshed
+        }
         try {
             blocked = api.request("/learning/blocks").objects("users")
         } catch (_: ApiError) {
@@ -215,11 +284,15 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
             )
         val token = result.text("token")
         check(token.isNotBlank())
+        val guestChoices = preferences
         api.signIn(token)
         accountDeleted = false
         user = api.request("/auth/me")
         loadAccount()
+        adoptGuestPreferences(guestChoices)
         identity++
+        loginReason = null
+        tab = 0
         screen = if (preferences.strings("interests").isEmpty()) "onboarding" else "home"
         resetFeed()
     }
@@ -228,18 +301,140 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         val result = api.request("/auth/mobile/google", "POST", json("idToken" to idToken))
         val token = result.text("token")
         check(token.isNotBlank())
+        val guestChoices = preferences
         api.signIn(token)
         accountDeleted = false
         user = api.request("/auth/me")
         loadAccount()
+        adoptGuestPreferences(guestChoices)
         identity++
+        loginReason = null
+        tab = 0
         screen = if (preferences.strings("interests").isEmpty()) "onboarding" else "home"
         resetFeed()
+    }
+
+    /**
+     * What a guest picked in onboarding becomes the new account's choices, so they are not asked
+     * again. An account that already has choices keeps them.
+     */
+    private suspend fun adoptGuestPreferences(guest: JSONObject) {
+        if (preferences.strings("interests").isNotEmpty() || guest.strings("interests").isEmpty())
+            return
+        try {
+            api.request("/learning/preferences", "PUT", guest)
+            preferences = guest
+            storage.edit().putString("preferences", guest.toString()).apply()
+        } catch (e: ApiError) {
+            // Onboarding asks again if the account could not take them.
+        }
+    }
+
+    private fun guestAnswerQueue(): JSONObject {
+        val saved = storage.getString("guestAnswerQueue", null)
+        if (saved != null) return JSONObject(saved)
+        val legacy = JSONArray(storage.getString("guestAnswers", "[]") ?: "[]")
+        return json("answers" to legacy, "pending" to JSONObject())
+    }
+
+    private fun rememberGuestAnswer(questionId: String, choice: Int) {
+        val queue = guestAnswerQueue()
+        val kept = queue.optJSONArray("answers") ?: JSONArray()
+        kept.put(json("questionId" to questionId, "choice" to choice))
+        val recent = JSONArray()
+        for (index in maxOf(0, kept.length() - 200) until kept.length()) recent.put(kept.get(index))
+        queue.put("answers", recent)
+        storage
+            .edit()
+            .putString("guestAnswerQueue", queue.toString())
+            .remove("guestAnswers")
+            .apply()
+    }
+
+    @Suppress("ApplySharedPref")
+    private fun saveGuestAnswerQueue(queue: JSONObject) {
+        check(
+            storage
+                .edit()
+                .putString("guestAnswerQueue", queue.toString())
+                .remove("guestAnswers")
+                .commit()
+        )
+    }
+
+    var guestImportFailed by mutableStateOf(false)
+        private set
+
+    var guestImportSkipped by mutableIntStateOf(0)
+        private set
+
+    fun retryGuestAnswers() {
+        viewModelScope.launch { importGuestAnswers() }
+    }
+
+    private suspend fun importGuestAnswers(): Boolean {
+        val accountId = user?.text("id").orEmpty()
+        val token = api.token ?: return false
+        val key = "guest-import:$accountId"
+        if (accountId.isBlank() || !inFlight.add(key)) return false
+        var updated = false
+        try {
+            while (api.token == token && user?.text("id") == accountId) {
+                val queue = guestAnswerQueue()
+                val pending = queue.getJSONObject("pending")
+                val unassigned = queue.optJSONArray("answers") ?: JSONArray()
+                if (!pending.has(accountId) && unassigned.length() > 0) {
+                    pending.put(
+                        accountId,
+                        json("requestId" to UUID.randomUUID().toString(), "answers" to unassigned),
+                    )
+                    queue.put("answers", JSONArray())
+                    saveGuestAnswerQueue(queue)
+                }
+                val batch = pending.optJSONObject(accountId) ?: break
+                val requestId = batch.text("requestId")
+                val answers = batch.getJSONArray("answers")
+                val result =
+                    api.request(
+                        "/learning/guest-answers",
+                        "POST",
+                        json(
+                            "accountId" to accountId,
+                            "requestId" to requestId,
+                            "answers" to answers,
+                        ),
+                    )
+                if (api.token != token || user?.text("id") != accountId) break
+                val imported = result.optInt("imported", -1)
+                val skipped = result.optInt("skipped", -1)
+                val refreshed = result.getJSONObject("progress")
+                check(imported in 0..answers.length() && skipped == answers.length() - imported)
+                check(refreshed.has("answeredTaps") && refreshed.has("totalXp"))
+                val current = guestAnswerQueue()
+                val currentPending = current.getJSONObject("pending")
+                if (currentPending.optJSONObject(accountId)?.text("requestId") != requestId) break
+                currentPending.remove(accountId)
+                saveGuestAnswerQueue(current)
+                progress = refreshed
+                guestImportSkipped += skipped
+                guestImportFailed = false
+                updated = true
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            if (api.token == token && user?.text("id") == accountId) guestImportFailed = true
+        } finally {
+            inFlight.remove(key)
+        }
+        return updated
     }
 
     private fun invalidateSession() {
         identity++
         user = null
+        guestImportFailed = false
+        guestImportSkipped = 0
         guestCorrect = 0
         guestAnswered = 0
         progress = JSONObject()
@@ -269,8 +464,8 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Permanently deletes the account. The token is forgotten only after the server confirms
-     * with 204; on any failure the account and the session stay as they were.
+     * Permanently deletes the account. The token is forgotten only after the server confirms with
+     * 204; on any failure the account and the session stay as they were.
      */
     fun deleteAccount() = action {
         api.request("/auth/me", "DELETE")
@@ -282,6 +477,8 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         api.forget()
         identity++
         user = null
+        guestImportFailed = false
+        guestImportSkipped = 0
         guestCorrect = 0
         guestAnswered = 0
         progress = JSONObject()
@@ -325,6 +522,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
 
     fun skipOnboarding() {
         storage.edit().putBoolean("onboarded", true).apply()
+        tab = 0
         screen = "home"
     }
 
@@ -435,21 +633,21 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
             ?: run {
                 guestAnswered++
                 if (result.optBoolean("correct")) guestCorrect++
+                rememberGuestAnswer(q.id, choice)
             }
     }
 
-    fun requireLogin(): Boolean {
+    fun requireLogin(reason: String = "progress"): Boolean {
         if (user == null) {
-            screen = "login"
-            sheet = ""
+            openLogin(reason)
             return false
         }
         return true
     }
 
     fun like(q: Question) {
-        if (!requireLogin()) return
-        action {
+        if (!requireLogin("like")) return
+        action("like:${q.id}") {
             val result =
                 api.request("/learning/questions/${q.id}/like", "PUT", json("liked" to !q.liked))
             update(
@@ -462,8 +660,8 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun save(q: Question) {
-        if (!requireLogin()) return
-        action {
+        if (!requireLogin("save")) return
+        action("save:${q.id}") {
             api.request("/learning/questions/${q.id}/save", "PUT", json("saved" to !q.saved))
             update(q.copy(saved = !q.saved))
         }
@@ -492,7 +690,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         requestId: String = UUID.randomUUID().toString(),
         onSuccess: () -> Unit = {},
     ) {
-        if (!requireLogin()) return
+        if (!requireLogin("comment")) return
         action {
             val body = json("text" to text, "kind" to kind, "requestId" to requestId)
             parent?.let { body.put("parentId", it) }
@@ -503,7 +701,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun helpful(q: Question, c: JSONObject) {
-        if (!requireLogin()) return
+        if (!requireLogin("comment")) return
         action {
             api.request(
                 "/learning/questions/${q.id}/comments/${c.text("id")}/helpful",
@@ -526,7 +724,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         details: String,
         onDone: () -> Unit = {},
     ) {
-        if (!requireLogin()) return
+        if (!requireLogin("comment")) return
         action {
             val id = c.text("id")
             api.request(
@@ -536,17 +734,26 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
             )
             // The server hides a reported comment (and its replies) from the reporter.
             comments = comments.filter { it.text("id") != id && it.text("parentId") != id }
-            notice = text("報告を受け付けました。このコメントは非表示になりました。", "Report received. This comment is now hidden for you.")
+            notice =
+                text(
+                    "報告を受け付けました。このコメントは非表示になりました。",
+                    "Report received. This comment is now hidden for you.",
+                )
             onDone()
         }
     }
 
-    /** Blocks a learner: their questions leave this device's lists and the server hides their comments. */
+    /**
+     * Blocks a learner: their questions leave this device's lists and the server hides their
+     * comments.
+     */
     fun blockUser(id: String, name: String, reload: Question? = null) {
-        if (!requireLogin()) return
+        if (!requireLogin("comment")) return
         action {
             api.request("/learning/blocks/$id", "PUT")
-            blocked = listOf(json("id" to id, "displayName" to name)) + blocked.filter { it.text("id") != id }
+            blocked =
+                listOf(json("id" to id, "displayName" to name)) +
+                    blocked.filter { it.text("id") != id }
             val hidden = { q: Question -> q.author?.text("id") == id }
             questions = questions.filterNot(hidden)
             collection = collection.filterNot(hidden)
@@ -555,7 +762,9 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
                 sheet = ""
                 if (screen == "question") screen = "home"
             }
-            reload?.let { comments = api.request("/learning/questions/${it.id}/comments").objects("comments") }
+            reload?.let {
+                comments = api.request("/learning/questions/${it.id}/comments").objects("comments")
+            }
             notice = text("${name}さんをブロックしました。", "You blocked $name.")
         }
     }
@@ -567,7 +776,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun assess(q: Question, answer: String, requestId: String) {
-        if (!requireLogin()) return
+        if (!requireLogin("explain")) return
         action {
             assessment =
                 api.request(
@@ -580,7 +789,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun ask(q: Question, question: String, requestId: String) {
-        if (!requireLogin()) return
+        if (!requireLogin("ask")) return
         action {
             followUp =
                 api.request(
@@ -592,7 +801,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun report(q: Question, reason: String, details: String) {
-        if (!requireLogin()) return
+        if (!requireLogin("comment")) return
         action {
             api.request(
                 "/learning/questions/${q.id}/reports",

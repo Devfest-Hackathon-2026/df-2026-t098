@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (resumed && ::model.isInitialized) model.refreshSession()
+        if (resumed && ::model.isInitialized) model.refreshIfStale()
         resumed = true
     }
 

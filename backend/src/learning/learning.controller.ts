@@ -35,6 +35,7 @@ import {
   ReportDto,
   FeedBatchDto,
   FollowUpDto,
+  GuestAnswersDto,
   LikeDto,
   LanguageDto,
   PreferencesDto,
@@ -193,6 +194,15 @@ export class LearningController {
     @Body() body: TapDto,
   ) {
     return this.practice.tap(request.user?.sub ?? null, id, body.choice);
+  }
+
+  @Post('guest-answers')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(...authenticatedWrite)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  importGuestAnswers(@Req() request: AuthenticatedRequest, @Body() body: GuestAnswersDto) {
+    return this.practice.importGuestAnswers(request.user!.sub, body);
   }
 
   @Post('questions/:id/follow-ups')

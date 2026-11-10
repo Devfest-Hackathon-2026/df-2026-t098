@@ -1,4 +1,18 @@
 <main>
+  @if (progress.guestImportFailed()) {
+    <div class="guest-import-notice">
+      <p role="alert">
+        {{
+          settings.language() === 'ja'
+            ? 'ゲストの回答を保存できませんでした。このタブに残っています。'
+            : 'We couldn’t save your guest answers. They’re still in this tab.'
+        }}
+      </p>
+      <button type="button" (click)="progress.retryGuestAnswers()">
+        {{ settings.language() === 'ja' ? '再試行' : 'Try again' }}
+      </button>
+    </div>
+  }
   <router-outlet #outlet="outlet" />
   @if (!outlet.isActivated) {
     <div class="session-loading" [attr.lang]="settings.language()">

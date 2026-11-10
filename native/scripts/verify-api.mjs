@@ -34,6 +34,15 @@ assert.equal(typeof signup.token, 'string');
 token = signup.token;
 const me = await call('auth/me');
 assert.equal(me.email, account.email);
+// Answers given as a guest before signing up count towards the new account.
+const guestQuestion = pool.questions.filter(q => q.format !== 'explain' && q.id !== question.id)[0];
+assert(guestQuestion, 'Expected a second seeded quiz question');
+const imported = await call('learning/guest-answers', 'POST', {
+  accountId: me.id, requestId: randomUUID(), answers: [{ questionId: guestQuestion.id, choice: 0 }],
+});
+assert.equal(imported.imported, 1, 'The guest answer must be imported');
+assert.equal(imported.skipped, 0);
+assert.equal(typeof imported.progress?.level, 'number', 'The import answers with the new progress');
 await call('learning/preferences', 'PUT', {
   interests: ['backend'], technologies: ['TypeScript'], difficulty: 'beginner', language: 'ja',
 });

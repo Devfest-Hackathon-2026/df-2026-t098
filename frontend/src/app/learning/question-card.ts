@@ -102,6 +102,8 @@ export class QuestionCard {
   private fitViewport = { width: 0, height: 0, font: '' };
   protected readonly detailsOpen = signal(false);
   protected readonly detailMode = signal<'explain' | 'ask' | 'info' | 'question'>('info');
+  /** Set when the sheet was opened from "Read feedback", so it opens on the feedback. */
+  protected readonly feedbackFocus = signal(false);
   private readonly commentsButton = viewChild<ElementRef<HTMLButtonElement>>('commentsButton');
   private readonly explainField = viewChild<ElementRef<HTMLTextAreaElement>>('explainField');
   private controller = new AbortController();
@@ -232,6 +234,10 @@ export class QuestionCard {
           if (open && !panel.open) {
             panel.showModal();
             this.detailHeading()?.nativeElement.focus({ preventScroll: true });
+            if (this.feedbackFocus())
+              panel
+                .querySelector<HTMLElement>('.reveal')
+                ?.scrollIntoView({ block: 'start', behavior: 'instant' as ScrollBehavior });
           } else if (!open && panel.open) panel.close();
         },
         { injector: this.injector },
@@ -545,7 +551,12 @@ export class QuestionCard {
     this.next.emit();
   }
 
-  protected openDetails(mode: 'explain' | 'ask' | 'info' | 'question', event?: Event): void {
+  protected openDetails(
+    mode: 'explain' | 'ask' | 'info' | 'question',
+    event?: Event,
+    feedback = false,
+  ): void {
+    this.feedbackFocus.set(feedback);
     this.detailTrigger =
       event?.currentTarget instanceof HTMLElement
         ? event.currentTarget
@@ -610,7 +621,8 @@ export class QuestionCard {
   }
 
   protected get detailTitle(): string {
-    if (this.detailMode() === 'question') return this.text('問題全体', 'Full question');
+    if (this.detailMode() === 'question')
+      return this.feedbackFocus() ? this.text('解説', 'Feedback') : this.text('問題全体', 'Full question');
     if (this.detailMode() === 'explain') return this.text('なぜ？を説明する', 'Explain why');
     if (this.detailMode() === 'ask') return this.text('Geminiに質問', 'Ask Gemini');
     return this.text('問題の詳細', 'Question details');
@@ -635,7 +647,7 @@ export class QuestionCard {
   protected openExplain(): void {
     if (!this.authenticated) {
       void this.router.navigate(['/login'], {
-        queryParams: { returnTo: `/questions/${this.question().id}?explain=1` },
+        queryParams: { reason: 'explain', returnTo: `/questions/${this.question().id}?explain=1` },
       });
       return;
     }
@@ -887,7 +899,9 @@ export class QuestionCard {
 
   protected async toggleLike(): Promise<void> {
     if (!this.authenticated) {
-      void this.router.navigate(['/login']);
+      void this.router.navigate(['/login'], {
+        queryParams: { reason: 'like', returnTo: `/questions/${this.question().id}` },
+      });
       return;
     }
     if (this.liking()) return;
@@ -914,7 +928,9 @@ export class QuestionCard {
 
   protected async toggleSave(): Promise<void> {
     if (!this.authenticated) {
-      void this.router.navigate(['/login']);
+      void this.router.navigate(['/login'], {
+        queryParams: { reason: 'save', returnTo: `/questions/${this.question().id}` },
+      });
       return;
     }
     if (this.saving()) return;

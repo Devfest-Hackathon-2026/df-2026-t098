@@ -9,7 +9,7 @@
     }}
   </p>
   @if (session.status() !== 'authenticated') {
-    <a class="signin-cta" routerLink="/login">{{
+    <a class="signin-cta" routerLink="/login" [queryParams]="{ reason: 'post' }">{{
       text('ログインして質問を投稿', 'Sign in to post a question')
     }}</a>
   } @else if (published(); as question) {

@@ -769,6 +769,11 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
     "recovery",
     "reader",
   );
+  const startingLanguage = await context.request.patch(
+    `${origin}/api/v1/learning/preferences/language`,
+    { headers: { Origin: origin }, data: { language: "ja" } },
+  );
+  expect(startingLanguage.ok()).toBe(true);
   let release!: () => void;
   const waiting = new Promise<void>((resolve) => {
     release = resolve;
@@ -781,6 +786,17 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
     await route.continue();
   });
   const initial = learningResponse(page, "/feed/batches", "POST");
+  // The account's progress is requested as soon as the learner is known, so it has to be held
+  // from the start for the Profile skeleton to be observable later.
+  let releaseProgress!: () => void;
+  const pendingProgress = new Promise<void>((resolve) => {
+    releaseProgress = resolve;
+  });
+  await page.route("**/api/v1/learning/progress", async (route) => {
+    await pendingProgress;
+    await route.continue();
+  });
+  const progressResponse = learningResponse(page, "/progress", "GET");
   await page.goto("/");
   try {
     await expect(
@@ -823,24 +839,11 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
     10,
   );
   await page.unroute(firstLoad);
-  let releaseProgress!: () => void;
-  const pendingProgress = new Promise<void>((resolve) => {
-    releaseProgress = resolve;
-  });
-  await page.route("**/api/v1/learning/progress", async (route) => {
-    await pendingProgress;
-    await route.continue();
-  });
-  const progressResponse = learningResponse(page, "/progress", "GET");
   await openProfile(page);
+  const progressSkeleton = page.locator('.profile-panel app-loading-skeleton[variant="profile"]');
   try {
-    await expect(
-      page.locator(".profile-panel app-loading-skeleton").first(),
-    ).toBeVisible();
-    await page
-      .locator(".profile-panel app-loading-skeleton")
-      .first()
-      .scrollIntoViewIfNeeded();
+    await expect(progressSkeleton).toBeVisible();
+    await progressSkeleton.scrollIntoViewIfNeeded();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollHeight <= innerHeight,
@@ -850,6 +853,7 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
     releaseProgress();
   }
   expect((await progressResponse).ok()).toBe(true);
+  await expect(page.getByRole("heading", { name: "今日の目標", exact: true })).toBeVisible();
   await page.unroute("**/api/v1/learning/progress");
   await openSettings(page);
   const saved = learningResponse(page, "/preferences/language", "PATCH");
@@ -858,6 +862,7 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
   await expect(
     page.getByRole("heading", { name: "App settings", exact: true }),
   ).toBeVisible();
+  await expect(page).toHaveURL(/\?tab=settings$/);
   await page.evaluate(() => {
     localStorage.removeItem("whylint-language");
     localStorage.removeItem("whylint-onboarding-v1");
@@ -865,7 +870,6 @@ test("language settings: skeleton feed, profile save and restoration on a clean 
   });
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await openSettings(page, "en");
   await expect(
     page.getByRole("radio", { name: "English", exact: true }),
   ).toBeChecked();
@@ -903,7 +907,7 @@ test("guest: skip setup, answer instantly without signing in, and get invited af
   await expect(page.locator(".signin-card")).toHaveCount(1);
   await expect(page.locator(".signin-card a")).toHaveAttribute(
     "href",
-    "/login",
+    "/login?reason=progress",
   );
   await expectUsableViewport(page);
   await page.screenshot({

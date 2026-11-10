@@ -298,7 +298,7 @@
           <p>{{ result.quickExplanation }}</p>
         }
         @if (pagedCompact() && !inSheet) {
-          <button class="review-question" type="button" (click)="openDetails('question', $event)">
+          <button class="review-question" type="button" (click)="openDetails('question', $event, true)">
             {{ text('解説を見る', 'Read feedback') }}
           </button>
         }

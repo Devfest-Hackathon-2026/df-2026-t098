@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AssessmentService } from './assessment.service';
 import { GeminiService } from './gemini/gemini.service';
 import { learningDay } from './learning-calendar';
@@ -19,7 +20,7 @@ import type {
   PublicQuestion,
 } from './learning.types';
 import { QuestionsService } from './questions.service';
-import type { FollowUpDto } from './dto/learning.dto';
+import type { FollowUpDto, GuestAnswersDto } from './dto/learning.dto';
 
 export const TAP_XP = 5;
 
@@ -101,67 +102,9 @@ export class PracticeService {
     }
 
     const outcome = await this.database.transaction(async (manager) => {
-      // Lock the learner while updating XP and reviews.
-      await manager.query('SELECT pg_advisory_xact_lock(1103,hashtext($1))', [
-        userId,
-      ]);
-      await manager.query(
-        `INSERT INTO learning_question_progress (user_id,question_id) VALUES ($1,$2)
-        ON CONFLICT (user_id,question_id) DO NOTHING`,
-        [userId, questionId],
-      );
-      const [progress] = await manager.query(
-        `SELECT xp_earned,box,needs_review,(due_at IS NOT NULL AND due_at <= now()) AS due
-        FROM learning_question_progress WHERE user_id = $1 AND question_id = $2 FOR UPDATE`,
-        [userId, questionId],
-      );
-      const [first] = await manager.query(
-        `SELECT choice,correct FROM learning_taps
-        WHERE user_id = $1 AND question_id = $2 AND NOT review`,
-        [userId, questionId],
-      );
-      const canReview = first && progress.needs_review;
-      if (first && !canReview) {
-        const [latest] = await manager.query(
-          `SELECT choice,correct FROM learning_taps WHERE user_id = $1 AND question_id = $2
-          ORDER BY created_at DESC,id DESC LIMIT 1`,
-          [userId, questionId],
-        );
-        return {
-          choice: latest.choice as number,
-          correct: latest.correct as boolean,
-          xp: 0,
-          review: false,
-        };
-      }
-
-      const correct = choice === question.correct_option;
-      const xp =
-        !first && correct && question.author_id !== userId
-          ? Math.max(0, Math.min(TAP_XP, 20 - progress.xp_earned))
-          : 0;
-      await manager.query(
-        `INSERT INTO learning_taps (user_id,question_id,choice,correct,review,xp_awarded,day)
-        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [
-          userId,
-          questionId,
-          choice,
-          correct,
-          Boolean(first),
-          xp,
-          learningDay(),
-        ],
-      );
-      const schedule = nextSchedule(progress.box, correct);
-      await manager.query(
-        `UPDATE learning_question_progress SET ${SCHEDULE_SQL},
-        xp_earned = xp_earned + $7, updated_at = now() WHERE user_id = $1 AND question_id = $2`,
-        [userId, questionId, ...scheduleParameters(schedule), xp],
-      );
-      return { choice, correct, xp, review: Boolean(first) };
+      await this.lockLearner(manager, userId);
+      return this.writeTap(manager, userId, questionId, choice, question, learningDay());
     });
-
     const progress = await this.assessment.progress(userId);
     return {
       ...reveal,
@@ -172,6 +115,134 @@ export class PracticeService {
       combo: progress.combo,
       progress,
     };
+  }
+
+  async importGuestAnswers(userId: string, input: GuestAnswersDto) {
+    if (input.accountId !== userId) throw new ForbiddenException('Account changed');
+    const claim = await this.operations.claim(userId, input.requestId, 'guest_import', input.answers);
+    let counts = claim.replay as { imported: number; skipped: number } | null;
+    if (!counts) {
+      try {
+        counts = await this.database.transaction(async (manager) => {
+          await this.operations.assertLease(manager, claim);
+          await this.lockLearner(manager, userId);
+          const ids = [...new Set(input.answers.map((answer) => answer.questionId))];
+          const rows: (TapRow & { id: string })[] = await manager.query(
+            `SELECT q.id,q.format,q.options,q.correct_option,q.quick_explanation,q.author_id
+            FROM learning_questions q WHERE q.id = ANY($1::uuid[])
+            AND q.generated_for IS NULL AND q.format <> 'explain'
+            AND NOT EXISTS (SELECT 1 FROM learning_user_blocks b
+              WHERE b.blocker_id = $2 AND b.blocked_id = q.author_id)`,
+            [ids, userId],
+          );
+          const questions = new Map(rows.map((question) => [question.id, question]));
+          const importedIds = new Set<string>();
+          const day = learningDay();
+          let imported = 0;
+          for (const answer of input.answers) {
+            const questionId = answer.questionId.toLowerCase();
+            const question = questions.get(questionId);
+            if (
+              !question?.options ||
+              question.correct_option === null ||
+              answer.choice >= question.options.length
+            )
+              continue;
+            const result = await this.writeTap(
+              manager,
+              userId,
+              questionId,
+              answer.choice,
+              question,
+              day,
+              !importedIds.has(questionId),
+            );
+            if (result.recorded) {
+              imported++;
+              importedIds.add(questionId);
+            }
+          }
+          const result = { imported, skipped: input.answers.length - imported };
+          await this.operations.complete(manager, claim, result);
+          return result;
+        });
+      } catch (error) {
+        await this.operations.fail(claim);
+        throw error;
+      }
+    }
+    return { ...counts, progress: await this.assessment.progress(userId) };
+  }
+
+  private async lockLearner(manager: EntityManager, userId: string): Promise<void> {
+    await manager.query('SELECT pg_advisory_xact_lock(1103,hashtext($1))', [userId]);
+  }
+
+  private async writeTap(
+    manager: EntityManager,
+    userId: string,
+    questionId: string,
+    choice: number,
+    question: TapRow,
+    day: string,
+    skipExisting = false,
+  ) {
+    await manager.query(
+      `INSERT INTO learning_question_progress (user_id,question_id) VALUES ($1,$2)
+      ON CONFLICT (user_id,question_id) DO NOTHING`,
+      [userId, questionId],
+    );
+    const [progress] = await manager.query(
+      `SELECT xp_earned,box,needs_review,(due_at IS NOT NULL AND due_at <= now()) AS due
+      FROM learning_question_progress WHERE user_id = $1 AND question_id = $2 FOR UPDATE`,
+      [userId, questionId],
+    );
+    const [first] = await manager.query(
+      `SELECT choice,correct FROM learning_taps
+      WHERE user_id = $1 AND question_id = $2 AND NOT review`,
+      [userId, questionId],
+    );
+    const canReview = first && progress.needs_review;
+    if (first && (skipExisting || !canReview)) {
+      const [latest] = await manager.query(
+        `SELECT choice,correct FROM learning_taps WHERE user_id = $1 AND question_id = $2
+        ORDER BY created_at DESC,id DESC LIMIT 1`,
+        [userId, questionId],
+      );
+      return {
+        choice: latest.choice as number,
+        correct: latest.correct as boolean,
+        xp: 0,
+        review: false,
+        recorded: false,
+      };
+    }
+
+    const correct = choice === question.correct_option;
+    const xp =
+      !first && correct && question.author_id !== userId
+        ? Math.max(0, Math.min(TAP_XP, 20 - progress.xp_earned))
+        : 0;
+    await manager.query(
+      `INSERT INTO learning_taps (user_id,question_id,choice,correct,review,xp_awarded,day,created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,clock_timestamp())`,
+      [
+        userId,
+        questionId,
+        choice,
+        correct,
+        Boolean(first),
+        xp,
+        day,
+      ],
+    );
+    const schedule = nextSchedule(progress.box, correct);
+    await manager.query(
+      `UPDATE learning_question_progress SET ${SCHEDULE_SQL},
+      xp_earned = xp_earned + $7, updated_at = now() WHERE user_id = $1 AND question_id = $2`,
+      [userId, questionId, ...scheduleParameters(schedule), xp],
+    );
+    return { choice, correct, xp, review: Boolean(first), recorded: true };
   }
 
   async followUp(

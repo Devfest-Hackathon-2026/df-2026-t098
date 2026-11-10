@@ -41,10 +41,6 @@ extension AppStore {
         }
 
         try api.accept(token: token)
-        await restoreSession()
-        guard signedIn else { throw APIError(status: 0, code: "SESSION_UNAVAILABLE") }
-        showingLogin = false
-        if preferences.isEmpty { showingOnboarding = true }
-        await loadFeed()
+        try await finishSignIn()
     }
 }

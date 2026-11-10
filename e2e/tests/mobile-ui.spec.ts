@@ -1,4 +1,4 @@
-import { test, expect, learner, origin, openSettings } from './fixtures';
+import { test, expect, browserRequest, completeOnboarding, learner, origin, openSettings } from './fixtures';
 import {
   checkedJson,
   closeLearningDetails,
@@ -82,7 +82,7 @@ test('guest Explain why returns to the requested question after signup', async (
   await page.goto(`/questions/${sqlQuestionId}`);
   const card = page.locator('.question-card');
   await card.getByRole('button', { name: /なぜ？を説明する/ }).click();
-  await expect(page).toHaveURL(/\/login\?returnTo=/);
+  await expect(page).toHaveURL(/\/login\?(reason=explain&)?returnTo=/);
   expect(new URL(page.url()).searchParams.get('returnTo')).toBe(
     `/questions/${sqlQuestionId}?explain=1`,
   );
@@ -97,4 +97,45 @@ test('guest Explain why returns to the requested question after signup', async (
   await expect(page).toHaveURL(`${origin}/questions/${sqlQuestionId}?explain=1`);
   await expect(page.locator('textarea[id^="answer-"]')).toBeVisible();
   await expectUsableViewport(page);
+});
+
+test('guest answers carry into the account even when the first import response is lost', async ({ page }) => {
+  await completeOnboarding(page);
+  await page.goto(`/questions/${sqlQuestionId}`);
+  const card = page.locator('.question-card');
+  await card.locator('button.code-line').nth(2).click();
+  await expect(card.locator('.reveal')).toBeVisible();
+  await page.reload();
+  await expect(card).toBeVisible();
+
+  const requestIds: string[] = [];
+  await page.route('**/api/v1/learning/guest-answers', async (route) => {
+    requestIds.push(route.request().postDataJSON().requestId);
+    if (requestIds.length !== 1) return route.continue();
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    await route.fulfill({ status: 503, json: { code: 'UNAVAILABLE' } });
+  });
+  const account = learner();
+  await page.goto('/signup');
+  await page.getByLabel('メールアドレス', { exact: true }).fill(account.email);
+  await page.getByLabel('ユーザー名', { exact: true }).fill(account.username);
+  await page.getByLabel('パスワード', { exact: true }).fill(account.password);
+  await page.getByRole('button', { name: 'アカウントを作成', exact: true }).click();
+  const notice = page.locator('.guest-import-notice');
+  await expect(notice.getByRole('alert')).toContainText('このタブに残っています');
+  const retried = learningResponse(page, '/guest-answers', 'POST');
+  await notice.getByRole('button', { name: '再試行' }).click();
+  expect((await checkedJson(await retried)).imported).toBe(1);
+  await expect(notice).toHaveCount(0);
+  expect(requestIds).toHaveLength(2);
+  expect(requestIds[1]).toBe(requestIds[0]);
+  expect((await browserRequest(page, '/api/v1/learning/progress')).body).toMatchObject({
+    answeredTaps: 1,
+    correctTaps: 1,
+    totalXp: 5,
+    dailyCompleted: 1,
+  });
+  await page.goto('/?tab=profile');
+  await expect(page.locator('.progress-summary')).toContainText('1 / 5');
 });

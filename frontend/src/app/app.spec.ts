@@ -7,6 +7,7 @@ import type { SessionStatus } from './auth/auth-session';
 describe('App', () => {
   const session = {
     status: signal<SessionStatus>('guest'),
+    user: signal(null),
     refresh: vi.fn().mockResolvedValue(false),
   };
 

@@ -71,8 +71,10 @@ final class SessionVault {
         self.token = token
     }
 
-    func request(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws
-        -> [String: Any]
+    func request(
+        _ path: String, method: String = "GET", body: [String: Any]? = nil,
+        timeout: TimeInterval? = nil
+    ) async throws -> [String: Any]
     {
         guard let url = URL(string: origin + "/api/v1" + path),
             url.scheme == "https" || debugLocal(url)
@@ -83,6 +85,7 @@ final class SessionVault {
         request.timeoutInterval =
             path.contains("batches") || path.contains("attempts") || path.contains("follow-ups")
                 || (path == "/learning/questions" && method == "POST") ? 75 : 15
+        if let timeout { request.timeoutInterval = timeout }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let sentToken = token
         if let sentToken {

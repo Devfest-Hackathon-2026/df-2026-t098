@@ -67,7 +67,7 @@ export class ProfilePanel {
   );
   private controller = new AbortController();
   private owner: string | null | undefined;
-  protected readonly progress = signal<Progress | null>(null);
+  protected readonly progress = this.progressStore.progress;
   protected readonly saved = signal<Question[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal('');
@@ -108,7 +108,6 @@ export class ProfilePanel {
         this.deleteError.set('');
         this.controller.abort();
         this.controller = new AbortController();
-        this.progress.set(null);
         this.saved.set([]);
         this.error.set('');
         this.savedError.set('');
@@ -147,6 +146,9 @@ export class ProfilePanel {
     const signal = this.controller.signal;
     this.loading.set(true);
     this.error.set('');
+    const transfer = this.progressStore.syncGuestAnswers();
+    if (transfer) await transfer;
+    if (signal.aborted) return;
     const [progress] = await Promise.allSettled([
       this.api.get<Progress>('/progress', signal),
       this.loadSaved(),
@@ -154,7 +156,6 @@ export class ProfilePanel {
     if (signal.aborted) return;
     if (progress.status === 'fulfilled') {
       this.progress.set(progress.value);
-      this.progressStore.progress.set(progress.value);
     } else this.error.set(learningError(progress.reason, this.language()));
     this.loading.set(false);
   }

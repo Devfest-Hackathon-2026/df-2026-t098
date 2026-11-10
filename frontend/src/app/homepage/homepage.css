@@ -328,7 +328,7 @@ button:disabled {
   line-height: 1.7;
   color: var(--muted);
 }
-.collection > a {
+.collection > a:not(.signin-cta) {
   color: var(--accent);
 }
 .question-list a {
@@ -463,6 +463,13 @@ button:disabled {
     display: none;
   }
   .daily-banner {
+    flex-wrap: nowrap;
+    margin-bottom: 6px;
+    padding-inline: 4px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .daily-banner > span:not(.daily-rank) {
     display: none;
   }
 }

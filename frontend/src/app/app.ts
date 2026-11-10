@@ -4,6 +4,7 @@ import { RouterOutlet } from '@angular/router';
 import { AuthSession } from './auth/auth-session';
 import { DisplaySettings } from './learning/display-settings';
 import { LoadingSkeleton } from './learning/loading-skeleton';
+import { ProgressStore } from './learning/progress-store';
 
 @Component({
   imports: [RouterOutlet, LoadingSkeleton],
@@ -16,6 +17,7 @@ export class App {
   protected readonly session = inject(AuthSession);
   private readonly document = inject(DOCUMENT);
   protected readonly settings = inject(DisplaySettings);
+  protected readonly progress = inject(ProgressStore);
 
   constructor() {
     const destroyRef = inject(DestroyRef);

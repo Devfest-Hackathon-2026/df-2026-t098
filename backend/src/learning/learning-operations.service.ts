@@ -27,7 +27,7 @@ export class LearningOperationsService {
   async claim(
     userId: string,
     id: string,
-    kind: 'feed' | 'attempt' | 'publish' | 'followup',
+    kind: 'feed' | 'attempt' | 'publish' | 'followup' | 'guest_import',
     payload: unknown,
     questionId?: string,
   ): Promise<OperationClaim> {

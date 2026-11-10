@@ -452,6 +452,13 @@
           }
         </div>
       </fieldset>
+      @if (session.status() === 'guest') {
+        <app-language-picker
+          [language]="language()"
+          [selected]="language()"
+          (changed)="settings.setLanguage($event)"
+        />
+      }
       @if (session.status() === 'authenticated') {
         <app-language-picker
           [language]="language()"

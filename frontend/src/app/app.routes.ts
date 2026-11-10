@@ -25,6 +25,16 @@ export const routes: Routes = [
     loadComponent: () => import('./google-login/google-login').then((m) => m.GoogleLogin),
   },
   {
+    path: 'terms',
+    data: { kind: 'terms' },
+    loadComponent: () => import('./legal/legal-page').then((m) => m.LegalPage),
+  },
+  {
+    path: 'privacy',
+    data: { kind: 'privacy' },
+    loadComponent: () => import('./legal/legal-page').then((m) => m.LegalPage),
+  },
+  {
     path: 'questions/:id',
     loadComponent: () => import('./learning/shared-question').then((m) => m.SharedQuestion),
   },

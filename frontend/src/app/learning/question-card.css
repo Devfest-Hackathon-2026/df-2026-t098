@@ -4,6 +4,7 @@
 .question-card {
   background: var(--surface);
   border-radius: 16px;
+  box-shadow: var(--card-shadow, none);
   padding: clamp(20px, 4vw, 32px);
   overflow-wrap: anywhere;
 }

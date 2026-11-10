@@ -397,7 +397,9 @@ describe('Account profile regressions', () => {
     });
     await fixture.whenStable();
     expect(TestBed.inject(DisplaySettings).language()).toBe('ja');
-    expect(fixture.nativeElement.querySelector('app-language-picker')).toBeNull();
+    // A guest can still switch language on this device; the stale account response must not move it.
+    const picker = fixture.nativeElement.querySelector('app-language-picker');
+    expect(picker?.querySelector('input[value="ja"]')?.checked).toBe(true);
   });
   describe('store policy requirements', () => {
     beforeEach(async () => {

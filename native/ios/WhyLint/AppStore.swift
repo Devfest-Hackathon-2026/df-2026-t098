@@ -37,7 +37,15 @@ struct BlockedUser: Identifiable, Hashable {
 
 @Observable @MainActor final class AppStore {
     let api = API()
-    var language: String { didSet { UserDefaults.standard.set(language, forKey: "language") } }
+    var language: String {
+        didSet { UserDefaults.standard.set(language, forKey: "language") }
+    }
+    /// Why the sign-in screen is showing, so it can say what signing in unlocks.
+    var loginReason: String?
+    func promptSignIn(_ reason: String) {
+        loginReason = reason
+        showingLogin = true
+    }
     private var applyingSystemTheme = false
     var hasThemePreference = UserDefaults.standard.string(forKey: "theme") != nil
     var theme: String {
@@ -82,7 +90,9 @@ struct BlockedUser: Identifiable, Hashable {
     private var pendingBatchID: String?
 
     init() {
-        language = UserDefaults.standard.string(forKey: "language") ?? "ja"
+        language =
+            UserDefaults.standard.string(forKey: "language")
+            ?? (Locale.preferredLanguages.first?.lowercased().hasPrefix("ja") == true ? "ja" : "en")
         theme =
             UserDefaults.standard.string(forKey: "theme")
             ?? (UITraitCollection.current.userInterfaceStyle == .light ? "light" : "dark")
@@ -91,6 +101,12 @@ struct BlockedUser: Identifiable, Hashable {
         #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
             if arguments.contains("--ui-testing") { didOnboard = true }
+            // A test that signs up as a brand-new guest starts without choices left by another.
+            if arguments.contains("--reset-guest") {
+                UserDefaults.standard.removeObject(forKey: "guestPreferences")
+                UserDefaults.standard.removeObject(forKey: "guestAnswers")
+                UserDefaults.standard.removeObject(forKey: "guestAnswerQueue")
+            }
             if let i = arguments.firstIndex(of: "--tab"), arguments.indices.contains(i + 1) {
                 tab = arguments[i + 1]
             }
@@ -119,6 +135,35 @@ struct BlockedUser: Identifiable, Hashable {
     var signedIn: Bool { user != nil }
     var palette: Palette { Palette(light: theme == "light") }
     func text(_ ja: String, _ en: String) -> String { language == "ja" ? ja : en }
+    /// What signing in unlocks, shown on the sign-in screen when it was opened by a locked action.
+    func loginReasonText(_ key: String?) -> String? {
+        switch key {
+        case "explain":
+            return text(
+                "ログインすると、あなたの説明をGeminiが採点し、+15 XPを獲得できます。",
+                "Sign in to get your explanation graded by Gemini and earn +15 XP.")
+        case "ask":
+            return text("ログインすると、Geminiに質問できます。", "Sign in to ask Gemini a follow-up question.")
+        case "save":
+            return text(
+                "ログインすると、問題を保存して、プロフィールからいつでも見返せます。",
+                "Sign in to save this question and find it again in your Profile.")
+        case "like": return text("ログインすると、問題にいいねできます。", "Sign in to like questions.")
+        case "comment":
+            return text("ログインすると、コメントできます。", "Sign in to join the discussion.")
+        case "practice":
+            return text(
+                "ログインすると、間違えた問題を毎朝復習できます。",
+                "Sign in to review the questions you missed every morning.")
+        case "post":
+            return text("ログインすると、あなたの問題を投稿できます。", "Sign in to post a question of your own.")
+        case "progress":
+            return text(
+                "ログインすると、進捗・XP・連続記録をすべての端末で保存できます。",
+                "Sign in to keep your progress, XP and streak on every device.")
+        default: return nil
+        }
+    }
     func errorMessage(_ error: Error) -> String {
         let providerError = error as NSError
         if providerError.domain == "com.google.GIDSignIn" && providerError.code == -5 {
@@ -180,15 +225,23 @@ struct BlockedUser: Identifiable, Hashable {
         do {
             let restoredUser = try await api.request("/auth/me")
             guard api.token == sessionToken else { return }
+            if user?["id"] as? String != restoredUser["id"] as? String {
+                guestImportFailed = false
+                guestImportSkipped = 0
+            }
             user = restoredUser
             sessionUnavailable = false
+            let importedProgress = await importGuestAnswers()
+            guard api.token == sessionToken else { return }
             let result = try await api.request("/learning/preferences")
             guard api.token == sessionToken else { return }
             preferences = result["preferences"] as? [String: Any] ?? [:]
             if let lang = preferences["language"] as? String { language = lang }
-            let restoredProgress = try await api.request("/learning/progress")
-            guard api.token == sessionToken else { return }
-            progress = restoredProgress
+            if !importedProgress {
+                let restoredProgress = try await api.request("/learning/progress")
+                guard api.token == sessionToken else { return }
+                progress = restoredProgress
+            }
             await loadBlocked()
         } catch {
             if api.token == nil { user = nil } else { sessionUnavailable = true }
@@ -211,14 +264,130 @@ struct BlockedUser: Identifiable, Hashable {
             throw APIError(status: 0, code: "SESSION_MISSING")
         }
         try api.accept(token: token)
+        try await finishSignIn()
+    }
+    /// Everything that follows a successful password or Google sign-in.
+    func finishSignIn() async throws {
+        let guestChoices = guestPreferences()
         await restoreSession()
         guard signedIn else { throw APIError(status: 0, code: "SESSION_UNAVAILABLE") }
         showingLogin = false
+        // What a guest picked in onboarding becomes the new account's choices, so they are not
+        // asked again; the account's own choices win when it already has them.
+        if preferences.isEmpty, !guestChoices.isEmpty,
+            let saved = try? await api.request(
+                "/learning/preferences", method: "PUT", body: guestChoices)
+        {
+            preferences = saved["preferences"] as? [String: Any] ?? guestChoices
+        }
         if preferences.isEmpty { showingOnboarding = true }
         await loadFeed()
     }
+    private struct GuestAnswer: Codable {
+        let questionId: String
+        let choice: Int
+
+        var payload: [String: Any] { ["questionId": questionId, "choice": choice] }
+    }
+
+    private struct GuestBatch: Codable {
+        let requestId: String
+        let answers: [GuestAnswer]
+    }
+
+    private struct GuestQueue: Codable {
+        var answers: [GuestAnswer] = []
+        var pending: [String: GuestBatch] = [:]
+    }
+
+    private func guestQueue() -> GuestQueue {
+        let defaults = UserDefaults.standard
+        if let data = defaults.data(forKey: "guestAnswerQueue"),
+            let saved = try? JSONDecoder().decode(GuestQueue.self, from: data)
+        {
+            return saved
+        }
+        let legacy = defaults.array(forKey: "guestAnswers") as? [[String: Any]] ?? []
+        return GuestQueue(
+            answers: legacy.compactMap { answer in
+                guard let id = answer["questionId"] as? String,
+                    let choice = answer["choice"] as? Int
+                else { return nil }
+                return GuestAnswer(questionId: id, choice: choice)
+            })
+    }
+
+    private func saveGuestQueue(_ queue: GuestQueue) throws {
+        let defaults = UserDefaults.standard
+        defaults.set(try JSONEncoder().encode(queue), forKey: "guestAnswerQueue")
+        defaults.removeObject(forKey: "guestAnswers")
+    }
+
+    private func rememberGuestAnswer(_ questionID: String, choice: Int) {
+        var queue = guestQueue()
+        queue.answers = Array(
+            (queue.answers + [GuestAnswer(questionId: questionID, choice: choice)]).suffix(200))
+        try? saveGuestQueue(queue)
+    }
+
+    private(set) var guestImportFailed = false
+    private(set) var guestImportSkipped = 0
+    private var guestImports: Set<String> = []
+
+    func retryGuestAnswers() async {
+        _ = await importGuestAnswers()
+    }
+
+    private func importGuestAnswers() async -> Bool {
+        guard let accountID = user?["id"] as? String, let token = api.token,
+            guestImports.insert(accountID).inserted
+        else { return false }
+        defer { guestImports.remove(accountID) }
+        var updated = false
+        do {
+            while api.token == token && user?["id"] as? String == accountID {
+                var queue = guestQueue()
+                if queue.pending[accountID] == nil && !queue.answers.isEmpty {
+                    queue.pending[accountID] = GuestBatch(
+                        requestId: UUID().uuidString.lowercased(), answers: queue.answers)
+                    queue.answers = []
+                    try saveGuestQueue(queue)
+                }
+                guard let batch = queue.pending[accountID] else { break }
+                let response = try await api.request(
+                    "/learning/guest-answers", method: "POST",
+                    body: [
+                        "accountId": accountID, "requestId": batch.requestId,
+                        "answers": batch.answers.map(\.payload),
+                    ], timeout: 30)
+                guard api.token == token && user?["id"] as? String == accountID else { break }
+                guard let imported = response["imported"] as? Int,
+                    let skipped = response["skipped"] as? Int,
+                    (0...batch.answers.count).contains(imported),
+                    skipped == batch.answers.count - imported,
+                    let refreshed = response["progress"] as? [String: Any],
+                    refreshed["answeredTaps"] is Int, refreshed["totalXp"] is Int
+                else { throw APIError(status: 0, code: "GUEST_IMPORT_RECEIPT") }
+                queue = guestQueue()
+                guard queue.pending[accountID]?.requestId == batch.requestId else { break }
+                queue.pending.removeValue(forKey: accountID)
+                try saveGuestQueue(queue)
+                progress = refreshed
+                guestImportSkipped += skipped
+                guestImportFailed = false
+                updated = true
+            }
+        } catch {
+            if api.token == token && user?["id"] as? String == accountID {
+                guestImportFailed = true
+            }
+        }
+        return updated
+    }
     private func clearSession() {
         user = nil
+        guestImportFailed = false
+        guestImportSkipped = 0
         progress = [:]
         preferences = guestPreferences()
         publishDraft = [:]
@@ -358,6 +527,7 @@ struct BlockedUser: Identifiable, Hashable {
         if !signedIn {
             guestAnswered += 1
             if tap.correct { guestCorrect += 1 }
+            rememberGuestAnswer(question.id, choice: choice)
         }
         return tap
     }

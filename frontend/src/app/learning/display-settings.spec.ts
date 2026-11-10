@@ -111,3 +111,31 @@ describe('Reading display settings', () => {
     expect(document.documentElement.style.getPropertyValue('--reading-scale')).toBe('1.15');
   });
 });
+
+describe('First language', () => {
+  const setBrowser = (language: string) =>
+    Object.defineProperty(window.navigator, 'language', { value: language, configurable: true });
+
+  afterEach(() => {
+    setBrowser('ja-JP');
+    localStorage.removeItem('whylint-language');
+  });
+
+  it.each([
+    ['ja-JP', 'ja'],
+    ['en-US', 'en'],
+    ['fr-FR', 'en'],
+  ])('uses the browser language %s as %s when nothing is saved', (browser, expected) => {
+    localStorage.removeItem('whylint-language');
+    setBrowser(browser);
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(DisplaySettings).language()).toBe(expected);
+  });
+
+  it('prefers the saved choice over the browser language', () => {
+    localStorage.setItem('whylint-language', 'ja');
+    setBrowser('en-US');
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(DisplaySettings).language()).toBe('ja');
+  });
+});

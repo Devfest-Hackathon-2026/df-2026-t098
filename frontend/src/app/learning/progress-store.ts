@@ -1,5 +1,6 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { AuthSession } from '../auth/auth-session';
+import { GuestSession, type GuestImport } from './guest-session';
 import { LearningApi } from './learning-api';
 import type { Progress, TapResult } from './learning.types';
 
@@ -18,15 +19,18 @@ const COMBO_MILESTONES = new Set([3, 5, 10, 15, 20, 30, 50]);
 export class ProgressStore {
   private readonly api = inject(LearningApi);
   private readonly session = inject(AuthSession);
+  private readonly guest = inject(GuestSession);
   private owner: string | null | undefined;
   private controller = new AbortController();
+  private transfer: { accountId: string; task: Promise<void> } | null = null;
   private nextToast = 1;
   readonly progress = signal<Progress | null>(null);
-  readonly guestCombo = signal(0);
-  readonly guestCorrect = signal(0);
-  readonly guestAnswered = signal(0);
+  readonly guestCombo = signal(this.guest.counters.combo);
+  readonly guestCorrect = signal(this.guest.counters.correct);
+  readonly guestAnswered = signal(this.guest.counters.answered);
   readonly toasts = signal<Toast[]>([]);
   readonly pulse = signal<{ correct: boolean; xp: number; at: number } | null>(null);
+  readonly guestImportFailed = signal(false);
 
   readonly combo = computed(() => this.progress()?.combo ?? this.guestCombo());
   readonly levelProgress = computed(() => {
@@ -45,9 +49,9 @@ export class ProgressStore {
         this.controller.abort();
         this.controller = new AbortController();
         this.progress.set(null);
-        this.guestCombo.set(0);
-        this.guestCorrect.set(0);
-        this.guestAnswered.set(0);
+        this.transfer = null;
+        this.guestImportFailed.set(false);
+        this.refreshGuestCounters();
         this.toasts.set([]);
         if (owner) void this.load();
       });
@@ -57,10 +61,74 @@ export class ProgressStore {
   async load(): Promise<void> {
     const signal = this.controller.signal;
     try {
+      const transfer = this.syncGuestAnswers();
+      if (transfer) await transfer;
+      if (signal.aborted) return;
       const progress = await this.api.get<Progress>('/progress', signal);
       if (!signal.aborted) this.update(progress, false);
     } catch {
     }
+  }
+
+  syncGuestAnswers(): Promise<void> | undefined {
+    const accountId = this.session.user()?.id;
+    if (this.session.status() !== 'authenticated' || !accountId || accountId !== this.owner) return;
+    if (this.transfer?.accountId === accountId) return this.transfer.task;
+    if (this.guestImportFailed()) return;
+
+    let batch: GuestImport | undefined;
+    try {
+      batch = this.guest.beginImport(accountId);
+    } catch {
+      this.guestImportFailed.set(true);
+      return;
+    }
+    if (!batch) return;
+
+    const signal = this.controller.signal;
+    const task = this.importGuestAnswers(accountId, signal, batch).finally(() => {
+      if (this.transfer?.task === task) this.transfer = null;
+    });
+    this.transfer = { accountId, task };
+    return task;
+  }
+
+  retryGuestAnswers(): void {
+    if (this.session.status() !== 'authenticated') return;
+    this.guestImportFailed.set(false);
+    void this.load();
+  }
+
+  private async importGuestAnswers(
+    accountId: string,
+    signal: AbortSignal,
+    first: GuestImport,
+  ): Promise<void> {
+    try {
+      let batch: GuestImport | undefined = first;
+      while (batch && !signal.aborted && this.session.user()?.id === accountId) {
+        this.refreshGuestCounters();
+        const result = await this.api.send<{ progress: Progress }>(
+          '/guest-answers',
+          'POST',
+          { accountId, ...batch },
+          signal,
+        );
+        if (signal.aborted || this.session.user()?.id !== accountId) return;
+        this.guest.finishImport(accountId, batch.requestId);
+        this.update(result.progress, false);
+        batch = this.guest.beginImport(accountId);
+      }
+    } catch {
+      if (!signal.aborted && this.session.user()?.id === accountId) this.guestImportFailed.set(true);
+    }
+  }
+
+  private refreshGuestCounters(): void {
+    const { combo, correct, answered } = this.guest.counters;
+    this.guestCombo.set(combo);
+    this.guestCorrect.set(correct);
+    this.guestAnswered.set(answered);
   }
 
   applyTap(result: TapResult): void {
@@ -69,6 +137,7 @@ export class ProgressStore {
       this.update(result.progress, true);
       return;
     }
+    this.guest.record(result);
     this.guestAnswered.update((count) => count + 1);
     if (result.correct) {
       this.guestCorrect.update((count) => count + 1);

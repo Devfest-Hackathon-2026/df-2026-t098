@@ -1119,3 +1119,113 @@ Verification: the web production build, 249 unit tests, and 18 focused browser c
 The desktop sidebar and phone gear were also checked with a saved question on Profile. Five
 iPhone 17 simulator tests passed across learning, account deletion, and display preferences.
 Android `assembleDebug` and `lintDebug` passed. Android UI was not exercised on a device.
+
+## Startup animation — 2026-11-09
+
+Both native apps play a ~1.2 s launch animation once per process: the brand "W" settles in (spring, 0.5 s), the cursor underline types across and blinks once, then the screen dissolves into the app (0.26 s fade + 6% scale).
+
+- iOS: `SplashView` and `MarkW` in `native/ios/WhyLint/WhyLintApp.swift`. Skipped with the `--ui-testing` launch argument. Reduce Motion shows the finished mark for 0.45 s and fades.
+- Android: `native/android/.../Splash.kt`, shown from `WhyLint()` in `Ui.kt` (`rememberSaveable`, so rotation does not replay it). Animations turned off in system settings gives the same static fade. `values-v31/styles.xml` makes the Android 12+ system splash dark with no icon, so there is no white-circle flash before ours.
+- Verified by recording the launch on the iPhone 17 simulator and the API 37 emulator. Not verified: physical devices, light-theme launch on Android, TalkBack/VoiceOver (the splash is hidden from accessibility).
+- Known gap: a phone in light mode that saved a dark app theme shows the light launch screen, then crossfades to the dark splash. The launch screen cannot read the in-app preference.
+
+## Stronger light theme — 2026-11-09
+
+The light theme read as thin: a white card on a near-white canvas, hairline borders, a code block and option rows barely different from the canvas, and no depth. New shared tokens (web `styles.css`, iOS `Palette`, Android `Light` scheme, launch screen, splash, brand marks):
+
+| Token | Before | After |
+|-------|--------|-------|
+| canvas | `#f3f5f0` | `#e9eee1` |
+| text / muted | `#20251f` / `#555e53` | `#131811` / `#465142` |
+| accent | `#4b6c08` | `#3d5d00` |
+| border | `#d2d9cf` | `#aab6a2` |
+| control / code | `#f1f3ed` / `#f1f3ed` | `#e3e9d8` / `#e0e7d4` |
+
+The feed card also gets a soft shadow (`--card-shadow` on web, a shadow on the card background on iOS, `Modifier.shadow` on Android) and a 1.5 pt accent border in light mode only. Dark mode is unchanged.
+
+Verified: iOS simulator and Android emulator screenshots in light mode; web unit tests 250/250; web light mode on a disposable stack (onboarding, feed on phone and desktop widths, ranking, settings). The dark topic cards seen in a first check came from forcing `data-theme` by hand and do not occur when the theme is set through the app. WCAG contrast computed for the token pairs: all text pairs pass AA (muted on control 6.7, accent on selected 5.6, syntax colours on the code block 5.0 to 6.6, danger on canvas 4.6); decorative borders are 1.8 to 2.1 against surface and canvas, below the 3:1 non-text guideline, and input borders are 4.6. Not verified: Playwright e2e, the answered/feedback states and the other native screens beyond Feed and Profile.
+Build note: after editing Swift files an incremental `xcodebuild` kept the old colors in the binary; `clean build` fixed it.
+
+## Production audit fixes and legal pages — 2026-11-09
+
+Driven by the first-time-user audit of whylint.com (phone and desktop).
+
+- **Terms of Service and Privacy Policy** are now pages in the app: `/terms` and `/privacy` (`frontend/src/app/legal/`), Japanese and English, with a language switch. The text describes what the code does today (email and Google sign-in, Gemini processing, the 7-day `access_token` cookie, Google Fonts, account deletion cascading with published questions kept without an author). It names no operator, address or contact: the contact block shows `SUPPORT_CONTACT` when configured, otherwise points to "Report a problem". **It is a draft for the owner to review with counsel** (minimum age, governing law, retention, operator identity). `LEGAL_BASE_URL` still overrides the links when the owner publishes elsewhere. Sign-in and sign-up now say "By continuing you agree to the Terms and Privacy Policy" with links (`app-consent-notice`), and the legal links in the footer fall back to the in-app pages.
+- **Practice sign-in button** was unreadable (accent text on a button colour; 1.16:1 in dark, 2.45:1 in light) because `.collection > a` in the homepage styles beat `.signin-cta`. Fixed with `:not(.signin-cta)`.
+- **Sign-in walls explain themselves.** Guest taps on Explain why, Save, Like, Practice, Post and "Sign in to save" go to `/login?reason=…` and the page says why; Save and Like now return to the question. The back link no longer says "Back to practice".
+- **Guest progress survives a reload** (`GuestSession`, sessionStorage, cleared on sign-in): the counter, combo and answered cards come back, and answered cards are not served again.
+- **Header chips** have titles and clearer screen-reader text; "Save progress" is "Sign in to save".
+- **First screen**: a one-line pitch on onboarding, a note on why Continue is disabled, and the first language now follows the browser (Japanese for `ja*`, otherwise English; a saved choice wins). Guests can change language in Settings. Specs run with `navigator.language = ja-JP` (`src/test-setup.ts`).
+- **Read feedback** on phones opens a sheet titled "Feedback", scrolled to the explanation. The IPv4 octet explanation now says why position 4 (seed and migration `1794410000000`).
+- **Bug of the Day** label is shown on phones. Tabs are in the address (`?tab=practice|ranking|post|profile|settings`), so reload, links and Back work.
+- Light theme answer badges are stronger; the ranking note explains how ties are ordered.
+- Not changed: guest feed content mix (about 55% of the pool has no code) and near-duplicate concepts in the pool; Android/iOS were not touched (their legal URL setting still points at the Cloud Run host, which serves the same pages after deploy).
+
+## Guest progress and public support
+
+- After password signup, password login, or Google sign-in, the web app submits the guest tab's
+  stored question IDs and selected options in answer order. Previously stored guest data can supply
+  its last choice per question. Keep up to 200 recent answers, including retries.
+- `POST /api/v1/learning/guest-answers` requires the signed-in account, its allowed browser origin,
+  and an account-bound request ID. The server grades against the current public question and uses
+  the normal tap XP and review schedule. It skips missing or incompatible questions and questions
+  the account already answered. A retry within the imported session can become a normal review.
+  The import records activity on the current Japan day and derives progress from stored answers.
+- Save a pending batch against the intended account in the current tab before sending it. Clear
+  the pending batch only after acknowledgment. A failed request stays available for retry, even
+  after reload or signing back into the same account. The account lock and completed request record
+  make the import safe to retry without awarding XP twice.
+- Terms, Privacy, and Settings display the public `SUPPORT_CONTACT` without requiring sign-in.
+  The production value for the next release is `kenzie@whylint.com`. Verify mail forwarding before
+  publishing the address. Remove the signed-in question-report form as the fallback support path.
+- Verify server grading, chronological retries, duplicate requests, existing account answers,
+  and guest answers carrying into Profile after signup.
+
+## Native audit fixes — 2026-11-10
+
+### Release decision and native guest progress
+
+- Use browser or device language for first launch, with saved learner and account choices taking
+  precedence. The location lookup, network request, and related disclosure are deferred.
+- On iOS and Android, reserve guest answers for the signed-in account before requesting import.
+  Persist the same request ID and choices until the server acknowledges the batch, including after
+  reload or a later sign-in. Another account cannot claim that pending batch.
+- Acknowledge only a well-formed import receipt. Show a retry for a failed request and explain
+  skipped answers in Profile. Apply the returned progress so Profile immediately shows the
+  server's answer count, daily goal and XP.
+- On both native clients, answer a quiz as a guest using the disposable backend, sign up, and
+  verify the new account's Profile shows one correct answer, one completed question and 5 XP.
+
+Verified on the iPhone 17 simulator and Android API 37 emulator. Both signup and password
+sign-in to an existing fixture account showed 1 / 1 correct, 1 / 5 daily progress and 5 XP in
+Profile. The native API smoke checks, Android build and lint, web display settings tests and
+web production build passed.
+
+### Other native audit changes
+
+- **Spot-the-bug cards say the lines are the answers.** iOS and Android had no hint and nothing
+  that looked tappable; a first-time guest tapped "Explain why" and hit the sign-in wall. They now
+  show "Tap the buggy line" above the code and an accent stripe on tappable lines (as the web
+  already did). (The audit's "first card is an Explain
+  question" was wrong: it is a spot-the-bug quiz.)
+- **Native sign-in screens** explain what the locked action unlocks (same texts as the web), say
+  "Back to learning", have a consent line with Terms and Privacy links, name the missing field
+  instead of "Check the password length", and have a bordered switch button.
+- **Guests carry into accounts on native.** Interests chosen in onboarding are saved to the new
+  account (no second onboarding) and answers given as a guest are imported with
+  `POST /learning/guest-answers`; a failed import is kept for the next sign-in. Android lands on
+  Feed after sign-in.
+- **iOS**: primary and outline buttons dim when disabled; technology chips expose "selected".
+  **Android**: auth buttons follow the theme (dark green in light mode); offline cold start says
+  "Could not connect. You are still signed in…"; navigation and social labels stop growing at
+  1.3x so they no longer clip at the largest system text; a like or save is no longer dropped
+  while another request runs; a temporary Keystore failure no longer signs the learner out; the
+  app refreshes on resume at most once a minute; an unknown deep link shows "Not found".
+- Guest Practice and Post tabs show a three-step "how it works". Continue on interests says why
+  it is disabled.
+- Tests: iOS `testGuestChoicesAndProgressCarryIntoANewAccount` and
+  `testGuestProgressCarriesIntoAnExistingAccount` (`--reset-guest` clears guest data between tests),
+  plus Android `guest_progress_smoke.py` and the native API smoke checks.
+- Not done: Sign in with Apple, release signing, crash reporting and CI test steps (they need
+  the owner's accounts); the Android header still shows the guest "Save progress" chip while the
+  session cannot be checked offline.

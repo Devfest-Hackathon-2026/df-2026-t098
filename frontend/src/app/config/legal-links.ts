@@ -1,10 +1,16 @@
 import { Component, inject, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { DisplaySettings } from '../learning/display-settings';
 import { contactHref, PublicConfig } from './public-config';
 
-/** Privacy policy, terms and the support contact, shown only when they are configured. */
+/**
+ * Privacy policy, terms and the support contact. The documents live in this app (/privacy,
+ * /terms) unless LEGAL_BASE_URL points somewhere else; the support contact is shown only when
+ * it is configured.
+ */
 @Component({
   selector: 'app-legal-links',
+  imports: [RouterLink],
   template: `
     @if (config.privacyUrl(); as privacy) {
       <nav class="legal-links" [attr.aria-label]="text('法的情報', 'Legal')">
@@ -14,6 +20,11 @@ import { contactHref, PublicConfig } from './public-config';
         <a [href]="config.termsUrl()" target="_blank" rel="noopener noreferrer">{{
           text('利用規約', 'Terms of service')
         }}</a>
+      </nav>
+    } @else {
+      <nav class="legal-links" [attr.aria-label]="text('法的情報', 'Legal')">
+        <a routerLink="/privacy">{{ text('プライバシーポリシー', 'Privacy policy') }}</a>
+        <a routerLink="/terms">{{ text('利用規約', 'Terms of service') }}</a>
       </nav>
     }
     @if (support() && config.supportContact(); as contact) {

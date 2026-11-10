@@ -62,6 +62,7 @@ is limited to three calls a minute per address. Clients clear their token only a
 | PUT `/learning/blocks/:userId` | no body | 200, `{ blocked: true }` (idempotent; yourself 400, unknown user 404) |
 | DELETE `/learning/blocks/:userId` | no body | 204 |
 | GET `/config` | none | `{ legalBaseUrl, supportContact }`, both `null` when not configured |
+| POST `/learning/guest-answers` | bearer | `{ accountId, requestId (UUID v4), answers: [{ questionId, choice }] }` (up to 200); counts answers given as a guest towards the new account |
 
 The server hides a blocked learner's comments (and replies under them), published questions and
 public creator page from the blocker (`GET /learning/creators/:id` answers 404). Clients also drop

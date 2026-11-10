@@ -60,17 +60,24 @@ export function badgeInfo(id: string, language: Language): { icon: string; name:
           ></span>
         </span>
       } @else if (session.status() === 'guest') {
-        <span class="chip">
+        <span
+          class="chip"
+          [attr.title]="text('正解数 / 回答数', 'Correct answers / questions answered')"
+        >
           <app-icon name="check" />{{ store.guestCorrect() }}/{{ store.guestAnswered() }}
-          <span class="sr-only">{{ text('正解', 'correct') }}</span>
+          <span class="sr-only">{{ text('正解', 'correct out of answered') }}</span>
         </span>
-        <a class="chip signin" routerLink="/login">{{
-          text('ログインして記録', 'Save progress')
+        <a class="chip signin" routerLink="/login" [queryParams]="{ reason: 'progress' }">{{
+          text('ログインして記録', 'Sign in to save')
         }}</a>
       }
       @if (store.combo() >= 2) {
         @for (combo of [store.combo()]; track combo) {
-          <span class="chip combo" [class.hot]="combo >= 5" aria-live="polite"
+          <span
+            class="chip combo"
+            [class.hot]="combo >= 5"
+            aria-live="polite"
+            [attr.title]="text('連続正解', 'Correct answers in a row')"
             >×{{ combo }} <span class="combo-label">{{ text('コンボ', 'combo') }}</span></span
           >
         }

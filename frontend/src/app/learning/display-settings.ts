@@ -17,7 +17,7 @@ export class DisplaySettings {
     '(prefers-color-scheme: light)',
   );
   private hasThemePreference = ['light', 'dark'].includes(this.read('whylint-theme') ?? '');
-  readonly language = signal<Language>(this.read('whylint-language') === 'en' ? 'en' : 'ja');
+  readonly language = signal<Language>(this.initialLanguage());
   readonly theme = signal<'light' | 'dark'>(
     this.read('whylint-theme') === 'light' ? 'light' : 'dark',
   );
@@ -57,6 +57,13 @@ export class DisplaySettings {
     this.readingSize.set(size);
     this.save('whylint-reading-size', size);
     this.apply();
+  }
+  /** The saved choice, else the browser's language: Japanese for ja, English for anything else. */
+  private initialLanguage(): Language {
+    const saved = this.read('whylint-language');
+    if (saved === 'en' || saved === 'ja') return saved;
+    const browser = this.document.defaultView?.navigator?.language ?? 'ja';
+    return browser.toLowerCase().startsWith('ja') ? 'ja' : 'en';
   }
   private read(key: string): string | null {
     try {
@@ -98,6 +105,6 @@ export class DisplaySettings {
         : 'WhyLint — Understand why technology works';
     this.document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', this.theme() === 'light' ? '#f3f5f0' : '#080808');
+      ?.setAttribute('content', this.theme() === 'light' ? '#e9eee1' : '#080808');
   }
 }

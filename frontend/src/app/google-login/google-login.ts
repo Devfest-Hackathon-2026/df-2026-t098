@@ -1,3 +1,4 @@
+import { ConsentNotice } from '../config/consent-notice';
 import { LegalLinks } from '../config/legal-links';
 import { Brand } from '../brand/brand';
 import { LoadingSkeleton } from '../learning/loading-skeleton';
@@ -20,6 +21,25 @@ const GOOGLE_LOGIN_ALLOWED_ORIGINS: readonly string[] = [
   'https://whylint-8715935974.asia-northeast1.run.app',
 ];
 const GOOGLE_EXCHANGE_TIMEOUT_MS = 10_000;
+
+const REASONS = {
+  ja: {
+    explain: 'ログインすると、あなたの説明をGeminiが採点し、+15 XPを獲得できます。',
+    save: 'ログインすると、問題を保存して、プロフィールからいつでも見返せます。',
+    like: 'ログインすると、問題にいいねできます。',
+    practice: 'ログインすると、間違えた問題を毎朝復習できます。',
+    post: 'ログインすると、あなたの問題を投稿できます。',
+    progress: 'ログインすると、進捗・XP・連続記録をすべての端末で保存できます。',
+  },
+  en: {
+    explain: 'Sign in to get your explanation graded by Gemini and earn +15 XP.',
+    save: 'Sign in to save this question and find it again in your Profile.',
+    like: 'Sign in to like questions.',
+    practice: 'Sign in to review the questions you missed every morning.',
+    post: 'Sign in to post a question of your own.',
+    progress: 'Sign in to keep your progress, XP and streak on every device.',
+  },
+} as const;
 
 type Phase = 'ready' | 'working' | 'signed-in' | 'error';
 type ErrorKey = 'origin' | 'cancelled' | 'invalid' | 'storage' | 'api' | 'restart';
@@ -58,7 +78,7 @@ const COPY = {
     restart: 'Googleログインを最初からやり直してください。',
   },
   en: {
-    back: 'Back to practice',
+    back: 'Back to learning',
     title: 'Sign in',
     intro: 'Sign in and continue learning with WhyLint.',
     identifierLabel: 'Email or username',
@@ -91,7 +111,7 @@ const COPY = {
 
 @Component({
   selector: 'app-google-login',
-  imports: [Brand, RouterLink, LoadingSkeleton, LegalLinks],
+  imports: [Brand, RouterLink, LoadingSkeleton, LegalLinks, ConsentNotice],
   templateUrl: './google-login.html',
   styleUrl: './google-login.css',
 })
@@ -127,6 +147,12 @@ export class GoogleLogin implements OnInit {
   protected readonly passwordStatus = signal<PasswordStatus>(null);
   protected get ui() {
     return COPY[this.language()];
+  }
+  /** Why the learner was sent here, so the page does not feel like a surprise wall. */
+  protected get reason(): string | null {
+    const key = this.route.snapshot.queryParamMap?.get('reason');
+    const reasons: Record<string, string> = REASONS[this.language()];
+    return key && Object.hasOwn(reasons, key) ? reasons[key] : null;
   }
 
   constructor() {
