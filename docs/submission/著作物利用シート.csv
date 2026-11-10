@@ -1,0 +1,23 @@
+﻿No.,著作物の名称,種類,入手元URL,権利者名（著作者名）,ライセンス形態,改変の有無
+1,DB-IP Country Lite（IP→国判定データ）,データ,https://db-ip.com,DB-IP.com,CC BY 4.0,なし
+2,DM Sans,フォント,https://fonts.google.com/specimen/DM+Sans,The DM Sans Project Authors,SIL Open Font License 1.1,なし
+3,DM Mono,フォント,https://fonts.google.com/specimen/DM+Mono,The DM Mono Project Authors,SIL Open Font License 1.1,なし
+4,Angular,コード,https://github.com/angular/angular,Google LLC,MIT License,なし
+5,NestJS,コード,https://github.com/nestjs/nest,Kamil Myśliwiec,MIT License,なし
+6,TypeORM,コード,https://github.com/typeorm/typeorm,TypeORM contributors,MIT License,なし
+7,node-postgres (pg),コード,https://github.com/brianc/node-postgres,node-postgres contributors,MIT License,なし
+8,google-auth-library,コード,https://github.com/googleapis/google-auth-library-nodejs,Google LLC,Apache License 2.0,なし
+9,node-argon2（パスワードハッシュ）,コード,https://github.com/ranisalt/node-argon2,node-argon2 contributors,MIT License,なし
+10,Prettier（コード整形）,コード,https://github.com/prettier/prettier,Prettier contributors,MIT License,なし
+11,refractor（シンタックスハイライト）,コード,https://github.com/wooorm/refractor,refractor contributors,MIT License,なし
+12,RxJS,コード,https://github.com/ReactiveX/rxjs,RxJS contributors,Apache License 2.0,なし
+13,mmdb-lib,コード,https://github.com/runk/mmdb-lib,mmdb-lib contributors,MIT License,なし
+14,ipaddr.js,コード,https://github.com/whitequark/ipaddr.js,ipaddr.js contributors,MIT License,なし
+15,Google Sign-In for iOS,コード,https://github.com/google/GoogleSignIn-iOS,Google LLC,Apache License 2.0,なし
+16,Jetpack Compose / AndroidX（Credential Manager含む）,コード,https://developer.android.com/jetpack/androidx,The Android Open Source Project,Apache License 2.0,なし
+17,Coil（Android画像読み込み）,コード,https://github.com/coil-kt/coil,Coil contributors,Apache License 2.0,なし
+18,kotlinx.coroutines,コード,https://github.com/Kotlin/kotlinx.coroutines,JetBrains s.r.o.,Apache License 2.0,なし
+19,Gemini API（問題生成・採点）,API,https://ai.google.dev,Google LLC,Gemini API 利用規約,なし
+20,Google Cloud Text-to-Speech（デモ動画の日本語ナレーション）,API／音声,https://cloud.google.com/text-to-speech,Google LLC,Google Cloud 利用規約,あり（音量調整・再生速度変更）
+21,Kokoro-82M（デモ動画の英語ナレーション）,音声モデル,https://huggingface.co/hexgrad/Kokoro-82M,hexgrad,Apache License 2.0,あり（音量調整・再生速度変更）
+22,video-demo（デモ動画の撮影ツール）,コード,https://github.com/nilbuild/video-demo,Kamran Ahmed,MIT License,あり（カメラ動作・強調表示を追加）
