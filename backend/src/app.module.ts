@@ -8,9 +8,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppDataSource } from './datasource';
 import { UsersModule } from './users/users.module';
 import { LearningModule } from './learning/learning.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
-  imports: [AuthModule, TypeOrmModule.forRoot(AppDataSource.options), UsersModule, LearningModule],
+  imports: [AuthModule, TypeOrmModule.forRoot(AppDataSource.options), UsersModule, LearningModule, AdminModule],
   controllers: [AppController, HealthController, PublicConfigController],
   providers: [AppService],
 })

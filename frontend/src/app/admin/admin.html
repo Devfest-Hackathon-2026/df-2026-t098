@@ -1,0 +1,199 @@
+<div class="shell">
+  <header class="header">
+    <a class="brand" routerLink="/" aria-label="WhyLint"><app-brand /></a>
+    <div class="header-actions">
+      <div class="language" role="group" [attr.aria-label]="text('言語', 'Language')">
+        <button
+          type="button"
+          [attr.aria-pressed]="settings.language() === 'ja'"
+          (click)="settings.setLanguage('ja')"
+        >
+          日本語
+        </button>
+        <button
+          type="button"
+          [attr.aria-pressed]="settings.language() === 'en'"
+          (click)="settings.setLanguage('en')"
+        >
+          English
+        </button>
+      </div>
+      @if (session.status() === 'authenticated') {
+        <button type="button" class="signout" [disabled]="busy()" (click)="logout()">
+          {{ text('ログアウト', 'Sign out') }}
+        </button>
+      }
+    </div>
+  </header>
+  <main>
+    <a class="back" routerLink="/">{{ text('学習に戻る', 'Back to learning') }}</a>
+    <h1>{{ text('報告の管理', 'Reports') }}</h1>
+    <p class="intro">
+      {{
+        text(
+          '学習者からの報告を確認し、対応状況を管理します。',
+          'Review learner reports and keep track of what has been handled.'
+        )
+      }}
+    </p>
+
+    @if (state() === 'loading') {
+      <div class="loading" role="status">
+        <span class="sr-only">{{ text('読み込み中…', 'Loading…') }}</span>
+        <div class="skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+    } @else if (state() === 'login') {
+      <form class="login" (ngSubmit)="login()">
+        <h2>{{ text('管理者ログイン', 'Admin sign in') }}</h2>
+        <label for="admin-user">{{ text('ユーザー名またはメール', 'Username or email') }}</label>
+        <input
+          id="admin-user"
+          name="username"
+          [(ngModel)]="username"
+          autocomplete="username"
+          required
+        />
+        <label for="admin-password">{{ text('パスワード', 'Password') }}</label>
+        <input
+          id="admin-password"
+          name="password"
+          [(ngModel)]="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+        <button class="primary" type="submit" [disabled]="busy() || !username || !password">
+          {{ busy() ? text('ログイン中…', 'Signing in…') : text('ログイン', 'Sign in') }}
+        </button>
+      </form>
+    } @else if (state() === 'denied') {
+      <div class="notice">
+        <h2>{{ text('アクセスできません', 'Access unavailable') }}</h2>
+        <p>
+          {{
+            text(
+              'このアカウントには管理者権限がありません。',
+              'This account does not have admin access.'
+            )
+          }}
+        </p>
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+      </div>
+    } @else if (state() === 'error') {
+      <div class="notice" role="alert">
+        <h2>{{ text('読み込めませんでした', 'Could not load reports') }}</h2>
+        <p>
+          {{ text('接続を確認して再試行してください。', 'Check your connection and try again.') }}
+        </p>
+        <button type="button" (click)="load()">{{ text('再試行', 'Retry') }}</button>
+      </div>
+    } @else {
+      <nav class="tabs" [attr.aria-label]="text('報告の状態', 'Report status')">
+        <button
+          #openTab
+          type="button"
+          [attr.aria-pressed]="status() === 'open'"
+          [attr.aria-disabled]="busy() || refreshing()"
+          [disabled]="busy()"
+          (click)="select('open')"
+        >
+          {{ text('未対応', 'Open') }}
+        </button>
+        <button
+          #resolvedTab
+          type="button"
+          [attr.aria-pressed]="status() === 'resolved'"
+          [attr.aria-disabled]="busy() || refreshing()"
+          [disabled]="busy()"
+          (click)="select('resolved')"
+        >
+          {{ text('対応済み', 'Resolved') }}
+        </button>
+      </nav>
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+      <p class="sr-only" role="status" aria-live="polite">
+        {{
+          refreshing()
+            ? text('読み込み中…', 'Loading…')
+            : feedback() || text(reports().length + '件の報告', reports().length + ' reports')
+        }}
+      </p>
+      <div [attr.aria-busy]="refreshing()">
+        @if (!reports().length) {
+          <div class="empty">
+            {{
+              status() === 'open'
+                ? text('未対応の報告はありません。', 'No open reports.')
+                : text('対応済みの報告はありません。', 'No resolved reports yet.')
+            }}
+          </div>
+        }
+        <div class="reports">
+          @for (report of reports(); track report.type + report.id) {
+            <article class="report">
+              <div class="meta">
+                <span class="kind">{{
+                  report.type === 'question'
+                    ? text('問題', 'Question')
+                    : text('コメント', 'Comment')
+                }}</span
+                ><span>{{ report.created_at | date: 'medium' }}</span
+                ><span>{{ report.reporter || text('学習者', 'Learner') }}</span>
+              </div>
+              <h2>
+                <a [routerLink]="['/questions', report.question_id]">{{ report.question_title }}</a>
+              </h2>
+              <p class="prompt">{{ report.question_prompt }}</p>
+              @if (report.comment_text !== null) {
+                <p class="comment">
+                  {{ report.comment_text || text('削除されたコメント', 'Deleted comment') }}
+                </p>
+              }
+              <dl>
+                <div>
+                  <dt>{{ text('理由', 'Reason') }}</dt>
+                  <dd>{{ reason(report.reason) }}</dd>
+                </div>
+                @if (report.details) {
+                  <div>
+                    <dt>{{ text('詳細', 'Details') }}</dt>
+                    <dd>{{ report.details }}</dd>
+                  </div>
+                }
+              </dl>
+              <button
+                type="button"
+                class="resolve"
+                [disabled]="busy() || refreshing()"
+                (click)="updateStatus(report, $event)"
+              >
+                {{
+                  status() === 'open'
+                    ? text('対応済みにする', 'Mark as resolved')
+                    : text('未対応に戻す', 'Reopen')
+                }}
+              </button>
+            </article>
+          }
+        </div>
+        @if (offset() > 0 || hasMore()) {
+          <nav class="pagination" [attr.aria-label]="text('ページ', 'Pages')">
+            <button type="button" [disabled]="busy() || offset() === 0" (click)="page(-50)">
+              {{ text('前へ', 'Previous') }}</button
+            ><span>{{ offset() + 1 }}–{{ offset() + reports().length }}</span
+            ><button type="button" [disabled]="busy() || !hasMore()" (click)="page(50)">
+              {{ text('次へ', 'Next') }}
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  </main>
+</div>

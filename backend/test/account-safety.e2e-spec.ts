@@ -12,6 +12,7 @@ import { SessionEntity } from '../src/auth/sessions/session.entity';
 import { SessionsService } from '../src/auth/sessions/sessions.service';
 import { AuthModule } from '../src/auth/auth.module';
 import { LearningModule } from '../src/learning/learning.module';
+import { AdminModule } from '../src/admin/admin.module';
 import { LEARNING_ENTITIES } from '../src/learning/entities/learning.entity';
 import { QuestionsService } from '../src/learning/questions.service';
 import { GeminiService } from '../src/learning/gemini/gemini.service';
@@ -46,6 +47,7 @@ describeDatabase('Account deletion, reports and blocks (HTTP and disposable Post
     JWT_SECRET: process.env.JWT_SECRET,
     FRONTEND_URL: process.env.FRONTEND_URL,
     LEARNING_POOL_SEED: process.env.LEARNING_POOL_SEED,
+    ADMIN_USER_IDS: process.env.ADMIN_USER_IDS,
   };
   const gemini = {
     generateQuestions: jest.fn(),
@@ -183,7 +185,7 @@ describeDatabase('Account deletion, reports and blocks (HTTP and disposable Post
       quickExplanation: null,
     });
     const module = await Test.createTestingModule({
-      imports: [TypeOrmModule.forRoot(options), AuthModule, LearningModule],
+      imports: [TypeOrmModule.forRoot(options), AuthModule, LearningModule, AdminModule],
     })
       .overrideProvider(GeminiService)
       .useValue(gemini)
@@ -207,6 +209,111 @@ describeDatabase('Account deletion, reports and blocks (HTTP and disposable Post
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+  });
+
+  it('restricts the report queue to configured admins and resolves reports', async () => {
+    const admin = await learner('admin');
+    const reporter = await learner('reporter');
+    const author = await learner('author');
+    const questionId = await questions.insert(
+      database.manager,
+      quiz('admin'),
+      'ai',
+      null,
+    );
+    const commentId = (
+      await comment(author, questionId, 'Reported fixture comment')
+    ).id;
+    const questionReport = (
+      await send(
+        'post',
+        `/learning/questions/${questionId}/reports`,
+        reporter,
+        {
+          reason: 'incorrect',
+          details: 'Needs a correction',
+        },
+      ).expect(201)
+    ).body;
+    const commentReport = (
+      await send(
+        'post',
+        `/learning/questions/${questionId}/comments/${commentId}/reports`,
+        reporter,
+        {
+          reason: 'spam',
+          details: 'Unrelated content',
+        },
+      ).expect(201)
+    ).body;
+
+    delete process.env.ADMIN_USER_IDS;
+    await send('get', '/admin/reports', null).expect(401);
+    await send('get', '/admin/reports', admin).expect(403);
+    process.env.ADMIN_USER_IDS = admin.id;
+    await send('get', '/admin/reports', reporter).expect(403);
+    await send(
+      'patch',
+      `/admin/reports/question/${questionReport.id}/resolve`,
+      reporter,
+    ).expect(403);
+    const list = (await send('get', '/admin/reports', admin).expect(200)).body
+      .reports;
+    expect(list).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: questionReport.id,
+          type: 'question',
+          details: 'Needs a correction',
+        }),
+        expect.objectContaining({
+          id: commentReport.id,
+          type: 'comment',
+          comment_text: 'Reported fixture comment',
+        }),
+      ]),
+    );
+    expect(JSON.stringify(list)).not.toContain(reporter.email);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/admin/reports/question/${questionReport.id}/resolve`)
+      .set('Cookie', `access_token=${admin.token}`)
+      .set('Origin', 'https://other.example')
+      .expect(403);
+    await send(
+      'patch',
+      `/admin/reports/question/${questionReport.id}/resolve`,
+      admin,
+    ).expect(200);
+    await send(
+      'patch',
+      `/admin/reports/question/${questionReport.id}/resolve`,
+      admin,
+    ).expect(200);
+    const resolved = (
+      await send('get', '/admin/reports?status=resolved', admin).expect(200)
+    ).body.reports;
+    expect(resolved).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: questionReport.id,
+          status: 'resolved',
+        }),
+      ]),
+    );
+    await send('patch', `/admin/reports/question/${questionReport.id}/reopen`, admin).expect(200);
+    await send('patch', `/admin/reports/question/${questionReport.id}/resolve`, admin).expect(200);
+    await send('post', `/learning/questions/${questionId}/reports`, reporter, {
+      reason: 'incorrect',
+    }).expect(201);
+    await send('patch', `/admin/reports/question/${questionReport.id}/reopen`, admin).expect(409);
+    await send('patch', `/admin/reports/comment/${commentReport.id}/resolve`, admin).expect(200);
+    await send('get', '/admin/reports?status=other', admin).expect(400);
+    await send(
+      'patch',
+      `/admin/reports/other/${randomUUID()}/resolve`,
+      admin,
+    ).expect(400);
+    delete process.env.ADMIN_USER_IDS;
   });
 
   it('migrates down and back up without losing the older report reasons', async () => {

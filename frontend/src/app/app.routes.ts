@@ -11,6 +11,10 @@ const learningGuard = async () => {
 
 export const routes: Routes = [
   {
+    path: 'admin',
+    loadComponent: () => import('./admin/admin').then((m) => m.AdminPage),
+  },
+  {
     path: 'login',
     loadComponent: () => import('./google-login/google-login').then((m) => m.GoogleLogin),
     canActivate: [guestOnlyGuard],
