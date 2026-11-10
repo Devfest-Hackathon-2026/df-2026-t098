@@ -104,12 +104,15 @@ internal class Api(context: Context) {
     var token: String? = vault.read()
         private set
 
+    @Synchronized
     fun signIn(value: String) {
         vault.write(value)
         token = value
     }
 
-    fun forget() {
+    @Synchronized
+    fun forget(expectedToken: String? = null) {
+        if (expectedToken != null && token != expectedToken) return
         token = null
         vault.clear()
     }
@@ -163,7 +166,7 @@ internal class Api(context: Context) {
                         JSONObject()
                     }
                 if (status !in 200..299) {
-                    if (status == 401 && session != null && token == session) forget()
+                    if (status == 401 && session != null) forget(session)
                     throw ApiError(status, result.optString("code", "REQUEST_FAILED"))
                 }
                 result

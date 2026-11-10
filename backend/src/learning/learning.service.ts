@@ -112,33 +112,39 @@ export class LearningService {
     });
     if (claim.replay) {
       const result = claim.replay as FeedBatch;
+      const community = result.communityQuestion ? [result.communityQuestion] : [];
+      const reviews = result.reviewQuestions ?? [];
+      const ids = [...result.questions, ...community, ...reviews].map(
+        (question) => question.id,
+      );
+      // Visibility and author identity can change after a batch is recorded.
+      const current = await this.questions.list(
+        'WHERE q.id = ANY($1::uuid[])',
+        [ids],
+        userId,
+      );
+      const visible = new Map(current.map((question) => [question.id, question]));
+      const replayQuestions = (questions: PublicQuestion[]) =>
+        Promise.all(
+          questions.flatMap((question) => {
+            const latest = visible.get(question.id);
+            if (!latest) return [];
+            return [
+              formatQuestionCode({
+                ...question,
+                author: latest.author,
+                references: learningReferences(question.topics),
+                novelty: questionNovelty(question),
+              }),
+            ];
+          }),
+        );
+      const [communityQuestion] = await replayQuestions(community);
       return {
         ...result,
-        questions: await Promise.all(
-          result.questions.map((question) =>
-            formatQuestionCode({
-              ...question,
-              references: learningReferences(question.topics),
-              novelty: questionNovelty(question),
-            }),
-          ),
-        ),
-        communityQuestion: result.communityQuestion
-          ? await formatQuestionCode({
-              ...result.communityQuestion,
-              references: learningReferences(result.communityQuestion.topics),
-              novelty: questionNovelty(result.communityQuestion),
-            })
-          : null,
-        reviewQuestions: await Promise.all(
-          (result.reviewQuestions ?? []).map((question) =>
-            formatQuestionCode({
-              ...question,
-              references: learningReferences(question.topics),
-              novelty: questionNovelty(question),
-            }),
-          ),
-        ),
+        questions: await replayQuestions(result.questions),
+        communityQuestion: communityQuestion ?? null,
+        reviewQuestions: await replayQuestions(reviews),
       };
     }
     try {
@@ -189,6 +195,7 @@ export class LearningService {
                   previous: [...recentQuestions, ...generatedQuestions],
                 },
                 userId,
+                manager,
               )
             : [];
         const questions = [...generatedQuestions, ...topUp].map((question) => ({

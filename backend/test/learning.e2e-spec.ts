@@ -758,6 +758,10 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
       WHERE user_id = $1 AND question_id = $2`,
       [users[0], missed.id],
     );
+    const duePool = await read('/feed/pool?language=ja').expect(200);
+    expect(duePool.body.reviewQuestions.map((question) => question.id)).toContain(
+      missed.id,
+    );
     const batch = await write('/feed/batches', {
       requestId: randomUUID(),
       language: 'ja',
@@ -1572,6 +1576,10 @@ describeDatabase('Learning engine (HTTP and disposable PostgreSQL)', () => {
           'beginner','en','ai','Fixture reference','[]','choice','["One","Two"]',1,'Two is correct'
         FROM unnest($1::uuid[]) AS input(id)`,
       [[correct, retried, existing]],
+    );
+    await database.query(
+      'UPDATE learning_questions SET generated_for = $1 WHERE id = $2',
+      [users[0], correct],
     );
     await write('/questions/' + existing + '/taps', { choice: 0 }, learner).expect(200);
     const before = (await read('/progress', learner).expect(200)).body;

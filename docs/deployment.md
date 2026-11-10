@@ -105,11 +105,14 @@ Also: point the startup and uptime checks at `/api/v1/health/ready`, map the cus
 See [production-readiness.md](production-readiness.md) for the full list. The ones that change how
 this deployment behaves:
 
-- The web Google sign-in flow permits the configured Cloud Run origin and localhost. A different
+- The web Google sign-in flow permits `https://whylint.com`, the Cloud Run origin, and localhost. A different
   public domain requires updating the frontend allowlist and the Google OAuth redirect URI.
 - **Rate limits are per instance** (in-memory throttler), and Gemini spend has no global budget.
-- No password reset, email verification, privacy policy, or account deletion (B4, B5).
-- The Angular shell has no Content-Security-Policy yet (H5).
+- Password reset and email verification remain open. The app has self-serve account deletion and
+  publishes its privacy policy and terms.
+- The baseline Content Security Policy restricts base URLs, object embeds, and framing. A
+  script and style policy still needs browser compatibility testing.
+- Verify automated Cloud SQL backups and point-in-time recovery before a public rollout.
 
 ## What has been verified
 
@@ -117,6 +120,5 @@ this deployment behaves:
   (`nest build`) run against a disposable TLS-only PostgreSQL covering every `DB_SSL` mode, a Unix
   socket URL, an idempotent second release run, the app serving the Angular build, SIGTERM exit,
   and the HTTP smoke script (including sign-up and session on one origin).
-- **Not verified here:** the Docker image build and `container-smoke.sh` (Docker was not running),
-  the GitHub Actions workflow on GitHub, Cloud Build, Cloud Run, Cloud SQL, and TLS against a
-  managed database. The first CI run is the first test of the image.
+- GitHub Actions builds the Docker image and runs `container-smoke.sh` against disposable
+  PostgreSQL. WhyLint serves the web app and API through Cloud Run on `https://whylint.com`.

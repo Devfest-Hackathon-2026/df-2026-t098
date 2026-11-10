@@ -52,6 +52,7 @@ refuse "an unknown API path is not the shell" '<app-root' "${HTML[@]}" "$BASE/ap
 echo "Headers"
 check "nosniff" 'x-content-type-options: nosniff' "${HTML[@]}" "$BASE/"
 check "frame protection" 'x-frame-options: DENY' "${HTML[@]}" "$BASE/"
+check "baseline Content Security Policy" "content-security-policy: base-uri 'self'; object-src 'none'; frame-ancestors 'none'" "${HTML[@]}" "$BASE/"
 check "HSTS (NODE_ENV=production)" 'strict-transport-security' "${HTML[@]}" "$BASE/"
 refuse "no X-Powered-By" 'x-powered-by' "$BASE/api/v1/health"
 

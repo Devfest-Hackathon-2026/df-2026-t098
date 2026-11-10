@@ -234,11 +234,12 @@ export class QuestionsService {
       previous?: NoveltyQuestion[];
     },
     userId: string | null,
+    manager = this.database.manager,
   ): Promise<PublicQuestion[]> {
     const topics = expandInterests(input.topics);
     const previous = [
       ...(input.previous ?? []),
-      ...(await this.noveltyContext(input.exclude, userId)),
+      ...(await this.noveltyContext(input.exclude, userId, manager)),
     ];
     const candidates = await this.list(
       `WHERE q.format <> 'explain' AND q.language = $1
@@ -258,6 +259,7 @@ export class QuestionsService {
         Math.min(100, input.limit * 20),
       ],
       userId,
+      manager,
     );
     return selectNovelQuestions(candidates, previous, input.limit);
   }
@@ -265,8 +267,9 @@ export class QuestionsService {
   async noveltyContext(
     ids: string[],
     userId: string | null,
+    manager = this.database.manager,
   ): Promise<NoveltyQuestion[]> {
-    return this.database.query(
+    return manager.query(
       `SELECT prompt,code,code_language AS "codeLanguage",concept FROM learning_questions
       WHERE id = ANY($1::uuid[])
       OR id IN (SELECT id FROM learning_questions WHERE generated_for = $2::uuid
@@ -290,13 +293,10 @@ export class QuestionsService {
     userId: string,
     language: LearningLanguage,
     limit: number,
-    manager = this.database.manager,
+    claimTransaction?: EntityManager,
   ): Promise<PublicQuestion[]> {
-    // Claim each review once across concurrent feed requests.
-    if (!manager.queryRunner?.isTransactionActive)
-      return this.database.transaction((transaction) =>
-        this.dueReviews(userId, language, limit, transaction),
-      );
+    // Pool reads can show due cards. Only batch creation claims them.
+    const manager = claimTransaction ?? this.database.manager;
     const rows: {
       question_id: string;
       box: number;
@@ -305,23 +305,23 @@ export class QuestionsService {
       `SELECT p.question_id,p.box,p.last_missed_at FROM learning_question_progress p
         JOIN learning_questions q ON q.id = p.question_id
         WHERE p.user_id = $1 AND p.needs_review AND p.due_at <= now() AND q.language = $2
+        AND NOT EXISTS (SELECT 1 FROM learning_user_blocks b
+          WHERE b.blocker_id = $1 AND b.blocked_id = q.author_id)
         ORDER BY p.due_at,p.last_missed_at NULLS LAST,p.question_id LIMIT $3
-        FOR UPDATE OF p SKIP LOCKED`,
+        ${claimTransaction ? 'FOR UPDATE OF p SKIP LOCKED' : ''}`,
       [userId, language, limit],
     );
     if (!rows.length) return [];
-    await manager.query(
-      `UPDATE learning_question_progress SET due_at = $3::timestamptz
-      WHERE user_id = $1 AND question_id = ANY($2::uuid[]) AND needs_review`,
-      [
-        userId,
-        rows.map((row) => row.question_id),
-        nextReviewAt().toISOString(),
-      ],
-    );
+    const ids = rows.map((row) => row.question_id);
+    if (claimTransaction)
+      await claimTransaction.query(
+        `UPDATE learning_question_progress SET due_at = $3::timestamptz
+        WHERE user_id = $1 AND question_id = ANY($2::uuid[]) AND needs_review`,
+        [userId, ids, nextReviewAt().toISOString()],
+      );
     const questions = await this.list(
       'WHERE q.id = ANY($1::uuid[])',
-      [rows.map((row) => row.question_id)],
+      [ids],
       userId,
       manager,
     );

@@ -495,6 +495,47 @@ describeDatabase('Account deletion, reports and blocks (HTTP and disposable Post
     });
   });
 
+  it('respects blocks and account deletion when retrying a feed batch', async () => {
+    const viewer = await learner('replay_viewer');
+    const author = await learner('replay_author');
+    const questionId = await questions.insert(
+      database.manager,
+      {
+        ...quiz('HTTP caching'),
+        prompt: 'Which cache directive prevents intermediaries from storing a response?',
+        concept: 'http-cache-no-store',
+        format: null,
+        options: null,
+        correctOption: null,
+        quickExplanation: null,
+      },
+      'community',
+      author.id,
+    );
+    await send('put', '/learning/preferences', viewer, preferences).expect(200);
+    gemini.generateQuestions.mockResolvedValueOnce([
+      { ...quiz('Fixture generation'), prompt: 'What is a variable in a program?' },
+    ]);
+    const body = { requestId: randomUUID(), language: 'ja' };
+    const batch = () => send('post', '/learning/feed/batches', viewer, body).expect(200);
+    const initial = (await batch()).body;
+    expect(initial.communityQuestion).toMatchObject({
+      id: questionId,
+      author: { id: author.id },
+    });
+    const generationCalls = gemini.generateQuestions.mock.calls.length;
+
+    await send('put', `/learning/blocks/${author.id}`, viewer).expect(200);
+    expect((await batch()).body).toEqual({ ...initial, communityQuestion: null });
+
+    await send('delete', '/auth/me', author).expect(204);
+    expect((await batch()).body).toEqual({
+      ...initial,
+      communityQuestion: { ...initial.communityQuestion, author: null },
+    });
+    expect(gemini.generateQuestions).toHaveBeenCalledTimes(generationCalls);
+  });
+
   describe('account deletion', () => {
     it('only keeps foreign keys that cascade or clear, so no table can block a deletion', async () => {
       const rows: { table_name: string; confdeltype: string }[] = await database.query(

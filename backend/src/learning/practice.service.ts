@@ -130,7 +130,7 @@ export class PracticeService {
           const rows: (TapRow & { id: string })[] = await manager.query(
             `SELECT q.id,q.format,q.options,q.correct_option,q.quick_explanation,q.author_id
             FROM learning_questions q WHERE q.id = ANY($1::uuid[])
-            AND q.generated_for IS NULL AND q.format <> 'explain'
+            AND q.format <> 'explain'
             AND NOT EXISTS (SELECT 1 FROM learning_user_blocks b
               WHERE b.blocker_id = $2 AND b.blocked_id = q.author_id)`,
             [ids, userId],

@@ -249,23 +249,28 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         sessionError = false
         val previousUser = user?.text("id")
         val previousLanguage = language
-        val hadToken = api.token != null
+        val owner = identity
+        val token = api.token
         viewModelScope.launch {
             try {
                 resolveDefaultLanguage()
                 catalog = api.request("/learning/catalog")
-                if (api.token != null) {
-                    user = api.request("/auth/me")
+                if (token != null && api.token == token) {
+                    val restoredUser = api.request("/auth/me")
+                    if (api.token != token) return@launch
+                    user = restoredUser
                     loadAccount()
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                if (hadToken && api.token == null) invalidateSession()
-                else if (api.token != null) sessionError = true
+                if (owner == identity && token != null) {
+                    if (api.token == null) invalidateSession()
+                    else if (api.token == token) sessionError = true
+                }
             } finally {
                 sessionLoading = false
                 if (
-                    !sessionError &&
+                    owner == identity && !sessionError &&
                         (questions.isEmpty() ||
                             previousUser != user?.text("id") ||
                             previousLanguage != language)
@@ -294,8 +299,10 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
             progress = refreshed
         }
         try {
-            blocked = api.request("/learning/blocks").objects("users")
-        } catch (_: ApiError) {
+            val restoredBlocks = api.request("/learning/blocks").objects("users")
+            if (api.token == token) blocked = restoredBlocks
+        } catch (error: ApiError) {
+            if (error.status == 401) throw error
             // The list is only for Profile; the server hides blocked content either way.
         }
     }
