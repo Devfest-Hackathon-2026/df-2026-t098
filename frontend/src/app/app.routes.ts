@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { Router, Routes } from '@angular/router';
 import { OnboardingState } from './onboarding/onboarding-state';
 import { guestOnlyGuard } from './auth/guest.guard';
+import { NotFound } from './not-found';
 
 const learningGuard = async () => {
   const state = inject(OnboardingState);
@@ -63,4 +64,5 @@ export const routes: Routes = [
       },
     ],
   },
+  { path: '**', component: NotFound },
 ];

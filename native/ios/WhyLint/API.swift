@@ -128,6 +128,11 @@ final class SessionVault {
 }
 
 struct Question: Identifiable, Hashable {
+    struct Reason: Hashable {
+        let kind: String
+        let topic: String?
+    }
+
     let id: String
     let title: String
     let prompt: String
@@ -144,6 +149,7 @@ struct Question: Identifiable, Hashable {
     var liked: Bool
     var saved: Bool
     let references: [Reference]
+    let reason: Reason?
     var tap: Tap?
     init?(_ json: [String: Any]) {
         guard let id = json["id"] as? String, let prompt = json["prompt"] as? String else {
@@ -170,6 +176,11 @@ struct Question: Identifiable, Hashable {
                 let url = URL(string: value), url.scheme == "https"
             else { return nil }
             return Reference(title: title, url: url)
+        }
+        if let data = json["reason"] as? [String: Any], let kind = data["kind"] as? String {
+            reason = Reason(kind: kind, topic: data["topic"] as? String)
+        } else {
+            reason = nil
         }
         tap = (json["tap"] as? [String: Any]).map(Tap.init)
     }

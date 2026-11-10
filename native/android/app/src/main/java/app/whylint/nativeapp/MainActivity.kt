@@ -1,5 +1,6 @@
 package app.whylint.nativeapp
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,10 +14,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         model = ViewModelProvider(this)[AppModel::class.java]
-        intent.data
-            ?.takeIf { it.scheme == "whylint" && it.host == "questions" }
-            ?.lastPathSegment
-            ?.let(model::deepLink)
+        openQuestionLink(intent)
         setContent { WhyLint(model) }
     }
 
@@ -28,11 +26,14 @@ class MainActivity : ComponentActivity() {
         resumed = true
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data
-            ?.takeIf { it.scheme == "whylint" && it.host == "questions" }
-            ?.lastPathSegment
-            ?.let(model::deepLink)
+        openQuestionLink(intent)
+    }
+
+    private fun openQuestionLink(intent: Intent) {
+        val link = intent.data ?: return
+        if (link.scheme == "whylint" && link.host == "questions")
+            model.deepLink(link.pathSegments.singleOrNull().orEmpty())
     }
 }

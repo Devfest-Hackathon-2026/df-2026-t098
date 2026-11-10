@@ -27,10 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
@@ -40,6 +38,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.*
 import androidx.credentials.CredentialManager
@@ -128,9 +127,32 @@ internal fun WhyLint(m: AppModel) {
                         m.screen == "creator" -> Creator(m)
                         m.screen == "question" ->
                             Column {
-                                BackRow(m)
-                                m.focused?.let {
-                                    QuestionCard(m, it, Modifier.fillMaxSize().padding(16.dp))
+                                BackRow(m, onBack = m::closeQuestion)
+                                val question = m.focused
+                                val error = m.sharedQuestionError
+                                when {
+                                    question != null ->
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                                            QuestionCard(
+                                                m,
+                                                question,
+                                                Modifier.widthIn(max = 760.dp).fillMaxWidth()
+                                                    .fillMaxHeight().padding(16.dp),
+                                            )
+                                        }
+                                    error != null -> Empty(
+                                        error,
+                                        if (m.canRetrySharedQuestion) m.text("再試行", "Retry")
+                                        else m.text("フィードに戻る", "Back to feed"),
+                                        action = {
+                                            if (m.canRetrySharedQuestion) m.retrySharedQuestion()
+                                            else {
+                                                m.closeQuestion()
+                                                m.changeTab(0)
+                                            }
+                                        },
+                                    )
+                                    else -> Loading(m.text("問題を読み込み中…", "Loading question…"))
                                 }
                             }
                         else -> Home(m)
@@ -146,7 +168,13 @@ internal fun WhyLint(m: AppModel) {
                     }
                 }
             }
-            BackHandler(m.screen != "home") { m.screen = "home" }
+            BackHandler(m.screen != "home") {
+                when (m.screen) {
+                    "question" -> m.closeQuestion()
+                    "login", "signup" -> m.closeLogin()
+                    else -> m.screen = "home"
+                }
+            }
             var splash by rememberSaveable { mutableStateOf(true) }
             if (splash) Splash(m.dark) { splash = false }
         }
@@ -326,6 +354,7 @@ private fun Home(m: AppModel) {
                 .forEachIndexed { i, label ->
                     Column(
                         Modifier.weight(1f)
+                            .heightIn(min = 48.dp)
                             .selectable(
                                 m.tab == i,
                                 role = Role.Tab,
@@ -346,15 +375,13 @@ private fun Home(m: AppModel) {
                             Modifier.size(22.dp),
                             tint = color,
                         )
-                        CappedTextScale {
-                            Text(
-                                label,
-                                fontSize = 10.sp,
-                                color = color,
-                                maxLines = 1,
-                                modifier = Modifier.padding(top = 3.dp),
-                            )
-                        }
+                        Text(
+                            label,
+                            fontSize = 10.sp,
+                            color = color,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+                        )
                     }
                 }
         }
@@ -397,12 +424,16 @@ private fun Feed(m: AppModel) {
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
-        if (!m.generating && m.notice.isNotBlank())
+        if (!m.generating && m.generationError.isNotBlank())
             Row(
                 Modifier.padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(m.notice, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text(
+                    m.generationError,
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+                )
                 TextButton(onClick = m::generate) { Text(m.text("再試行", "Retry")) }
             }
         VerticalPager(pager, modifier = Modifier.weight(1f), key = { m.questions[it].id }) { index
@@ -462,449 +493,470 @@ private fun QuestionCard(
     onNext: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
-    val context = LocalContext.current
     var picked by remember(q.id) { mutableIntStateOf(-1) }
+    val choose: (Int) -> Unit = { option ->
+        picked = option
+        m.answer(q, option)
+    }
     BoxWithConstraints(modifier) {
-        val promptUnits = q.prompt.sumOf { if (it.code >= 0x2e80) 1.0 else .55 }
-        val promptLines =
-            kotlin.math
-                .ceil(promptUnits / (maxWidth.value / 20f).coerceAtLeast(1f))
-                .coerceAtLeast(1.0)
-        val codeHeight =
-            if (q.code.isBlank()) 0.0
-            else
-                q.code.lines().size * 27.2 +
-                    if (q.format == "spot_bug") q.options.size * 20.8 else 0.0
-        val optionsHeight = if (q.format == "spot_bug") 0.0 else q.options.size * 56.0
-        val feedbackHeight = 0.0
-        val expected = promptLines * 25.0 + codeHeight + optionsHeight + feedbackHeight + 30.0
-        val fit =
-            ((maxHeight.value - 168.0) / expected.coerceAtLeast(1.0)).toFloat().coerceIn(.65f, 1f)
-        val promptSize = (20f * fit).coerceAtLeast(13f)
-        val codeSize = (16f * fit).coerceAtLeast(11f)
-        Column(
-            Modifier.fillMaxSize()
-                .then(
-                    if (m.dark) Modifier
-                    else
-                        Modifier.shadow(
-                            6.dp,
-                            RoundedCornerShape(16.dp),
-                            ambientColor = Color(0xff131811),
-                            spotColor = Color(0xff131811),
-                        )
-                )
-                .border(
-                    if (m.dark) 1.dp else 1.5.dp,
-                    colors.primary.copy(alpha = if (m.dark) .6f else .85f),
-                    RoundedCornerShape(16.dp),
-                )
-                .background(colors.surface, RoundedCornerShape(16.dp))
-                .padding(8.dp)
-        ) {
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Text(
-                    q.prompt,
-                    fontSize = promptSize.sp,
-                    lineHeight = (promptSize * 1.25f).sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier =
-                        Modifier.fillMaxWidth().padding(bottom = 12.dp).semantics { heading() },
-                )
-                if (q.format == "spot_bug" && q.tap == null && q.code.isNotBlank()) {
-                    Text(
-                        m.text("バグのある行をタップ", "Tap the buggy line"),
-                        color = colors.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
-                if (q.code.isNotBlank()) {
-                    BoxWithConstraints(
-                        Modifier.fillMaxWidth()
-                            .background(
-                                if (m.dark) Color(0xff090909) else Color(0xffe0e7d4),
-                                RoundedCornerShape(12.dp),
-                            )
-                    ) {
-                        val viewport = maxWidth
-                        // Rows are at least as wide as the card and share one width, so a
-                        // highlight spans the whole line even when other lines scroll.
-                        Column(
-                            Modifier.horizontalScroll(rememberScrollState())
-                                .widthIn(min = viewport)
-                                .width(IntrinsicSize.Max)
-                                .padding(vertical = 5.dp)
-                        ) {
-                            q.code.lines().forEachIndexed { index, line ->
-                                val option =
-                                    if (q.format == "spot_bug")
-                                        q.options.indexOfFirst {
-                                            Regex("\\d+").find(it)?.value?.toIntOrNull() ==
-                                                index + 1
-                                        }
-                                    else -1
-                                val isCorrect = q.tap?.correctOption == option && option >= 0
-                                val isMissed = !isCorrect && q.tap?.choice == option && option >= 0
-                                val state =
-                                    when {
-                                        isCorrect -> Color(0xff8ee05a).copy(alpha = .16f)
-                                        isMissed -> colors.error.copy(alpha = .16f)
-                                        picked == option && option >= 0 ->
-                                            colors.primary.copy(alpha = .12f)
-                                        else -> Color.Transparent
-                                    }
-                                val stateText =
-                                    when {
-                                        isCorrect && q.tap?.choice == option ->
-                                            m.text("あなたの回答・正解", "Your answer, correct")
-                                        isCorrect -> m.text("正解", "Correct answer")
-                                        isMissed -> m.text("あなたの回答・不正解", "Your answer, incorrect")
-                                        else -> null
-                                    }
-                                Row(
-                                    Modifier.fillMaxWidth()
-                                        .heightIn(
-                                            min = if (option >= 0) 48.dp else (codeSize * 1.7f).dp
-                                        )
-                                        .background(state)
-                                        .then(
-                                            if (option >= 0 && q.tap == null)
-                                                Modifier.drawBehind {
-                                                    drawRect(
-                                                        colors.primary.copy(alpha = .55f),
-                                                        size = Size(3.dp.toPx(), size.height),
-                                                    )
-                                                }
-                                            else Modifier
-                                        )
-                                        .then(
-                                            if (option >= 0)
-                                                Modifier.clickable(
-                                                        enabled = q.tap == null && !m.busy,
-                                                        role = Role.Button,
-                                                        onClick = {
-                                                            picked = option
-                                                            m.answer(q, option)
-                                                        },
-                                                    )
-                                                    .semantics {
-                                                        contentDescription =
-                                                            m.text(
-                                                                "${index+1}行目: $line",
-                                                                "Line ${index+1}: $line",
-                                                            )
-                                                        stateText?.let { stateDescription = it }
-                                                    }
-                                            else Modifier
-                                        )
-                                        .padding(
-                                            start = if (q.format == "spot_bug") 4.dp else 10.dp,
-                                            end = 10.dp,
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    if (q.format == "spot_bug") {
-                                        // Result glyph, so the state does not rely on color alone.
-                                        Box(Modifier.width(16.dp), Alignment.Center) {
-                                            if (isCorrect)
-                                                Icon(
-                                                    Icons.Outlined.Check,
-                                                    contentDescription = null,
-                                                    tint = Color(0xff8ee05a),
-                                                    modifier = Modifier.size(12.dp),
-                                                )
-                                            else if (isMissed)
-                                                Icon(
-                                                    Icons.Outlined.Close,
-                                                    contentDescription = null,
-                                                    tint = colors.error,
-                                                    modifier = Modifier.size(12.dp),
-                                                )
-                                        }
-                                    }
-                                    Text(
-                                        (index + 1).toString(),
-                                        fontFamily = Mono,
-                                        fontSize = codeSize.sp,
-                                        color = colors.onSurfaceVariant,
-                                        modifier = Modifier.width(25.dp),
-                                    )
-                                    Text(
-                                        syntax(line, m.dark),
-                                        fontFamily = Mono,
-                                        fontSize = codeSize.sp,
-                                        lineHeight = (codeSize * 1.7f).sp,
-                                        softWrap = false,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                if (q.format != "spot_bug")
-                    q.options.forEachIndexed { i, option ->
-                        val isRight = q.tap?.correctOption == i
-                        val isMissed = !isRight && q.tap?.choice == i
-                        val border =
-                            when {
-                                isRight -> Color(0xff8ee05a)
-                                isMissed -> colors.error
-                                else -> colors.outline
-                            }
-                        val stateText =
-                            when {
-                                isRight && q.tap?.choice == i ->
-                                    m.text("あなたの回答・正解", "Your answer, correct")
-                                isRight -> m.text("正解", "Correct answer")
-                                isMissed -> m.text("あなたの回答・不正解", "Your answer, incorrect")
-                                else -> null
-                            }
-                        OutlinedButton(
-                            onClick = {
-                                picked = i
-                                m.answer(q, i)
-                            },
-                            enabled = q.tap == null && !m.busy,
-                            modifier =
-                                Modifier.fillMaxWidth().padding(top = 8.dp).semantics {
-                                    stateText?.let { stateDescription = it }
-                                },
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(if (isRight || isMissed) 2.dp else 1.dp, border),
-                            contentPadding = PaddingValues(12.dp),
-                        ) {
-                            Text(
-                                if (q.format == "true_false") (if (i == 0) "○" else "×")
-                                else ('A' + i).toString(),
-                                color = colors.onSurfaceVariant,
-                                modifier = Modifier.width(26.dp),
-                            )
-                            Text(
-                                option,
-                                Modifier.weight(1f),
-                                color = colors.onSurface,
-                                fontSize = 15.sp,
-                            )
-                            // Fixed slot so the text does not re-wrap when the result arrives.
-                            Box(Modifier.size(20.dp), Alignment.Center) {
-                                if (isRight)
-                                    Icon(
-                                        Icons.Outlined.Check,
-                                        contentDescription = null,
-                                        tint = Color(0xff8ee05a),
-                                    )
-                                else if (isMissed)
-                                    Icon(
-                                        Icons.Outlined.Close,
-                                        contentDescription = null,
-                                        tint = colors.error,
-                                    )
-                            }
-                        }
-                    }
-                Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(top = 8.dp)) {
-                    q.tap?.let { answer ->
-                        Row(
-                            Modifier.fillMaxWidth()
-                                .heightIn(min = 56.dp)
-                                .background(
-                                    (if (answer.correct) colors.primary else colors.error).copy(
-                                        alpha = .10f
-                                    ),
-                                    RoundedCornerShape(10.dp),
-                                )
-                                .padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                if (answer.correct) Icons.Outlined.Check else Icons.Outlined.Close,
-                                contentDescription = null,
-                                tint = if (answer.correct) colors.primary else colors.error,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                if (answer.correct) m.text("正解！", "Correct!")
-                                else m.text("おしい！", "Not quite"),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = if (answer.correct) colors.primary else colors.error,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            TextButton(
-                                onClick = { m.open(q, "details") },
-                                contentPadding = PaddingValues(6.dp),
-                            ) {
-                                Text(m.text("解説を読む", "Read feedback"), fontSize = 12.sp)
-                            }
-                            onNext?.let { next ->
-                                Button(
-                                    onClick = next,
-                                    shape = RoundedCornerShape(24.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp),
-                                    colors =
-                                        ButtonDefaults.buttonColors(
-                                            containerColor = colors.onSurface,
-                                            contentColor = colors.surface,
-                                        ),
-                                ) {
-                                    Text(m.text("次へ", "Next"), fontSize = 13.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-                if (m.busy && picked >= 0)
-                    LinearProgressIndicator(
-                        Modifier.fillMaxWidth().padding(top = 8.dp),
-                        color = colors.primary,
-                    )
-                if (m.error.isNotBlank() && picked >= 0) {
-                    ErrorText(m.error)
-                    TextButton(onClick = { m.answer(q, picked) }, enabled = !m.busy) {
-                        Text(m.text("回答を再試行", "Retry answer"))
-                    }
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        val fontScale = LocalDensity.current.fontScale
+        val width = maxWidth
+        val wide = width >= 620.dp && maxHeight >= 300.dp && fontScale <= 1.25f
+        val binaryFits =
+            q.format == "true_false" && q.options.size == 2 &&
+                width.value >= 310 * fontScale && q.options.all { it.length <= 8 }
+        val shape = RoundedCornerShape(16.dp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState())
+                    .background(colors.surface, shape)
+                    .border(1.dp, colors.outline, shape)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SocialButton(
-                    Icons.Outlined.FavoriteBorder,
-                    q.likes.toString(),
-                    m.text("いいね", "Like"),
-                    q.liked,
-                    { m.like(q) },
-                )
-                Spacer(Modifier.weight(1f))
-                SocialButton(
-                    Icons.Outlined.ChatBubbleOutline,
-                    m.text("コメント", "Comments"),
-                    m.text("コメント", "Comments"),
-                    false,
-                    { m.open(q, "comments") },
-                )
-                Spacer(Modifier.weight(1f))
-                SocialButton(
-                    Icons.Outlined.IosShare,
-                    m.text("共有", "Share"),
-                    m.text("共有", "Share"),
-                    false,
-                    {
-                        val url =
-                            "https://whylint-8715935974.asia-northeast1.run.app/questions/${q.id}"
-                        context.startActivity(
-                            Intent.createChooser(
-                                Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, q.title + "\n" + url)
-                                },
-                                m.text("共有", "Share"),
-                            )
-                        )
-                    },
-                )
-                Spacer(Modifier.weight(1f))
-                SocialButton(
-                    if (q.saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                    m.text("保存", "Save"),
-                    m.text("保存", "Save"),
-                    q.saved,
-                    { m.save(q) },
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuestionHeading(m, q)
+                if (q.code.isNotBlank()) QuestionCode(m, q, picked, choose)
+                if (q.format != "spot_bug" && q.options.isNotEmpty()) {
+                    if (binaryFits) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            q.options.forEachIndexed { index, option ->
+                                QuestionOption(m, q, index, option, Modifier.weight(1f), choose)
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            q.options.forEachIndexed { index, option ->
+                                QuestionOption(m, q, index, option, Modifier.fillMaxWidth(), choose)
+                            }
+                        }
+                    }
+                }
+                q.tap?.let { QuestionFeedback(m, q, it, onNext) }
+                if (m.pendingAnswerId == q.id)
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = colors.primary)
+                if (picked >= 0 && q.tap == null)
+                    m.answerFailure?.takeIf { it.first == q.id }?.let { (_, error) ->
+                        ErrorText(error)
+                        TextButton(onClick = { m.answer(q, picked) }, enabled = !m.busy) {
+                            Text(m.text("回答を再試行", "Retry answer"))
+                        }
+                    }
                 OutlinedButton(
                     onClick = { if (m.requireLogin("explain")) m.open(q, "explain") },
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, colors.primary.copy(alpha = .5f)),
+                    border = BorderStroke(1.dp, colors.primary.copy(alpha = .6f)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
-                    Icon(
-                        androidx.compose.ui.res.painterResource(R.drawable.web_pencil),
-                        null,
-                        Modifier.size(20.dp),
-                        tint = colors.primary,
-                    )
-                    Text(
-                        " " + m.text("なぜ？", "Explain why"),
-                        color = colors.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
-                        fontSize = if (q.tap != null) 13.sp else 14.sp,
-                    )
+                    Icon(painterResource(R.drawable.web_pencil), null, Modifier.size(20.dp), tint = colors.primary)
+                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        Text(m.text("なぜ？", "Explain why"), color = colors.onSurface, fontWeight = FontWeight.Bold)
+                        Text(
+                            m.text("Geminiが採点 · +15 XP", "Graded by Gemini · +15 XP"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                        )
+                    }
                 }
                 if (q.tap != null)
-                    OutlinedButton(
-                        onClick = { if (m.requireLogin("ask")) m.open(q, "ask") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                    ) {
-                        Icon(
-                            androidx.compose.ui.res.painterResource(R.drawable.web_comment),
-                            null,
-                            Modifier.size(18.dp),
-                            tint = colors.primary,
-                        )
-                        Text(" " + m.text("質問する", "Ask Gemini"), fontSize = 13.sp)
+                    TextButton(onClick = { if (m.requireLogin("ask")) m.open(q, "ask") }) {
+                        Icon(painterResource(R.drawable.web_comment), null, Modifier.size(18.dp))
+                        Text(m.text("質問する", "Ask Gemini"), Modifier.padding(start = 8.dp))
                     }
-                OutlinedButton(
-                    onClick = { m.open(q, "details") },
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp),
-                    border = BorderStroke(1.dp, colors.outline),
-                ) {
-                    Text(m.text("詳細", "Details"), color = colors.onSurface)
+                if (!wide) QuestionActions(m, q, columns = if (width.value >= 355 * fontScale) 4 else 2)
+                if (q.references.isNotEmpty()) {
+                    HorizontalDivider(color = colors.outline)
+                    Column {
+                        Text(
+                            m.text("さらに学ぶ", "Further reading"),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        QuestionReferences(q)
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = { if (m.requireLogin("report")) m.open(q, "report") },
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                    ) {
+                        Icon(Icons.Outlined.Flag, null, Modifier.size(18.dp), tint = colors.onSurfaceVariant)
+                        Text(
+                            m.text("問題を報告", "Report a problem"),
+                            Modifier.padding(start = 6.dp),
+                            color = colors.onSurfaceVariant,
+                        )
+                    }
+                    if (q.author != null)
+                        TextButton(onClick = { m.open(q, "details") }) {
+                            Text(m.text("詳細", "Details"))
+                        }
+                }
+                if (m.reportedQuestionId == q.id && m.notice.isNotBlank())
+                    Text(
+                        m.notice,
+                        color = colors.onSurfaceVariant,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+            }
+            if (wide) Box(Modifier.width(76.dp)) { QuestionActions(m, q, columns = 1) }
+        }
+    }
+}
+
+@Composable
+private fun QuestionHeading(m: AppModel, q: Question) {
+    val colors = MaterialTheme.colorScheme
+    val format =
+        when (q.format) {
+            "true_false" -> m.text("○か×か", "True or false")
+            "predict_output" -> m.text("出力を予想", "Predict the output")
+            "spot_bug" -> m.text("バグを探せ", "Spot the bug")
+            "choice" -> m.text("選んで答える", "Pick one")
+            else -> m.text("説明してみよう", "Explain it")
+        }
+    val topic = q.reasonTopic
+    val reason =
+        when {
+            q.daily -> R.drawable.web_bug to m.text("今日のバグ", "Bug of the Day")
+            q.reasonKind == "review" -> R.drawable.web_review to m.text("復習", "Review")
+            q.reasonKind == "interest" && topic.isNotBlank() ->
+                R.drawable.web_sparkle to m.text("${topic}に興味があるから", "Because you like $topic")
+            q.reasonKind == "weak" && topic.isNotBlank() ->
+                R.drawable.web_target to m.text("${topic}を克服しよう", "Because you missed $topic")
+            q.reasonKind == "challenge" && topic.isNotBlank() ->
+                R.drawable.web_bolt to m.text("${topic}の応用に挑戦", "Level up: $topic")
+            q.source == "community" ->
+                R.drawable.web_users to m.text("コミュニティの問題", "From the community")
+            q.reasonKind == "general" ->
+                R.drawable.web_book to m.text("みんなが知っておきたい基礎", "Core concept everyone needs")
+            else -> null
+        }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        reason?.let { (icon, label) ->
+            Row(
+                Modifier.background(colors.primary.copy(alpha = .14f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(painterResource(icon), null, Modifier.size(14.dp), tint = colors.onSurface)
+                Text(label, Modifier.padding(start = 5.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Text(
+            format,
+            Modifier.border(1.dp, colors.outline, RoundedCornerShape(24.dp))
+                .padding(horizontal = 9.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant,
+        )
+    }
+    Text(
+        q.prompt.ifBlank { q.title },
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.fillMaxWidth().semantics { heading() },
+    )
+    val metadata = listOfNotNull(
+        q.title.takeIf { it.isNotBlank() && it != q.prompt },
+        if (q.source == "ai") m.text("Gemini が作成", "Created by Gemini")
+        else q.author?.text("displayName")?.takeIf { it.isNotBlank() },
+        q.difficulty.takeIf { it.isNotBlank() }?.let { difficultyLabel(m, it) },
+        q.topics.filter { it.isNotBlank() && it != "general" }.take(3).joinToString(" · ").takeIf { it.isNotBlank() },
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        metadata.forEach { label ->
+            Text(label, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun QuestionCode(m: AppModel, q: Question, picked: Int, onChoose: (Int) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val codeSize = 13f
+    val lines = remember(q.code) { q.code.lines() }
+    val highlighted = remember(lines, m.dark) { lines.map { syntax(it, m.dark) } }
+    val bugOptions = remember(q.options) {
+        val digits = Regex("\\d+")
+        q.options.map { digits.find(it)?.value?.toIntOrNull() }
+    }
+    Column(
+        Modifier.fillMaxWidth()
+            .background(if (m.dark) Color(0xff090909) else Color(0xffe0e7d4), RoundedCornerShape(12.dp)),
+    ) {
+        FlowRow(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                q.codeLanguage.ifBlank { m.text("コード", "Code") },
+                fontFamily = Mono,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+            )
+            if (q.format == "spot_bug" && q.tap == null)
+                Text(
+                    m.text("バグのある行をタップ", "Tap the buggy line"),
+                    color = colors.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+        }
+        HorizontalDivider(color = colors.outline)
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val viewport = maxWidth
+            Column(
+                Modifier.horizontalScroll(rememberScrollState())
+                    .widthIn(min = viewport)
+                    .width(IntrinsicSize.Max)
+                    .padding(vertical = 5.dp)
+            ) {
+                lines.forEachIndexed { index, line ->
+                    val option = if (q.format == "spot_bug") bugOptions.indexOf(index + 1) else -1
+                    val isCorrect = q.tap?.correctOption == option && option >= 0
+                    val isMissed = !isCorrect && q.tap?.choice == option && option >= 0
+                    val state =
+                        when {
+                            isCorrect -> colors.primary.copy(alpha = .16f)
+                            isMissed -> colors.error.copy(alpha = .16f)
+                            picked == option && option >= 0 -> colors.primary.copy(alpha = .12f)
+                            else -> Color.Transparent
+                        }
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .heightIn(min = if (option >= 0) 48.dp else 22.dp)
+                            .background(state)
+                            .then(
+                                if (option >= 0 && q.tap == null)
+                                    Modifier.drawBehind {
+                                        drawRect(colors.primary.copy(alpha = .55f), size = Size(3.dp.toPx(), size.height))
+                                    }
+                                else Modifier
+                            )
+                            .then(
+                                if (option >= 0)
+                                    Modifier.clickable(enabled = q.tap == null && !m.busy, role = Role.Button) {
+                                        onChoose(option)
+                                    }.semantics {
+                                        contentDescription = m.text("${index + 1}行目: $line", "Line ${index + 1}: $line")
+                                        answerState(m, q, option)?.let { stateDescription = it }
+                                    }
+                                else Modifier
+                            )
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (q.format == "spot_bug") {
+                            Box(Modifier.width(16.dp), Alignment.Center) {
+                                if (isCorrect || isMissed)
+                                    Icon(
+                                        if (isCorrect) Icons.Outlined.Check else Icons.Outlined.Close,
+                                        null,
+                                        Modifier.size(12.dp),
+                                        tint = if (isCorrect) colors.primary else colors.error,
+                                    )
+                            }
+                        }
+                        Text(
+                            (index + 1).toString(),
+                            fontFamily = Mono,
+                            fontSize = codeSize.sp,
+                            color = colors.onSurfaceVariant,
+                            modifier = Modifier.widthIn(min = 25.dp).padding(end = 4.dp),
+                        )
+                        Text(highlighted[index], fontFamily = Mono, fontSize = codeSize.sp, softWrap = false)
+                    }
                 }
             }
         }
     }
 }
 
+private fun answerState(m: AppModel, q: Question, option: Int): String? =
+    when {
+        q.tap?.correctOption == option && q.tap.choice == option ->
+            m.text("あなたの回答・正解", "Your answer, correct")
+        q.tap?.correctOption == option -> m.text("正解", "Correct answer")
+        q.tap?.choice == option -> m.text("あなたの回答・不正解", "Your answer, incorrect")
+        else -> null
+    }
+
 @Composable
-private fun SocialButton(
-    icon: ImageVector,
-    label: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit,
+private fun QuestionOption(
+    m: AppModel, q: Question, index: Int, option: String, modifier: Modifier, onChoose: (Int) -> Unit,
 ) {
-    Row(
-        Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onClick).semantics {
-            contentDescription = description
-            this.selected = selected
+    val colors = MaterialTheme.colorScheme
+    val correct = q.tap?.correctOption == index
+    val missed = !correct && q.tap?.choice == index
+    val border = if (correct) colors.primary else if (missed) colors.error else colors.outline
+    val label = if (q.format == "true_false") (if (index == 0) "○" else "×") else ('A' + index).toString()
+    OutlinedButton(
+        onClick = { onChoose(index) },
+        enabled = q.tap == null && !m.busy,
+        modifier = modifier.heightIn(min = 48.dp).semantics {
+            answerState(m, q, index)?.let { stateDescription = it }
         },
-        verticalAlignment = Alignment.CenterVertically,
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = colors.surfaceVariant,
+            disabledContainerColor = border.copy(alpha = .12f),
+        ),
+        border = BorderStroke(if (correct || missed) 2.dp else 1.dp, border),
+        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 7.dp),
     ) {
-        val c =
-            if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant
-        Icon(
-            androidx.compose.ui.res.painterResource(
-                when (icon) {
-                    Icons.Outlined.FavoriteBorder -> R.drawable.web_like
-                    Icons.Outlined.ChatBubbleOutline -> R.drawable.web_comment
-                    Icons.Outlined.IosShare -> R.drawable.web_share
-                    else -> R.drawable.web_save
-                }
-            ),
-            null,
-            Modifier.size(21.dp),
-            tint = c,
+        Box(
+            Modifier.background(colors.background, RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label,
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
+        }
+        Text(
+            option,
+            Modifier.weight(1f).padding(start = 8.dp),
+            color = colors.onSurface,
+            fontFamily = if (q.format == "predict_output") Mono else Sans,
+            style = MaterialTheme.typography.bodyMedium,
         )
-        CappedTextScale { Text(" " + label, fontSize = 11.sp, color = c, maxLines = 1) }
+        Box(Modifier.size(18.dp), Alignment.Center) {
+            if (correct || missed)
+                Icon(
+                    if (correct) Icons.Outlined.Check else Icons.Outlined.Close,
+                    null,
+                    Modifier.fillMaxSize(),
+                    tint = border,
+                )
+        }
     }
 }
 
 @Composable
-private fun BackRow(m: AppModel, title: String = "") {
+private fun QuestionFeedback(m: AppModel, q: Question, answer: QuizAnswer, onNext: (() -> Unit)?) {
+    val colors = MaterialTheme.colorScheme
+    val tint = if (answer.correct) colors.primary else colors.error
+    FlowRow(
+        Modifier.fillMaxWidth()
+            .background(tint.copy(alpha = .10f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 4.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            Icon(if (answer.correct) Icons.Outlined.Check else Icons.Outlined.Close, null, Modifier.size(18.dp), tint)
+            Text(
+                if (answer.correct) m.text("正解！", "Correct!") else m.text("おしい！", "Not quite"),
+                Modifier.padding(start = 6.dp),
+                fontWeight = FontWeight.Bold,
+                color = tint,
+            )
+        }
+        TextButton(onClick = { m.open(q, "details") }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text(m.text("解説を読む", "Read feedback"))
+        }
+        onNext?.let { next ->
+            Button(onClick = next, contentPadding = PaddingValues(horizontal = 12.dp)) {
+                Text(m.text("次へ", "Next"))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuestionReferences(q: Question) {
+    val uri = LocalUriHandler.current
+    q.references.forEach { ref ->
+        val title = ref.text("title")
+        val url = ref.text("url")
+        if (title.isNotBlank() && url.startsWith("https://"))
+            TextButton(
+                onClick = { openLink(uri, url) },
+                contentPadding = PaddingValues(horizontal = 0.dp),
+            ) {
+                Text(title, textDecoration = TextDecoration.Underline)
+            }
+    }
+}
+
+@Composable
+private fun QuestionActions(m: AppModel, q: Question, columns: Int) {
+    val context = LocalContext.current
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        maxItemsInEachRow = columns,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        QuestionAction(
+            if (q.liked) R.drawable.web_like_filled else R.drawable.web_like, q.likes.toString(),
+            m.text("いいね ${q.likes}件", "Like, ${q.likes} likes"), Modifier.weight(1f), q.liked,
+        ) { m.like(q) }
+        QuestionAction(
+            R.drawable.web_comment, m.text("コメント", "Comments"), null, Modifier.weight(1f),
+            enabled = !m.busy,
+        ) { m.open(q, "comments") }
+        QuestionAction(
+            R.drawable.web_share, m.text("共有", "Share"), null, Modifier.weight(1f),
+        ) {
+            context.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, q.title + "\nhttps://whylint.com/questions/${q.id}")
+                    },
+                    m.text("共有", "Share"),
+                )
+            )
+        }
+        QuestionAction(
+            if (q.saved) R.drawable.web_save_filled else R.drawable.web_save,
+            m.text("保存", "Save"), null, Modifier.weight(1f), q.saved,
+        ) { m.save(q) }
+    }
+}
+
+@Composable
+private fun QuestionAction(
+    icon: Int, label: String, description: String?, modifier: Modifier,
+    selected: Boolean? = null, enabled: Boolean = true, onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val tint = if (selected == true) colors.primary else colors.onSurfaceVariant
+    Column(
+        modifier.heightIn(min = 48.dp).clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics {
+                description?.let { contentDescription = it }
+                selected?.let { this.selected = it }
+            }
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Box(Modifier.size(34.dp).background(colors.surfaceVariant, CircleShape), Alignment.Center) {
+            Icon(painterResource(icon), null, Modifier.size(19.dp), tint)
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = tint,
+            textAlign = TextAlign.Center,
+            modifier = if (description != null) Modifier.clearAndSetSemantics {} else Modifier,
+        )
+    }
+}
+
+@Composable
+private fun BackRow(m: AppModel, title: String = "", onBack: () -> Unit = { m.screen = "home" }) {
     Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { m.screen = "home" }) {
+        IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Outlined.ArrowBack, m.text("戻る", "Back"))
         }
         Text(title, fontWeight = FontWeight.Bold)
@@ -1072,20 +1124,6 @@ private fun openLink(uri: androidx.compose.ui.platform.UriHandler, url: String) 
     }
 }
 
-/**
- * Navigation and the like/comment/share row are chrome with little room: at the largest system text
- * sizes their labels would clip or collide, so they grow only up to 1.3x while the content itself
- * keeps the full size.
- */
-@Composable
-private fun CappedTextScale(content: @Composable () -> Unit) {
-    val density = LocalDensity.current
-    CompositionLocalProvider(
-        LocalDensity provides Density(density.density, density.fontScale.coerceAtMost(1.3f)),
-        content = content,
-    )
-}
-
 /** Privacy policy and terms (and optionally the support contact), shown when configured. */
 @Composable
 private fun LegalLinks(m: AppModel, support: Boolean = false) {
@@ -1203,7 +1241,7 @@ private fun AuthScreen(m: AppModel) {
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         TextButton(
-            onClick = { m.screen = "home" },
+            onClick = m::closeLogin,
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.padding(top = 28.dp, bottom = 22.dp),
         ) {
@@ -2087,10 +2125,7 @@ private fun Avatar(url: String, label: String) {
 @Composable
 private fun QuestionLink(m: AppModel, q: Question) {
     TextButton(
-        onClick = {
-            m.focused = q
-            m.screen = "question"
-        },
+        onClick = { m.openQuestion(q) },
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(q.title, Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurface)
@@ -2267,11 +2302,15 @@ private fun QuestionSheet(m: AppModel, q: Question) {
                         )
                     if (m.busy && m.comments.isEmpty())
                         LinearProgressIndicator(Modifier.fillMaxWidth())
-                    if (m.comments.isEmpty() && !m.busy)
+                    if (m.comments.isEmpty() && !m.busy && m.error.isBlank())
                         Text(
                             m.text("まだコメントはありません。", "No comments yet."),
                             modifier = Modifier.padding(vertical = 16.dp),
                         )
+                    if (m.comments.isEmpty() && !m.busy && m.error.isNotBlank())
+                        TextButton(onClick = { m.loadComments(q) }) {
+                            Text(m.text("コメントを再読み込み", "Retry comments"))
+                        }
                     m.comments.forEach { comment ->
                         val author = comment.optJSONObject("author") ?: JSONObject()
                         Column(
@@ -2296,7 +2335,7 @@ private fun QuestionSheet(m: AppModel, q: Question) {
                                 lineHeight = 23.sp,
                             )
                             if (!comment.optBoolean("deleted"))
-                                Row {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     TextButton(
                                         onClick = { m.helpful(q, comment) },
                                         enabled =
@@ -2636,12 +2675,7 @@ private fun Publish(m: AppModel) {
         m.publishedQuestion?.let { published ->
             SectionTitle(m.text("質問を公開しました", "Your question is published"))
             Text(published.prompt, lineHeight = 24.sp)
-            TextButton(
-                onClick = {
-                    m.focused = published
-                    m.screen = "question"
-                }
-            ) {
+            TextButton(onClick = { m.openQuestion(published) }) {
                 Text(m.text("公開した質問を開く", "Open your question"))
             }
             OutlinedButton(

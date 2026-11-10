@@ -1,6 +1,21 @@
 import { test, expect, openProfile } from "./fixtures";
 import { prepareLearningAccount } from "./learning-fixtures";
 
+test("unknown pages and invalid or missing question links let learners return to the feed", async ({
+  page,
+}) => {
+  await page.goto("/no-such-page");
+  await expect(page.getByRole("heading", { name: "ページが見つかりません" })).toBeVisible();
+  await expect(page.locator("app-loading-skeleton")).toHaveCount(0);
+  for (const id of ["not-a-question-id", "00000000-0000-4000-8000-000000000099"]) {
+    await page.goto(`/questions/${id}`);
+    await expect(page.getByRole("heading", { name: "問題が見つかりません" })).toBeVisible();
+    await expect(page.locator("app-loading-skeleton")).toHaveCount(0);
+  }
+  await page.getByRole("link", { name: "フィードに戻る", exact: true }).click();
+  await expect(page).toHaveURL(/\/onboarding$/);
+});
+
 test("onboarding starts each step at its heading and wraps a long technology", async ({
   page,
 }) => {

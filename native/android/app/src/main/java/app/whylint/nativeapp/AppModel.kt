@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import java.net.URLEncoder
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -56,11 +57,23 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     var preferences by mutableStateOf(JSONObject(storage.getString("preferences", "{}") ?: "{}"))
     var loading by mutableStateOf(false)
     var generating by mutableStateOf(false)
+    var generationError by mutableStateOf("")
+        private set
     var busy by mutableStateOf(false)
+    var pendingAnswerId by mutableStateOf<String?>(null)
+        private set
+    var answerFailure by mutableStateOf<Pair<String, String>?>(null)
+        private set
     var error by mutableStateOf("")
     var notice by mutableStateOf("")
+    var reportedQuestionId by mutableStateOf<String?>(null)
+        private set
     var daily by mutableStateOf<JSONObject?>(null)
     var focused by mutableStateOf<Question?>(null)
+    var sharedQuestionError by mutableStateOf<String?>(null)
+        private set
+    var canRetrySharedQuestion by mutableStateOf(false)
+        private set
     var sheet by mutableStateOf("")
     var comments by mutableStateOf<List<JSONObject>>(emptyList())
     var assessment by mutableStateOf<JSONObject?>(null)
@@ -72,12 +85,15 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     var accountDeleted by mutableStateOf(false)
     /** What the sign-in screen says signing in unlocks; set by whatever sent the learner there. */
     var loginReason by mutableStateOf<String?>(null)
+    private var returnToQuestionAfterLogin = false
     private var refreshedAt = 0L
     private val inFlight = mutableSetOf<String>()
     private var identity = 0
     private var batchId = UUID.randomUUID().toString()
     private var seen = linkedSetOf<String>()
     private var feedEpoch = 0
+    private var sharedQuestionJob: Job? = null
+    private var sharedQuestionId: String? = null
 
     fun text(ja: String, en: String) = if (language == "ja") ja else en
 
@@ -96,6 +112,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
                 )
             "like" -> text("ログインすると、問題にいいねできます。", "Sign in to like questions.")
             "comment" -> text("ログインすると、コメントできます。", "Sign in to join the discussion.")
+            "report" -> text("ログインすると、問題を報告できます。", "Sign in to report this question.")
             "practice" ->
                 text(
                     "ログインすると、間違えた問題を毎朝復習できます。",
@@ -111,10 +128,19 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         }
 
     fun openLogin(reason: String? = "progress", signup: Boolean = false) {
+        if (screen != "login" && screen != "signup")
+            returnToQuestionAfterLogin = screen == "question" && focused != null
         loginReason = reason
         error = ""
         sheet = ""
         screen = if (signup) "signup" else "login"
+    }
+
+    fun closeLogin() {
+        error = ""
+        loginReason = null
+        screen = if (returnToQuestionAfterLogin && focused != null) "question" else "home"
+        returnToQuestionAfterLogin = false
     }
 
     init {
@@ -215,13 +241,14 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
      * Runs one request at a time. A like or save passes its own [key], so it never blocks, or is
      * silently dropped behind, an answer in flight; it only waits for itself.
      */
-    fun action(key: String = "", block: suspend () -> Unit) {
+    fun action(key: String = "", onFailure: ((String) -> Unit)? = null, block: suspend () -> Unit) {
         if (key.isEmpty()) {
             if (busy) return
             busy = true
         } else if (!inFlight.add(key)) return
         error = ""
         notice = ""
+        reportedQuestionId = null
         val owner = identity
         viewModelScope.launch {
             try {
@@ -229,7 +256,8 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 if (owner == identity) {
-                    error = message(e)
+                    val description = message(e)
+                    if (onFailure == null) error = description else onFailure(description)
                     if (api.token == null && user != null) invalidateSession()
                 }
             } finally {
@@ -334,6 +362,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         adoptGuestPreferences(guestChoices)
         identity++
         loginReason = null
+        returnToQuestionAfterLogin = false
         tab = 0
         screen = if (preferences.strings("interests").isEmpty()) "onboarding" else "home"
         resetFeed()
@@ -351,6 +380,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         adoptGuestPreferences(guestChoices)
         identity++
         loginReason = null
+        returnToQuestionAfterLogin = false
         tab = 0
         screen = if (preferences.strings("interests").isEmpty()) "onboarding" else "home"
         resetFeed()
@@ -473,6 +503,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun invalidateSession() {
+        val link = sharedQuestionId.takeIf { screen == "question" }
         identity++
         user = null
         guestImportFailed = false
@@ -494,6 +525,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         sheet = ""
         screen = "home"
         resetFeed()
+        link?.let(::deepLink)
     }
 
     fun logout() = action {
@@ -569,6 +601,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun resetFeed() {
+        generationError = ""
         feedEpoch++
         loading = false
         generating = false
@@ -622,6 +655,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     fun generate() {
         if (generating || user == null || preferences.strings("interests").isEmpty()) return
         generating = true
+        generationError = ""
         val epoch = feedEpoch
         val lang = language
         viewModelScope.launch {
@@ -647,7 +681,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 if (epoch == feedEpoch) {
-                    notice = message(e)
+                    generationError = message(e)
                     loadFeed()
                 }
             } finally {
@@ -661,22 +695,31 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         else loadFeed()
     }
 
-    private fun update(q: Question) {
-        questions = questions.map { if (it.id == q.id) q else it }
-        collection = collection.map { if (it.id == q.id) q else it }
-        if (focused?.id == q.id) focused = q
+    private fun updateQuestion(id: String, transform: (Question) -> Question) {
+        questions = questions.map { if (it.id == id) transform(it) else it }
+        collection = collection.map { if (it.id == id) transform(it) else it }
+        focused?.takeIf { it.id == id }?.let { focused = transform(it) }
     }
 
-    fun answer(q: Question, choice: Int) = action {
-        val result =
-            api.request("/learning/questions/${q.id}/taps", "POST", json("choice" to choice))
-        update(q.copy(tap = QuizAnswer.parse(result)))
-        result.optJSONObject("progress")?.let { progress = it }
-            ?: run {
-                guestAnswered++
-                if (result.optBoolean("correct")) guestCorrect++
-                rememberGuestAnswer(q.id, choice)
-            }
+    fun answer(q: Question, choice: Int) = action(onFailure = { answerFailure = q.id to it }) {
+        val owner = identity
+        answerFailure = null
+        pendingAnswerId = q.id
+        try {
+            val result =
+                api.request("/learning/questions/${q.id}/taps", "POST", json("choice" to choice))
+            if (owner != identity) return@action
+            val answer = QuizAnswer.parse(result)
+            updateQuestion(q.id) { it.copy(tap = answer) }
+            result.optJSONObject("progress")?.let { progress = it }
+                ?: run {
+                    guestAnswered++
+                    if (result.optBoolean("correct")) guestCorrect++
+                    rememberGuestAnswer(q.id, choice)
+                }
+        } finally {
+            pendingAnswerId = null
+        }
     }
 
     fun requireLogin(reason: String = "progress"): Boolean {
@@ -690,37 +733,47 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     fun like(q: Question) {
         if (!requireLogin("like")) return
         action("like:${q.id}") {
+            val owner = identity
             val result =
                 api.request("/learning/questions/${q.id}/like", "PUT", json("liked" to !q.liked))
-            update(
-                q.copy(
+            if (owner != identity) return@action
+            updateQuestion(q.id) { current ->
+                current.copy(
                     liked = result.optBoolean("liked", !q.liked),
-                    likes = result.optInt("likes", q.likes + if (q.liked) -1 else 1),
+                    likes = result.optInt("likes", current.likes + if (q.liked) -1 else 1),
                 )
-            )
+            }
         }
     }
 
     fun save(q: Question) {
         if (!requireLogin("save")) return
         action("save:${q.id}") {
-            api.request("/learning/questions/${q.id}/save", "PUT", json("saved" to !q.saved))
-            update(q.copy(saved = !q.saved))
+            val owner = identity
+            val result =
+                api.request("/learning/questions/${q.id}/save", "PUT", json("saved" to !q.saved))
+            if (owner != identity) return@action
+            updateQuestion(q.id) { it.copy(saved = result.optBoolean("saved", !q.saved)) }
         }
     }
 
     fun open(q: Question, kind: String) {
+        if (kind == "comments" && busy) return
         focused = q
         sheet = kind
         error = ""
         assessment = null
         followUp = null
-        if (kind == "comments") loadComments(q)
+        if (kind == "comments") {
+            comments = emptyList()
+            loadComments(q)
+        }
     }
 
     fun loadComments(q: Question) {
         action {
-            comments = api.request("/learning/questions/${q.id}/comments").objects("comments")
+            val result = api.request("/learning/questions/${q.id}/comments").objects("comments")
+            if (focused?.id == q.id && sheet == "comments") comments = result
         }
     }
 
@@ -843,7 +896,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun report(q: Question, reason: String, details: String) {
-        if (!requireLogin("comment")) return
+        if (!requireLogin("report")) return
         action {
             api.request(
                 "/learning/questions/${q.id}/reports",
@@ -851,6 +904,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
                 json("reason" to reason, "details" to details),
             )
             notice = text("報告を送信しました。", "Report submitted.")
+            reportedQuestionId = q.id
             sheet = ""
         }
     }
@@ -894,14 +948,55 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         user = api.request("/auth/me")
     }
 
+    fun openQuestion(question: Question) {
+        sharedQuestionJob?.cancel()
+        sharedQuestionId = null
+        sharedQuestionError = null
+        canRetrySharedQuestion = false
+        focused = question
+        sheet = ""
+        screen = "question"
+    }
+
+    fun closeQuestion() {
+        sharedQuestionJob?.cancel()
+        sharedQuestionId = null
+        focused = null
+        sheet = ""
+        screen = "home"
+    }
+
+    fun retrySharedQuestion() {
+        sharedQuestionId?.let(::deepLink)
+    }
+
     fun deepLink(id: String) {
-        if (!Regex("[a-fA-F0-9-]{36}").matches(id)) return
-        action {
-            focused =
-                api.request("/learning/questions/$id").optJSONObject("question")?.let {
-                    Question.parse(it)
-                }
-            screen = "question"
+        sharedQuestionJob?.cancel()
+        sharedQuestionId = id
+        sharedQuestionError = null
+        canRetrySharedQuestion = false
+        focused = null
+        sheet = ""
+        screen = "question"
+        if (!Regex("[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}").matches(id)) {
+            sharedQuestionError = text("この問題リンクは無効です。", "This question link is invalid.")
+            return
+        }
+        sharedQuestionJob = viewModelScope.launch {
+            try {
+                val result = api.request("/learning/questions/$id").optJSONObject("question")
+                    ?: throw ApiError(404, "QUESTION_NOT_FOUND")
+                if (screen == "question") focused = Question.parse(result)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (screen != "question") return@launch
+                val missing = (e as? ApiError)?.status == 404
+                canRetrySharedQuestion = !missing
+                sharedQuestionError =
+                    if (missing) text("この問題は利用できません。", "This question is unavailable.")
+                    else text("問題を読み込めませんでした。もう一度お試しください。", "Could not load this question. Try again.")
+            }
         }
     }
 }

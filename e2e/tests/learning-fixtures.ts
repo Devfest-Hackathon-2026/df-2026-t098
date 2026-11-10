@@ -125,7 +125,7 @@ export async function explanationField(card: Locator) {
 
 export async function openQuestionDetails(card: Locator) {
   await card.waitFor({ state: "visible" });
-  const button = card.getByRole("button", { name: /問題の詳細|Question details/, exact: true });
+  const button = card.getByRole("button", { name: /^(参考・報告|報告|Read & report|Report)$/ });
   if (await button.count()) await button.click();
 }
 

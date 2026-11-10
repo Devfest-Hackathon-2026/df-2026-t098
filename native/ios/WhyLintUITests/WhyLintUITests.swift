@@ -2,18 +2,33 @@ import XCTest
 
 @MainActor private func signOutIfNeeded(in app: XCUIApplication) {
     if app.buttons["public-profile"].waitForExistence(timeout: 3) {
-        app.buttons["open-settings"].tap()
-        app.buttons["account-settings"].tap()
-        app.buttons["logout"].tap()
+        let settings = app.buttons["open-settings"]
+        for _ in 0..<5 where !settings.isHittable { app.scrollViews.firstMatch.swipeDown() }
+        settings.tap()
+        let account = app.buttons["account-settings"]
+        XCTAssertTrue(account.waitForExistence(timeout: 5))
+        account.tap()
+        let logout = app.buttons["logout"]
+        for _ in 0..<5 where !logout.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        logout.tap()
         app.buttons["tab-profile"].tap()
     }
 }
 
+@MainActor private func revealOnCard(_ element: XCUIElement, in app: XCUIApplication) {
+    for _ in 0..<8 where !element.isHittable {
+        guard let scroll = app.scrollViews.matching(identifier: "question-card-scroll")
+            .allElementsBoundByIndex.first(where: { $0.isHittable })
+        else { break }
+        scroll.swipeUp(velocity: .slow)
+    }
+}
+
 final class WhyLintUITests: XCTestCase {
-    @MainActor private func launch(_ tab: String = "feed") -> XCUIApplication {
+    @MainActor private func launch(_ tab: String = "feed", readingSize: String = "0") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
-            "--ui-testing", "--tab", "profile", "--theme", "dark", "--reading-size", "0",
+            "--ui-testing", "--tab", "profile", "--theme", "dark", "--reading-size", readingSize,
             "--language", "ja",
         ]
         app.launchEnvironment["WHYLINT_API_URL"] = "http://127.0.0.1:3130"
@@ -23,6 +38,7 @@ final class WhyLintUITests: XCTestCase {
         app.buttons["tab-" + tab].tap()
         return app
     }
+
     @MainActor func testFeedAndSettingsAppearance() {
         let app = launch()
         XCTAssertTrue(app.buttons["tab-profile"].waitForExistence(timeout: 20))
@@ -44,14 +60,31 @@ final class WhyLintUITests: XCTestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         Thread.sleep(forTimeInterval: 2)  // Let OS rotation settle before hit-testing.
         XCTAssertTrue(app.buttons["tab-profile"].isHittable)
-        let detail = app.buttons["詳細"].firstMatch
-        XCTAssertTrue(detail.waitForExistence(timeout: 10))
-        XCTAssertTrue(detail.isHittable)
+        let explain = app.buttons["explain-open"].firstMatch
+        XCTAssertTrue(explain.waitForExistence(timeout: 10))
+        revealOnCard(explain, in: app)
+        XCTAssertTrue(explain.isHittable)
         Thread.sleep(forTimeInterval: 2)  // Let the OS rotation finish before capturing pixels.
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "ios-feed-landscape"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+    @MainActor func testLargeReadingSizeKeepsInlineQuestionActionsReachable() {
+        let app = launch(readingSize: "2")
+        XCTAssertTrue(app.staticTexts["question-format"].firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["question-metadata"].firstMatch.exists)
+        let explain = app.buttons["explain-open"].firstMatch
+        revealOnCard(explain, in: app)
+        XCTAssertTrue(explain.isHittable)
+        let reference = app.staticTexts["question-further-reading"].firstMatch
+        revealOnCard(reference, in: app)
+        XCTAssertTrue(reference.isHittable)
+        let report = app.buttons["report-question-open"].firstMatch
+        revealOnCard(report, in: app)
+        XCTAssertTrue(report.isHittable)
+        report.tap()
+        XCTAssertTrue(app.staticTexts["ログインすると、問題を報告できます。"].waitForExistence(timeout: 5))
     }
     @MainActor func testLanguageSettingAndEnglishLayouts() {
         let app = launch("profile")
@@ -217,11 +250,15 @@ final class WhyLintAccountUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "--ui-testing", "--tab", "profile", "--theme", "dark", "--language", "ja",
-            "--reset-guest", "--screen-onboarding",
+            "--reset-guest", "--reading-size", "0",
         ]
         app.launchEnvironment["WHYLINT_API_URL"] = "http://127.0.0.1:3130"
         app.launch()
         signOutIfNeeded(in: app)
+        XCTAssertTrue(app.buttons["login-topbar"].waitForExistence(timeout: 5))
+        app.terminate()
+        app.launchArguments.append("--screen-onboarding")
+        app.launch()
         // As a guest, pick an area and start learning.
         let next = app.buttons["次へ"]
         XCTAssertTrue(next.waitForExistence(timeout: 20))
@@ -270,8 +307,9 @@ final class WhyLintAccountUITests: XCTestCase {
         XCTAssertEqual(dailyGoal.label, "1 / 5")
         let xp = app.staticTexts["profile-total-xp"]
         let correct = app.staticTexts["profile-correct-answers"]
-        for _ in 0..<4 where !correct.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        for _ in 0..<4 where !xp.isHittable { app.scrollViews.firstMatch.swipeUp(velocity: .slow) }
         XCTAssertEqual(xp.label, "5")
+        for _ in 0..<4 where !correct.isHittable { app.scrollViews.firstMatch.swipeUp(velocity: .slow) }
         XCTAssertEqual(correct.label, "1 / 1")
     }
 
@@ -640,8 +678,10 @@ final class WhyLintSafetyUITests: XCTestCase {
         }
         let app = launchSignedIn(as: reader)
         app.buttons["tab-feed"].tap()
-        let comments = app.buttons["コメント"].firstMatch
+        let comments = app.buttons["question-comments-" + question].firstMatch
         XCTAssertTrue(comments.waitForExistence(timeout: 20))
+        revealOnCard(comments, in: app)
+        XCTAssertTrue(comments.isHittable)
         comments.tap()
         XCTAssertTrue(app.staticTexts[first].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts[second].exists)

@@ -92,9 +92,13 @@
           (click)="openExplain()"
           [attr.aria-label]="text('なぜ？を説明する', 'Explain why')"
         >
-          <app-icon name="pencil" aria-hidden="true" /><span>{{
-            text('なぜ？', 'Explain why')
-          }}</span>
+          <app-icon name="pencil" aria-hidden="true" />
+          <span>
+            {{ text('なぜ？', 'Explain why') }}
+            @if (!revealed()) {
+              <small>{{ text('Geminiが採点 · +15 XP', 'Graded by Gemini · +15 XP') }}</small>
+            }
+          </span>
         </button>
         @if (revealed()) {
           <button
@@ -112,9 +116,12 @@
           class="deeper-button info"
           type="button"
           (click)="openDetails('info', $event)"
-          [attr.aria-label]="text('問題の詳細', 'Question details')"
         >
-          <span>{{ text('詳細', 'Details') }}</span>
+          <span>{{
+            question().references?.length
+              ? text('参考・報告', 'Read & report')
+              : text('報告', 'Report')
+          }}</span>
         </button>
       </div>
     } @else {
@@ -131,24 +138,18 @@
       <span class="format-chip">{{ formatLabel }}</span>
     </div>
     <h2>{{ question().prompt }}</h2>
-    <p class="question-summary">
-      <span>{{ topics || question().codeLanguage || formatLabel }}</span>
+    <p class="question-credit">
+      <span class="question-title">{{ question().title }}</span>
+      @if (question().source === 'ai') {
+        <span>{{ text('Gemini が作成', 'Created by Gemini') }}</span>
+      } @else if (question().author; as author) {
+        <a [routerLink]="['/creators', author.id]">{{ author.displayName }}</a>
+      }
       <span>{{ difficulty }}</span>
+      @if (topics) {
+        <span>{{ topics }}</span>
+      }
     </p>
-    @if (!compact()) {
-      <p class="question-credit">
-        <span class="question-title">{{ question().title }}</span>
-        @if (question().source === 'ai') {
-          <span>{{ text('Gemini が作成', 'Created by Gemini') }}</span>
-        } @else if (question().author; as author) {
-          <a [routerLink]="['/creators', author.id]">{{ author.displayName }}</a>
-        }
-        <span>{{ difficulty }}</span>
-        @if (topics) {
-          <span>{{ topics }}</span>
-        }
-      </p>
-    }
     @if (codeLines(); as lines) {
       <div class="code-window bug-hunt" [class.locked]="revealed() || tapping()">
         <div class="code-head">
@@ -207,7 +208,7 @@
       <div
         class="quiz-options"
         [class.binary]="question().format === 'true_false'"
-        [class.two-up]="question().format === 'true_false' || twoColumnChoices()"
+        [class.two-up]="question().format === 'true_false'"
         role="group"
         [attr.aria-label]="text('答えを選ぶ', 'Choose an answer')"
         (keydown)="onOptionsKeydown($event)"
@@ -254,9 +255,6 @@
           </button>
         }
       </div>
-    }
-    @if (pagedCompact() && !inSheet && tappable() && !tap() && !tapError()) {
-      <div class="reveal-slot" aria-hidden="true"></div>
     }
     @if (tap(); as result) {
       <section class="reveal" [class.correct]="result.correct" aria-live="polite">

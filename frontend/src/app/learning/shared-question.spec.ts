@@ -16,7 +16,8 @@ describe('Shared-question account recovery', () => {
       return false;
     });
     const get = vi.fn().mockRejectedValue(new LearningError(404, 'NOT_FOUND'));
-    const paramMap = convertToParamMap({ id: 'fixture-question' });
+    const id = '894a7456-75cf-43c8-bb51-02f6b84a6cc3';
+    const paramMap = convertToParamMap({ id });
     TestBed.configureTestingModule({
       imports: [SharedQuestion],
       providers: [
@@ -43,6 +44,8 @@ describe('Shared-question account recovery', () => {
     root.querySelector<HTMLButtonElement>('button')!.click();
     await fixture.whenStable();
     expect(refresh).toHaveBeenCalledOnce();
-    expect(get).toHaveBeenCalledWith('/questions/fixture-question', expect.any(AbortSignal));
+    expect(get).toHaveBeenCalledWith('/questions/' + id, expect.any(AbortSignal));
+    expect(root.querySelector('h1')?.textContent).toContain('問題が見つかりません');
+    expect(root.querySelector('app-loading-skeleton')).toBeNull();
   });
 });

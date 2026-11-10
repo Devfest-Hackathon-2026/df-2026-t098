@@ -657,7 +657,6 @@ describe('Question understanding and social actions', () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     const fitted = natural.style.getPropertyValue('--question-density');
     expect(root.getAttribute('data-fit-overflow')).toBeNull();
-    expect(natural.querySelector('.reveal-slot')).not.toBeNull();
     expect(natural.hasAttribute('inert')).toBe(false);
     expect(root.querySelector('.question-stage-preview')).toBeNull();
     expect(root.querySelector('.full-question-button')).toBeNull();
@@ -667,7 +666,6 @@ describe('Question understanding and social actions', () => {
     natural.querySelector<HTMLButtonElement>('.quiz-option')!.click();
     await fixture.whenStable();
     expect(natural.querySelectorAll('.quiz-option')).toHaveLength(quiz.options!.length);
-    expect(natural.querySelector('.reveal-slot')).toBeNull();
     expect(natural.querySelector('.reveal')).not.toBeNull();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(natural.style.getPropertyValue('--question-density')).toBe(fitted);

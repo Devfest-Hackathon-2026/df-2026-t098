@@ -1,5 +1,47 @@
 # WhyLint native UI/UX audit — 9 November 2026
 
+## 10 November follow-up
+
+The earlier audit missed how much empty space the full-height cards created on
+short lessons and in opened questions. The new comparison uses the desktop
+true-or-false and predict-the-output references alongside the reported phone
+screens. The original audit below records the earlier implementation.
+
+| Finding | Correction |
+| --- | --- |
+| P1. Short cards stretched to the height of a swipe page, separating the question from its actions. Opened lessons could show the same gap. | The swipe page keeps its size. The card follows its content, and longer lessons scroll within the available space. |
+| P1. The compact layout hid the quiz format, source, and supporting context, and stacked binary answers even where they fit side by side. | The reason and format lead the card, followed by the prompt, metadata, code, and answers. True/false uses two columns when space and text size allow. Other choices stay stacked. |
+| P1. Unknown web links showed an indefinite loading skeleton. Malformed and missing shared questions lacked a dedicated recovery state. | The web app shows a page or question not found state with a route back to the feed. Android question links have distinct missing and retryable error states. |
+| P2. References and reporting were hidden in Details on the native cards. | The native cards expose Further reading and Report a problem near the lesson controls. Social actions and answer feedback retain native interactions. |
+| P1. The English Python index lesson claimed that a valid index raised an error. | The prompt now asks why the code prints the second item. The migration keeps the existing question ID, answer, and progress. |
+| P2. Overlapping Android answers, likes, and saves could replace newer card state with a stale copy. | Each response now updates its own fields on the current card and is ignored after an account change. |
+| P1. Maximum iOS Dynamic Type broke tab names mid-word and let the top bar crowd out the lesson. | The fixed navigation keeps complete accessibility labels and supports the iOS Large Content Viewer. The lesson still follows the system reading size and scrolls when needed. |
+
+The layout review covers visual hierarchy, light and dark appearance, long
+content, tap targets, accessible labels, and recovery states.
+
+- **iOS:** The focused iPhone 17 simulator suite passed feed/settings, guest
+  grading and sign-in validation, answered-card feedback, language switching,
+  landscape controls, and the largest in-app reading size with reachable
+  references and reporting. Signed fixture runs covered signup, session
+  persistence, logout, account deletion, legal/support, and lesson assessment.
+  The light iPad mini layout was also inspected.
+- **Android:** The API 37 emulator passed light true/false, dark code and
+  spot-the-bug, guest grading, feedback-sheet Back, empty comments, malformed and
+  missing question links, and landscape scrolling at 130% font scale. The signed-in
+  fixture covered relaunch, like/save persistence, report acknowledgement, account
+  deletion, and guest recovery after session revocation. A delayed Like response
+  preserved the answer feedback.
+- **Mobile web:** Chromium covered compact cards, long inline code and choices,
+  swipe paging, retry and feedback, and comment/report navigation. Supporting
+  links and reports are labeled in the sheet entry so the fixed pager retains
+  room for the lesson. Bad-link recovery also passed on desktop.
+
+Physical-device performance, VoiceOver and TalkBack traversal, foldable posture,
+and the full tablet and multi-window matrix remain outside this pass.
+
+## 9 November baseline
+
 The Android and iOS apps render native UI and share the existing backend. The reviewed phone screens preserve WhyLint’s palette, question-card hierarchy, five destinations, and account/settings structure. Theme selection is now in **Profile → Settings → Appearance** in the web app and both native apps.
 
 **Audit disposition: the reviewed core native flows work, and the material defects found in this pass have been corrected and checked.** Final captures verify the shared hierarchy, palette, icons, settings, compact answer controls, and app-wide iOS reading-size behavior. Complete pixel-for-pixel equivalence is not established; remaining platform presentation differences and coverage limits are listed below.
