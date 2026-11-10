@@ -353,6 +353,7 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
                 if (signup) "/auth/mobile/signup" else "/auth/mobile/password/login",
                 "POST",
                 body,
+                timeoutMs = if (signup) 25_000 else null,
             )
         val token = result.text("token")
         check(token.isNotBlank())
@@ -528,6 +529,34 @@ internal class AppModel(app: Application) : AndroidViewModel(app) {
         screen = "home"
         resetFeed()
         link?.let(::deepLink)
+    }
+
+    enum class EmailVerificationResult { VERIFIED, UNVERIFIED, SENT, COOLDOWN }
+
+    suspend fun updateEmailVerification(resend: Boolean): EmailVerificationResult {
+        val owner = api.token ?: throw ApiError(401, "SESSION_MISSING")
+        val sessionIdentity = identity
+        val result = try {
+            if (resend) api.request("/auth/email/verification", "POST")
+            else api.request("/auth/me")
+        } catch (error: ApiError) {
+            if (error.status == 401 && identity == sessionIdentity && api.token == null) {
+                invalidateSession()
+            }
+            throw error
+        }
+        if (api.token != owner) throw CancellationException()
+        if (!resend) {
+            user = result
+            return if (result.optBoolean("emailVerified")) EmailVerificationResult.VERIFIED
+            else EmailVerificationResult.UNVERIFIED
+        }
+        if (result.optBoolean("verified")) {
+            user = user?.let { JSONObject(it.toString()).put("emailVerified", true) }
+            return EmailVerificationResult.VERIFIED
+        }
+        return if (result.optBoolean("sent")) EmailVerificationResult.SENT
+        else EmailVerificationResult.COOLDOWN
     }
 
     fun logout() = action {

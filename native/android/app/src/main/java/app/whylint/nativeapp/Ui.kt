@@ -49,6 +49,7 @@ import coil.compose.AsyncImage
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -1229,6 +1230,7 @@ private fun AuthScreen(m: AppModel) {
     var validation by remember { mutableStateOf("") }
     var googleBusy by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val uri = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     Column(
         Modifier.fillMaxSize()
@@ -1289,6 +1291,24 @@ private fun AuthScreen(m: AppModel) {
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        if (!signup) {
+            TextButton(
+                onClick = {
+                    try {
+                        uri.openUri("https://whylint.com/forgot-password")
+                    } catch (_: IllegalArgumentException) {
+                        validation = m.text(
+                            "ブラウザを開けませんでした。whylint.comで再設定してください。",
+                            "Could not open a browser. Reset your password at whylint.com.",
+                        )
+                    }
+                },
+                enabled = !m.busy && !googleBusy,
+                modifier = Modifier.heightIn(min = 48.dp).testTag("auth-forgot-password"),
+            ) {
+                Text(m.text("パスワードをお忘れですか？", "Forgot your password?"))
+            }
+        }
         ErrorText(validation.ifBlank { m.error })
         Primary(
             if (m.busy) m.text("ログイン中…", "Signing in…")
@@ -1690,6 +1710,9 @@ private fun Profile(m: AppModel, onSettings: () -> Unit) {
             }
         } else {
             ProfileIdentity(user)
+            if (user.opt("emailVerified") == false) {
+                key(user.text("id")) { ProfileEmailVerification(m) }
+            }
             TextButton(onClick = { m.openCreator(user.text("id")) }) {
                 Text(m.text("公開プロフィールを見る", "View public profile"))
             }
@@ -1701,6 +1724,81 @@ private fun Profile(m: AppModel, onSettings: () -> Unit) {
         }
         ErrorText(m.error)
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun ProfileEmailVerification(m: AppModel) {
+    val scope = rememberCoroutineScope()
+    var pending by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+
+    fun update(resend: Boolean) {
+        if (pending) return
+        pending = true
+        status = ""
+        error = ""
+        scope.launch {
+            try {
+                status = when (m.updateEmailVerification(resend)) {
+                    AppModel.EmailVerificationResult.VERIFIED -> ""
+                    AppModel.EmailVerificationResult.UNVERIFIED -> m.text(
+                        "メールはまだ確認されていません。受信箱をご確認ください。",
+                        "Email is still unverified. Check your inbox.",
+                    )
+                    AppModel.EmailVerificationResult.SENT ->
+                        m.text("確認メールを送信しました。", "Verification email sent.")
+                    AppModel.EmailVerificationResult.COOLDOWN -> m.text(
+                        "1分ほど待ってから再送してください。",
+                        "Wait a minute before requesting another email.",
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                error = m.message(failure)
+            } finally {
+                pending = false
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        Text(
+            m.text("メールアドレスは未確認です", "Email not verified"),
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.testTag("email-not-verified"),
+        )
+        Text(
+            m.text(
+                "確認メールのリンクを開き、ここで確認状況を更新してください。",
+                "Open the link in your email, then check your status here.",
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(
+            onClick = { update(resend = true) },
+            enabled = !pending,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("resend-verification"),
+        ) {
+            Text(m.text("確認メールを再送", "Resend verification email"))
+        }
+        TextButton(
+            onClick = { update(resend = false) },
+            enabled = !pending,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("check-verification"),
+        ) {
+            Text(m.text("確認状況を更新", "Check verification status"))
+        }
+        if (status.isNotEmpty()) {
+            Text(
+                status,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("verification-status"),
+            )
+        }
+        ErrorText(error)
     }
 }
 

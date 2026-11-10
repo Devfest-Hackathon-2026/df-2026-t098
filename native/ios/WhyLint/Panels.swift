@@ -56,6 +56,11 @@ struct AuthView: View {
                             Text(store.text("15〜128文字で入力してください。", "Use 15–128 characters.")).font(
                                 .custom("DMSans-9ptRegular", size: 12, relativeTo: .caption)
                             ).foregroundStyle(store.palette.muted)
+                        } else if let recovery = SiteLinks.forgotPassword {
+                            Link(store.text("パスワードをお忘れですか？", "Forgot your password?"), destination: recovery)
+                                .frame(minHeight: 44)
+                                .disabled(pending)
+                                .accessibilityIdentifier("auth-forgot-password")
                         }
                     }
                     if let error { ErrorNotice(message: error) }
@@ -471,6 +476,9 @@ struct ProfileView: View {
                         ).fontWeight(.semibold)
                         if let user = store.user {
                             ProfileIdentity(user: user)
+                            if user["emailVerified"] as? Bool == false {
+                                ProfileEmailVerification().id(user.text("id"))
+                            }
                             Button(store.text("公開プロフィールを見る", "View public profile")) {
                                 store.creator = CreatorLink(id: user.text("id"))
                             }.frame(minHeight: 44).accessibilityIdentifier("public-profile")
@@ -488,6 +496,65 @@ struct ProfileView: View {
                 if store.signedIn { AccountLearningView() }
             }.padding(.horizontal, 16).padding(.vertical, 28).frame(maxWidth: 760)
         }.frame(maxWidth: .infinity)
+    }
+}
+
+private struct ProfileEmailVerification: View {
+    @Environment(AppStore.self) private var store
+    @State private var pending = false
+    @State private var status: String?
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(store.text("メールアドレスは未確認です", "Email not verified"))
+                .fontWeight(.semibold)
+                .accessibilityIdentifier("email-not-verified")
+            Text(store.text(
+                "確認メールのリンクを開き、ここで確認状況を更新してください。",
+                "Open the link in your email, then check your status here."
+            )).foregroundStyle(store.palette.muted)
+            Button(store.text("確認メールを再送", "Resend verification email")) {
+                update(resend: true)
+            }.frame(minHeight: 44).accessibilityIdentifier("resend-verification")
+            Button(store.text("確認状況を更新", "Check verification status")) {
+                update(resend: false)
+            }.frame(minHeight: 44).accessibilityIdentifier("check-verification")
+            if let status {
+                Text(status).foregroundStyle(store.palette.muted)
+                    .accessibilityIdentifier("verification-status")
+            }
+            if let error { ErrorNotice(message: error) }
+        }.disabled(pending)
+    }
+
+    private func update(resend: Bool) {
+        guard !pending else { return }
+        pending = true
+        status = nil
+        error = nil
+        Task {
+            defer { pending = false }
+            do {
+                switch try await store.updateEmailVerification(resend: resend) {
+                case .verified:
+                    break
+                case .unverified:
+                    status = store.text(
+                        "メールはまだ確認されていません。受信箱をご確認ください。",
+                        "Email is still unverified. Check your inbox."
+                    )
+                case .sent:
+                    status = store.text("確認メールを送信しました。", "Verification email sent.")
+                case .cooldown:
+                    status = store.text("1分ほど待ってから再送してください。", "Wait a minute before requesting another email.")
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                self.error = store.errorMessage(error)
+            }
+        }
     }
 }
 

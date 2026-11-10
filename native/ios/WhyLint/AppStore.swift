@@ -17,6 +17,7 @@ enum SiteLinks {
     }
     static var privacy: URL? { base?.appendingPathComponent("privacy") }
     static var terms: URL? { base?.appendingPathComponent("terms") }
+    static let forgotPassword = URL(string: "https://whylint.com/forgot-password")
     static var support: String { setting("WhyLintSupportContact") }
     static var supportURL: URL? {
         let contact = support
@@ -295,7 +296,8 @@ struct BlockedUser: Identifiable, Hashable {
             payload = ["identifier": identifier, "password": password]
             route = "/auth/mobile/password/login"
         }
-        let result = try await api.request(route, method: "POST", body: payload)
+        let result = try await api.request(
+            route, method: "POST", body: payload, timeout: route == "/auth/mobile/signup" ? 25 : nil)
         guard let token = result["token"] as? String, !token.isEmpty else {
             throw APIError(status: 0, code: "SESSION_MISSING")
         }
@@ -449,6 +451,29 @@ struct BlockedUser: Identifiable, Hashable {
         clearSession()
         await loadFeed()
     }
+    enum EmailVerificationResult {
+        case verified, unverified, sent, cooldown
+    }
+
+    func updateEmailVerification(resend: Bool) async throws -> EmailVerificationResult {
+        guard let owner = api.token else {
+            throw APIError(status: 401, code: "SESSION_MISSING")
+        }
+        if resend {
+            let result = try await api.request("/auth/email/verification", method: "POST")
+            guard api.token == owner else { throw CancellationError() }
+            if result["verified"] as? Bool == true {
+                user?["emailVerified"] = true
+                return .verified
+            }
+            return result["sent"] as? Bool == true ? .sent : .cooldown
+        }
+        let profile = try await api.request("/auth/me")
+        guard api.token == owner else { throw CancellationError() }
+        user = profile
+        return profile["emailVerified"] as? Bool == true ? .verified : .unverified
+    }
+
     /// Permanently deletes the account. The device forgets the session only after the server
     /// confirms with 204; on any failure the account and the session stay as they were.
     func deleteAccount() async throws {

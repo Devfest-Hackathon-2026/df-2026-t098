@@ -324,7 +324,10 @@ final class WhyLintAccountUITests: XCTestCase {
         signOutIfNeeded(in: app)
         XCTAssertTrue(app.buttons["login-topbar"].waitForExistence(timeout: 10))
         app.buttons["login-topbar"].tap()
+        let recoveryLink = app.descendants(matching: .any)["auth-forgot-password"].firstMatch
+        XCTAssertTrue(recoveryLink.waitForExistence(timeout: 5))
         app.buttons["auth-switch"].tap()
+        XCTAssertFalse(recoveryLink.exists)
         let unique = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(10))
             .lowercased()
         app.textFields["auth-email"].tap()
@@ -354,6 +357,16 @@ final class WhyLintAccountUITests: XCTestCase {
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
         XCTAssertTrue(app.buttons["public-profile"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["email-not-verified"].exists)
+        let resend = app.buttons["resend-verification"]
+        for _ in 0..<4 where !resend.isHittable { app.swipeUp() }
+        resend.tap()
+        XCTAssertTrue(app.staticTexts["verification-status"].waitForExistence(timeout: 10))
+        let checkStatus = app.buttons["check-verification"]
+        for _ in 0..<4 where !checkStatus.isHittable { app.swipeUp() }
+        checkStatus.tap()
+        let stillUnverified = app.staticTexts["メールはまだ確認されていません。受信箱をご確認ください。"]
+        XCTAssertTrue(stillUnverified.waitForExistence(timeout: 10))
         app.terminate()
         // Reinstalling or changing build identity can leave the Keychain session
         // intact while the device's onboarding preference is absent.

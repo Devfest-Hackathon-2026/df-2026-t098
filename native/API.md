@@ -12,7 +12,8 @@ encrypted storage or the iOS Keychain.
 | POST `/auth/mobile/signup` | `email`, `username`, `password` | 201, `{ message, token }` |
 | POST `/auth/mobile/password/login` | `identifier`, `password` | 200, `{ message, token }` |
 | POST `/auth/mobile/google` | `idToken` | 200, `{ message, token }` |
-| GET `/auth/me` | Bearer token | Existing user profile |
+| GET `/auth/me` | Bearer token | User profile, including optional `emailVerified` |
+| POST `/auth/email/verification` | Bearer token, no body | 200, `{ sent, verified }` |
 | POST `/auth/logout` | Bearer token | 204, server session revoked |
 | DELETE `/auth/me` | Bearer token, no body | 204, account and learning data deleted, every session revoked |
 
@@ -21,6 +22,11 @@ Fetch Metadata header. They validate the same signup/password DTOs and retain th
 existing rate limits. The Google endpoint verifies the provider's signature,
 expiry, issuer and configured server audience through `google-auth-library` before
 issuing a WhyLint session. Accounts are matched by verified Google subject.
+
+Password recovery opens `https://whylint.com/forgot-password` in the system browser.
+Verification and reset links are completed there. Profile shows resend and status
+controls only when the server explicitly reports `emailVerified: false`. The
+learner can refresh that status after opening the verification link.
 
 Mobile requests omit cookies and Origin. Authenticated writes are accepted only
 after the existing JWT guard has checked the signature and revocable database
