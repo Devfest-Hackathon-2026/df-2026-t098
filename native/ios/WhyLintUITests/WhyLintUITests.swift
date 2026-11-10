@@ -2,9 +2,15 @@ import XCTest
 
 @MainActor private func signOutIfNeeded(in app: XCUIApplication) {
     if app.buttons["public-profile"].waitForExistence(timeout: 3) {
-        app.buttons["open-settings"].tap()
-        app.buttons["account-settings"].tap()
-        app.buttons["logout"].tap()
+        let settings = app.buttons["open-settings"]
+        for _ in 0..<5 where !settings.isHittable { app.scrollViews.firstMatch.swipeDown() }
+        settings.tap()
+        let account = app.buttons["account-settings"]
+        XCTAssertTrue(account.waitForExistence(timeout: 5))
+        account.tap()
+        let logout = app.buttons["logout"]
+        for _ in 0..<5 where !logout.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        logout.tap()
         app.buttons["tab-profile"].tap()
     }
 }
@@ -243,11 +249,15 @@ final class WhyLintAccountUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "--ui-testing", "--tab", "profile", "--theme", "dark", "--language", "ja",
-            "--reset-guest", "--screen-onboarding",
+            "--reset-guest", "--reading-size", "0",
         ]
         app.launchEnvironment["WHYLINT_API_URL"] = "http://127.0.0.1:3130"
         app.launch()
         signOutIfNeeded(in: app)
+        XCTAssertTrue(app.buttons["login-topbar"].waitForExistence(timeout: 5))
+        app.terminate()
+        app.launchArguments.append("--screen-onboarding")
+        app.launch()
         // As a guest, pick an area and start learning.
         let next = app.buttons["次へ"]
         XCTAssertTrue(next.waitForExistence(timeout: 20))
@@ -296,8 +306,9 @@ final class WhyLintAccountUITests: XCTestCase {
         XCTAssertEqual(dailyGoal.label, "1 / 5")
         let xp = app.staticTexts["profile-total-xp"]
         let correct = app.staticTexts["profile-correct-answers"]
-        for _ in 0..<4 where !correct.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        for _ in 0..<4 where !xp.isHittable { app.scrollViews.firstMatch.swipeUp(velocity: .slow) }
         XCTAssertEqual(xp.label, "5")
+        for _ in 0..<4 where !correct.isHittable { app.scrollViews.firstMatch.swipeUp(velocity: .slow) }
         XCTAssertEqual(correct.label, "1 / 1")
     }
 

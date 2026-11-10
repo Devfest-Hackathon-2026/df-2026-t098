@@ -206,21 +206,26 @@ struct AppRoot: View {
             HStack(spacing: 0) {
                 ForEach(tabs, id: \.0) { tab in
                     let selected = store.tab == tab.0 || (store.tab == "settings" && tab.0 == "profile")
+                    let title = store.text(tab.2, tab.3)
                     Button {
                         store.tab = tab.0
                     } label: {
                         VStack(spacing: 5) {
                             Image("web-" + tab.0).renderingMode(.template).resizable().scaledToFit()
                                 .frame(width: 20, height: 20).accessibilityHidden(true)
-                            Text(store.text(tab.2, tab.3)).font(
-                                .custom("DMSans-9ptRegular", size: 11))
+                            Text(title).font(.custom("DMSans-9ptRegular", size: 11, relativeTo: .caption2))
+                                .lineLimit(1).minimumScaleFactor(0.85)
                         }.frame(maxWidth: .infinity, minHeight: 56)
                             .foregroundStyle(
                                 selected ? store.palette.accent : store.palette.muted)
-                    }.accessibilityIdentifier("tab-" + tab.0)
+                    }.accessibilityLabel(title)
+                        .accessibilityIdentifier("tab-" + tab.0)
                         .accessibilityAddTraits(selected ? [.isSelected] : [])
+                        .accessibilityShowsLargeContentViewer { Label(title, systemImage: tab.1) }
                 }
             }.padding(.horizontal, 8)
+                // Fixed navigation chrome uses the Large Content Viewer for magnification.
+                .dynamicTypeSize(...DynamicTypeSize.xLarge)
         }
         .background(store.palette.canvas).foregroundStyle(store.palette.text)
         .sheet(isPresented: $store.showingLogin, onDismiss: { store.loginReason = nil }) {
@@ -281,8 +286,13 @@ struct AppRoot: View {
                     ).frame(minHeight: 44)
                     .background(store.palette.control, in: Capsule())
                     .accessibilityIdentifier("login-topbar")
+                    .accessibilityShowsLargeContentViewer {
+                        Text(store.text("ログインして記録", "Save progress"))
+                    }
             }
-        }.font(.custom("DMSans-9ptRegular", size: 12)).padding(.horizontal, 12).frame(minHeight: 56)
+        }.font(.custom("DMSans-9ptRegular", size: 12, relativeTo: .caption))
+            .padding(.horizontal, 12).frame(minHeight: 56)
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
     }
 }
 

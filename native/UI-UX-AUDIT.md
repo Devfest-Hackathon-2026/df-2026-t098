@@ -15,6 +15,7 @@ screens. The original audit below records the earlier implementation.
 | P2. References and reporting were hidden in Details on the native cards. | The native cards expose Further reading and Report a problem near the lesson controls. Social actions and answer feedback retain native interactions. |
 | P1. The English Python index lesson claimed that a valid index raised an error. | The prompt now asks why the code prints the second item. The migration keeps the existing question ID, answer, and progress. |
 | P2. Overlapping Android answers, likes, and saves could replace newer card state with a stale copy. | Each response now updates its own fields on the current card and is ignored after an account change. |
+| P1. Maximum iOS Dynamic Type broke tab names mid-word and let the top bar crowd out the lesson. | The fixed navigation keeps complete accessibility labels and supports the iOS Large Content Viewer. The lesson still follows the system reading size and scrolls when needed. |
 
 The layout review covers visual hierarchy, light and dark appearance, long
 content, tap targets, accessible labels, and recovery states.
@@ -22,10 +23,15 @@ content, tap targets, accessible labels, and recovery states.
 - **iOS:** The focused iPhone 17 simulator suite passed feed/settings, guest
   grading and sign-in validation, answered-card feedback, language switching,
   landscape controls, and the largest in-app reading size with reachable
-  references and reporting. The light iPad mini layout was also inspected.
+  references and reporting. Signed fixture runs covered signup, session
+  persistence, logout, account deletion, legal/support, and lesson assessment.
+  The light iPad mini layout was also inspected.
 - **Android:** The API 37 emulator passed light true/false, dark code and
   spot-the-bug, guest grading, feedback-sheet Back, empty comments, malformed and
-  missing question links, and landscape scrolling at 130% font scale.
+  missing question links, and landscape scrolling at 130% font scale. The signed-in
+  fixture covered relaunch, like/save persistence, report acknowledgement, account
+  deletion, and guest recovery after session revocation. A delayed Like response
+  preserved the answer feedback.
 - **Mobile web:** Chromium covered compact cards, long inline code and choices,
   swipe paging, retry and feedback, and comment/report navigation. Supporting
   links and reports are labeled in the sheet entry so the fixed pager retains
