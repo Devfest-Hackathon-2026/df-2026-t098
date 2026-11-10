@@ -291,7 +291,7 @@ struct QuestionCard: View {
                 .disabled(reactionPending != nil)
             Button { sheet = .comments } label: {
                 socialLabel("bubble.left", title: store.text("コメント", "Comments"))
-            }
+            }.accessibilityIdentifier("question-comments-" + question.id)
             ShareLink(item: URL(string: "https://whylint.com")!
                 .appendingPathComponent("questions").appendingPathComponent(question.id))
             {

@@ -15,6 +15,15 @@ import XCTest
     }
 }
 
+@MainActor private func revealOnCard(_ element: XCUIElement, in app: XCUIApplication) {
+    for _ in 0..<8 where !element.isHittable {
+        guard let scroll = app.scrollViews.matching(identifier: "question-card-scroll")
+            .allElementsBoundByIndex.first(where: { $0.isHittable })
+        else { break }
+        scroll.swipeUp(velocity: .slow)
+    }
+}
+
 final class WhyLintUITests: XCTestCase {
     @MainActor private func launch(_ tab: String = "feed", readingSize: String = "0") -> XCUIApplication {
         let app = XCUIApplication()
@@ -30,14 +39,6 @@ final class WhyLintUITests: XCTestCase {
         return app
     }
 
-    @MainActor private func revealOnCard(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<8 where !element.isHittable {
-            guard let scroll = app.scrollViews.matching(identifier: "question-card-scroll")
-                .allElementsBoundByIndex.first(where: { $0.isHittable })
-            else { break }
-            scroll.swipeUp(velocity: .slow)
-        }
-    }
     @MainActor func testFeedAndSettingsAppearance() {
         let app = launch()
         XCTAssertTrue(app.buttons["tab-profile"].waitForExistence(timeout: 20))
@@ -677,8 +678,10 @@ final class WhyLintSafetyUITests: XCTestCase {
         }
         let app = launchSignedIn(as: reader)
         app.buttons["tab-feed"].tap()
-        let comments = app.buttons["コメント"].firstMatch
+        let comments = app.buttons["question-comments-" + question].firstMatch
         XCTAssertTrue(comments.waitForExistence(timeout: 20))
+        revealOnCard(comments, in: app)
+        XCTAssertTrue(comments.isHittable)
         comments.tap()
         XCTAssertTrue(app.staticTexts[first].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts[second].exists)
