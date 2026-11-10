@@ -18,13 +18,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -71,19 +75,19 @@ private val Dark =
     )
 private val Light =
     lightColorScheme(
-        secondaryContainer = Color(0xffe6ecdc),
-        onSecondaryContainer = Color(0xff20251f),
-        surfaceVariant = Color(0xfff1f3ed),
-        outlineVariant = Color(0xffd2d9cf),
-        primary = Color(0xff4b6c08),
+        secondaryContainer = Color(0xffd3e3b4),
+        onSecondaryContainer = Color(0xff131811),
+        surfaceVariant = Color(0xffe3e9d8),
+        outlineVariant = Color(0xffaab6a2),
+        primary = Color(0xff3d5d00),
         onPrimary = Color.White,
-        background = Color(0xfff3f5f0),
+        background = Color(0xffe9eee1),
         surface = Color.White,
-        onBackground = Color(0xff20251f),
-        onSurface = Color(0xff20251f),
-        onSurfaceVariant = Color(0xff555e53),
-        outline = Color(0xffd2d9cf),
-        secondary = Color(0xff4b6c08),
+        onBackground = Color(0xff131811),
+        onSurface = Color(0xff131811),
+        onSurfaceVariant = Color(0xff465142),
+        outline = Color(0xffaab6a2),
+        secondary = Color(0xff3d5d00),
         error = Color(0xffc2362f),
     )
 private val typography =
@@ -143,6 +147,8 @@ internal fun WhyLint(m: AppModel) {
                 }
             }
             BackHandler(m.screen != "home") { m.screen = "home" }
+            var splash by rememberSaveable { mutableStateOf(true) }
+            if (splash) Splash(m.dark) { splash = false }
         }
     }
 }
@@ -179,7 +185,10 @@ private fun Header(m: AppModel) {
         val colors = MaterialTheme.colorScheme
         if (m.user != null)
             Row(
-                Modifier.background(colors.outline.copy(alpha = .55f), RoundedCornerShape(24.dp))
+                Modifier.background(
+                        colors.outline.copy(alpha = if (m.dark) .55f else .35f),
+                        RoundedCornerShape(24.dp),
+                    )
                     .padding(9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -193,7 +202,10 @@ private fun Header(m: AppModel) {
             }
         Spacer(Modifier.width(6.dp))
         Row(
-            Modifier.background(colors.outline.copy(alpha = .55f), RoundedCornerShape(24.dp))
+            Modifier.background(
+                    colors.outline.copy(alpha = if (m.dark) .55f else .35f),
+                    RoundedCornerShape(24.dp),
+                )
                 .padding(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -229,10 +241,10 @@ private fun Header(m: AppModel) {
         Spacer(Modifier.width(6.dp))
         if (m.user == null)
             TextButton(
-                onClick = { m.screen = "login" },
+                onClick = { m.openLogin("progress") },
                 colors =
                     ButtonDefaults.textButtonColors(
-                        containerColor = colors.outline.copy(alpha = .55f)
+                        containerColor = colors.outline.copy(alpha = if (m.dark) .55f else .35f)
                     ),
                 shape = RoundedCornerShape(24.dp),
             ) {
@@ -240,7 +252,10 @@ private fun Header(m: AppModel) {
             }
         else
             Row(
-                Modifier.background(colors.outline.copy(alpha = .55f), RoundedCornerShape(24.dp))
+                Modifier.background(
+                        colors.outline.copy(alpha = if (m.dark) .55f else .35f),
+                        RoundedCornerShape(24.dp),
+                    )
                     .padding(9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -331,13 +346,15 @@ private fun Home(m: AppModel) {
                             Modifier.size(22.dp),
                             tint = color,
                         )
-                        Text(
-                            label,
-                            fontSize = 10.sp,
-                            color = color,
-                            maxLines = 1,
-                            modifier = Modifier.padding(top = 3.dp),
-                        )
+                        CappedTextScale {
+                            Text(
+                                label,
+                                fontSize = 10.sp,
+                                color = color,
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 3.dp),
+                            )
+                        }
                     }
                 }
         }
@@ -348,7 +365,10 @@ private fun Home(m: AppModel) {
 private fun Feed(m: AppModel) {
     if (m.sessionError) {
         Empty(
-            m.text("アカウントを確認できませんでした。", "Could not check your account."),
+            m.text(
+                "接続できませんでした。ログインは維持されています。通信状況を確認して、もう一度お試しください。",
+                "Could not connect. You are still signed in; check your connection and try again.",
+            ),
             m.text("再試行", "Retry"),
             m::refreshSession,
         )
@@ -464,7 +484,21 @@ private fun QuestionCard(
         val codeSize = (16f * fit).coerceAtLeast(11f)
         Column(
             Modifier.fillMaxSize()
-                .border(1.dp, colors.primary.copy(alpha = .6f), RoundedCornerShape(16.dp))
+                .then(
+                    if (m.dark) Modifier
+                    else
+                        Modifier.shadow(
+                            6.dp,
+                            RoundedCornerShape(16.dp),
+                            ambientColor = Color(0xff131811),
+                            spotColor = Color(0xff131811),
+                        )
+                )
+                .border(
+                    if (m.dark) 1.dp else 1.5.dp,
+                    colors.primary.copy(alpha = if (m.dark) .6f else .85f),
+                    RoundedCornerShape(16.dp),
+                )
                 .background(colors.surface, RoundedCornerShape(16.dp))
                 .padding(8.dp)
         ) {
@@ -477,11 +511,20 @@ private fun QuestionCard(
                     modifier =
                         Modifier.fillMaxWidth().padding(bottom = 12.dp).semantics { heading() },
                 )
+                if (q.format == "spot_bug" && q.tap == null && q.code.isNotBlank()) {
+                    Text(
+                        m.text("バグのある行をタップ", "Tap the buggy line"),
+                        color = colors.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 if (q.code.isNotBlank()) {
                     BoxWithConstraints(
                         Modifier.fillMaxWidth()
                             .background(
-                                if (m.dark) Color(0xff090909) else Color(0xfff1f3ed),
+                                if (m.dark) Color(0xff090909) else Color(0xffe0e7d4),
                                 RoundedCornerShape(12.dp),
                             )
                     ) {
@@ -526,6 +569,16 @@ private fun QuestionCard(
                                             min = if (option >= 0) 48.dp else (codeSize * 1.7f).dp
                                         )
                                         .background(state)
+                                        .then(
+                                            if (option >= 0 && q.tap == null)
+                                                Modifier.drawBehind {
+                                                    drawRect(
+                                                        colors.primary.copy(alpha = .55f),
+                                                        size = Size(3.dp.toPx(), size.height),
+                                                    )
+                                                }
+                                            else Modifier
+                                        )
                                         .then(
                                             if (option >= 0)
                                                 Modifier.clickable(
@@ -765,7 +818,7 @@ private fun QuestionCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = { if (m.requireLogin()) m.open(q, "explain") },
+                    onClick = { if (m.requireLogin("explain")) m.open(q, "explain") },
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, colors.primary.copy(alpha = .5f)),
@@ -780,11 +833,14 @@ private fun QuestionCard(
                         " " + m.text("なぜ？", "Explain why"),
                         color = colors.onSurface,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        fontSize = if (q.tap != null) 13.sp else 14.sp,
                     )
                 }
                 if (q.tap != null)
                     OutlinedButton(
-                        onClick = { if (m.requireLogin()) m.open(q, "ask") },
+                        onClick = { if (m.requireLogin("ask")) m.open(q, "ask") },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp),
@@ -841,7 +897,7 @@ private fun SocialButton(
             Modifier.size(21.dp),
             tint = c,
         )
-        Text(" " + label, fontSize = 11.sp, color = c)
+        CappedTextScale { Text(" " + label, fontSize = 11.sp, color = c, maxLines = 1) }
     }
 }
 
@@ -849,7 +905,7 @@ private fun SocialButton(
 private fun BackRow(m: AppModel, title: String = "") {
     Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { m.screen = "home" }) {
-            Icon(Icons.Outlined.ArrowBack, m.text("戻る", "Back"))
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, m.text("戻る", "Back"))
         }
         Text(title, fontWeight = FontWeight.Bold)
         Spacer(Modifier.weight(1f))
@@ -959,11 +1015,42 @@ private fun Primary(
         colors =
             ButtonDefaults.buttonColors(
                 containerColor =
-                    if (accent) Color(0xffc6f24e) else MaterialTheme.colorScheme.onSurface,
-                contentColor = if (accent) Color(0xff111111) else MaterialTheme.colorScheme.surface,
+                    if (accent) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface,
+                contentColor =
+                    if (accent) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.surface,
+                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
+                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .38f),
             ),
     ) {
         Text(label)
+    }
+}
+
+/** A short numbered "how it works" for tabs a guest cannot use yet, so they are not empty. */
+@Composable
+private fun Steps(items: List<String>) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items.forEachIndexed { index, item ->
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    (index + 1).toString(),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.width(28.dp),
+                )
+                Text(
+                    item,
+                    lineHeight = 22.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
 }
 
@@ -983,6 +1070,20 @@ private fun openLink(uri: androidx.compose.ui.platform.UriHandler, url: String) 
     } catch (_: Exception) {
         // No browser or mail app on this device; the text stays readable.
     }
+}
+
+/**
+ * Navigation and the like/comment/share row are chrome with little room: at the largest system text
+ * sizes their labels would clip or collide, so they grow only up to 1.3x while the content itself
+ * keeps the full size.
+ */
+@Composable
+private fun CappedTextScale(content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    CompositionLocalProvider(
+        LocalDensity provides Density(density.density, density.fontScale.coerceAtMost(1.3f)),
+        content = content,
+    )
 }
 
 /** Privacy policy and terms (and optionally the support contact), shown when configured. */
@@ -1106,9 +1207,9 @@ private fun AuthScreen(m: AppModel) {
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.padding(top = 28.dp, bottom = 22.dp),
         ) {
-            Icon(Icons.Outlined.ArrowBack, null, Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, Modifier.size(18.dp))
             Text(
-                "  " + m.text("学習に戻る", "Back to practice"),
+                "  " + m.text("学習に戻る", "Back to learning"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1121,9 +1222,15 @@ private fun AuthScreen(m: AppModel) {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            m.text("ログインして、学習を続けましょう。", "Sign in and continue learning with WhyLint."),
+            m.loginReasonText()
+                ?: if (signup)
+                    m.text(
+                        "進捗やXPを保存して、学習を続けましょう。",
+                        "Create an account to keep your progress and XP.",
+                    )
+                else m.text("ログインして、学習を続けましょう。", "Sign in and continue learning with WhyLint."),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp, bottom = 24.dp),
+            modifier = Modifier.padding(top = 10.dp, bottom = 24.dp).testTag("auth-reason"),
         )
         if (!signup)
             Text(
@@ -1157,9 +1264,12 @@ private fun AuthScreen(m: AppModel) {
         ) {
             validation =
                 when {
-                    (!signup && identifier.isBlank()) ||
-                        (signup && (email.isBlank() || username.isBlank())) ->
-                        m.text("すべての項目を入力してください。", "Complete all fields.")
+                    signup && email.isBlank() ->
+                        m.text("メールアドレスを入力してください。", "Enter your email address.")
+                    signup && username.isBlank() -> m.text("ユーザー名を入力してください。", "Enter a username.")
+                    !signup && identifier.isBlank() ->
+                        m.text("メールアドレスまたはユーザー名を入力してください。", "Enter your email or username.")
+                    password.isBlank() -> m.text("パスワードを入力してください。", "Enter your password.")
                     password.isBlank() ||
                         password.length > 128 ||
                         (signup && password.length < 15) ->
@@ -1168,12 +1278,14 @@ private fun AuthScreen(m: AppModel) {
                 }
             if (validation.isEmpty()) m.login(identifier, password, signup, email, username)
         }
-        TextButton(
+        if (signup) ConsentNotice(m, signup = true)
+        OutlinedButton(
             onClick = {
                 m.screen = if (signup) "login" else "signup"
                 m.error = ""
             },
-            modifier = Modifier.padding(top = 16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 8.dp),
+            shape = RoundedCornerShape(10.dp),
         ) {
             Text(
                 m.text(
@@ -1256,9 +1368,59 @@ private fun AuthScreen(m: AppModel) {
                 color = Color(0xff202124),
             )
         }
+        if (!signup) ConsentNotice(m, signup = false)
         LegalLinks(m)
         Spacer(Modifier.height(24.dp))
     }
+}
+
+/** "By continuing you agree to the Terms and Privacy Policy" with working links. */
+@Composable
+private fun ConsentNotice(m: AppModel, signup: Boolean) {
+    val uri = LocalUriHandler.current
+    val base = BuildConfig.LEGAL_URL.takeIf { it.startsWith("https://") }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val linked =
+        SpanStyle(
+            color = MaterialTheme.colorScheme.onSurface,
+            textDecoration = TextDecoration.Underline,
+        )
+    fun AnnotatedString.Builder.link(title: String, path: String) {
+        if (base == null) append(title)
+        else
+            withLink(
+                LinkAnnotation.Url("$base/$path", TextLinkStyles(linked)) {
+                    openLink(uri, "$base/$path")
+                }
+            ) {
+                append(title)
+            }
+    }
+    val terms = m.text("利用規約", "Terms of Service")
+    val privacy = m.text("プライバシーポリシー", "Privacy Policy")
+    Text(
+        buildAnnotatedString {
+            if (m.language == "ja") {
+                link(terms, "terms")
+                append("と")
+                link(privacy, "privacy")
+                append(if (signup) "に同意のうえ、アカウントを作成します。" else "に同意のうえ、続けます。")
+            } else {
+                append(
+                    if (signup) "By creating an account, you agree to the "
+                    else "By continuing, you agree to the "
+                )
+                link(terms, "terms")
+                append(" and ")
+                link(privacy, "privacy")
+                append(".")
+            }
+        },
+        fontSize = 13.sp,
+        lineHeight = 20.sp,
+        color = muted,
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("auth-consent"),
+    )
 }
 
 @Composable
@@ -1370,6 +1532,13 @@ private fun Onboarding(m: AppModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 20.dp),
             )
+            if (interests.isEmpty())
+                Text(
+                    m.text("続けるには、分野を1つ以上選んでください。", "Pick at least one area to continue."),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             Primary(m.text("次へ", "Continue"), interests.isNotEmpty()) { step = 2 }
         } else {
             SectionTitle(m.text("好きな技術から始めよう", "Start with your technologies"))
@@ -1470,7 +1639,7 @@ private fun Profile(m: AppModel, onSettings: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(
-                onClick = { m.screen = "login" },
+                onClick = { m.openLogin("progress") },
                 modifier = Modifier.padding(top = 8.dp).heightIn(min = 48.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors =
@@ -1511,7 +1680,7 @@ private fun Settings(m: AppModel, onBack: () -> Unit) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
     ) {
         TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-            Icon(Icons.Outlined.ArrowBack, contentDescription = null)
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(m.text("プロフィールに戻る", "Back to profile"))
         }
@@ -1530,7 +1699,13 @@ private fun Settings(m: AppModel, onBack: () -> Unit) {
                 )
             }
         } else {
-            TextButton(onClick = { m.screen = "login" }) { Text(m.text("ログイン", "Sign in")) }
+            OutlinedButton(
+                onClick = { m.openLogin("progress") },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Text(m.text("ログインして進捗を保存", "Sign in to keep your progress"))
+            }
         }
         if (user == null && m.accountDeleted)
             Text(
@@ -1543,7 +1718,12 @@ private fun Settings(m: AppModel, onBack: () -> Unit) {
             )
         ErrorText(m.error)
         HorizontalDivider(Modifier.padding(top = 20.dp), color = MaterialTheme.colorScheme.outline)
-        SectionTitle(m.text("アプリ設定", "App settings"))
+        Text(
+            m.text("この端末の設定", "On this device"),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 20.dp, bottom = 8.dp).semantics { heading() },
+        )
         Text(m.text("外観", "Appearance"), fontWeight = FontWeight.SemiBold)
         Text(
             m.text("この端末の表示テーマを選べます。", "Choose the appearance on this device."),
@@ -1630,7 +1810,7 @@ private fun AccountSettings(m: AppModel, user: JSONObject, onBack: () -> Unit) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
     ) {
         TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-            Icon(Icons.Outlined.ArrowBack, contentDescription = null)
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(m.text("設定に戻る", "Back to settings"))
         }
@@ -1746,6 +1926,24 @@ private fun AccountSettings(m: AppModel, user: JSONObject, onBack: () -> Unit) {
 @Composable
 private fun AccountLearning(m: AppModel) {
     var saved by remember { mutableStateOf(false) }
+    if (m.guestImportFailed) {
+        ErrorText(
+            m.text(
+                "ゲストの回答を保存できませんでした。この端末に残っています。",
+                "We couldn’t save your guest answers. They’re still on this device.",
+            )
+        )
+        TextButton(onClick = m::retryGuestAnswers) { Text(m.text("再試行", "Try again")) }
+    }
+    if (m.guestImportSkipped > 0) {
+        Text(
+            m.text(
+                "一部のゲスト回答は保存済みか、取り込めませんでした。",
+                "Some guest answers were already saved or couldn’t be imported.",
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     SectionTitle(m.text("今日の目標", "Today’s goal"))
     Text(m.text("問題に取り組む", "Work through questions"))
     Text("${m.progress.optInt("dailyCompleted")} / ${m.progress.optInt("dailyGoal",5)}")
@@ -1789,6 +1987,10 @@ private fun AccountLearning(m: AppModel) {
                                 "${m.progress.optInt(key)} / ${m.progress.optInt("answeredTaps")}"
                             else -> m.progress.optInt(key).toString()
                         },
+                        modifier =
+                            Modifier.testTag("profile-" + key).semantics {
+                                testTagsAsResourceId = true
+                            },
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                     )
@@ -1908,7 +2110,19 @@ private fun Collection(m: AppModel) {
             lineHeight = 23.sp,
         )
         if (m.user == null)
-            Primary(m.text("ログインして復習する", "Sign in to practice")) { m.screen = "login" }
+            Column {
+                Primary(m.text("ログインして復習する", "Sign in to practice")) { m.openLogin("practice") }
+                Steps(
+                    listOf(
+                        m.text("フィードで問題に間違える", "You miss a question in the feed."),
+                        m.text(
+                            "翌朝9時（日本時間）に、もう一度フィードに出てきます。",
+                            "It returns the next morning at 9:00 (Japan time).",
+                        ),
+                        m.text("正解すると、復習は完了です。", "Get it right and it is cleared."),
+                    )
+                )
+            }
         else if (m.busy) Loading(m.text("復習を読み込み中…", "Loading practice…"))
         else if (m.error.isNotBlank())
             Empty(m.error, m.text("再試行", "Retry"), { m.loadCollection(false) })
@@ -2143,8 +2357,7 @@ private fun QuestionSheet(m: AppModel, q: Question) {
                     }
                     if (m.user == null)
                         Primary(m.text("ログインしてコメント", "Sign in to comment")) {
-                            m.sheet = ""
-                            m.screen = "login"
+                            m.openLogin("comment")
                         }
                     else {
                         reply?.let {
@@ -2325,7 +2538,7 @@ private fun QuestionSheet(m: AppModel, q: Question) {
                         Text(ref.text("title"))
                     }
                 }
-                TextButton(onClick = { if (m.requireLogin()) m.sheet = "report" }) {
+                TextButton(onClick = { if (m.requireLogin("comment")) m.sheet = "report" }) {
                     Icon(Icons.Outlined.Flag, null, Modifier.size(18.dp))
                     Text(" " + m.text("問題を報告", "Report question"))
                 }
@@ -2407,7 +2620,17 @@ private fun Publish(m: AppModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (m.user == null) {
-            Primary(m.text("ログインして質問を投稿", "Sign in to post a question")) { m.screen = "login" }
+            Primary(m.text("ログインして質問を投稿", "Sign in to post a question")) { m.openLogin("post") }
+            Steps(
+                listOf(
+                    m.text("質問と説明を書く", "Write a question and its explanation."),
+                    m.text("Geminiが内容を確認してから公開します。", "Gemini reviews it before it is published."),
+                    m.text(
+                        "ほかの学習者が解き、いいねやコメントをくれます。",
+                        "Other learners answer it, like it and comment.",
+                    ),
+                )
+            )
             return@Column
         }
         m.publishedQuestion?.let { published ->

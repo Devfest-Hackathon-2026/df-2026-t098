@@ -133,7 +133,7 @@ struct CommentsView: View {
                     }
                 } else {
                     Button(store.text("ログインしてコメント", "Sign in to comment")) {
-                        store.showingLogin = true
+                        store.promptSignIn("comment")
                     }.buttonStyle(PrimaryButton())
                 }
             }.padding(16).background(store.palette.canvas)
@@ -350,8 +350,16 @@ struct PublishView: View {
                 ).foregroundStyle(store.palette.muted)
                 if !store.signedIn {
                     Button(store.text("ログインして質問を投稿", "Sign in to post a question")) {
-                        store.showingLogin = true
+                        store.promptSignIn("post")
                     }.buttonStyle(CompactPrimaryButton())
+                    StepsList(items: [
+                        store.text("質問と説明を書く", "Write a question and its explanation."),
+                        store.text(
+                            "Geminiが内容を確認してから公開します。", "Gemini reviews it before it is published."),
+                        store.text(
+                            "ほかの学習者が解き、いいねやコメントをくれます。",
+                            "Other learners answer it, like it and comment."),
+                    ])
                 } else if let published {
                     Label(store.text("公開しました", "Published"), systemImage: "checkmark.circle")
                         .foregroundStyle(store.palette.success)

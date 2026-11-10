@@ -166,15 +166,120 @@ final class WhyLintUITests: XCTestCase {
         app.buttons["login-topbar"].tap()
         XCTAssertTrue(app.buttons["auth-submit"].waitForExistence(timeout: 5))
         app.buttons["auth-submit"].tap()
-        XCTAssertTrue(app.staticTexts["パスワードの長さを確認してください。"].exists)
+        // Each missing field is named, not reported as a password-length problem.
+        XCTAssertTrue(app.staticTexts["メールアドレスまたはユーザー名を入力してください。"].exists)
+        // The sign-in screen says what the locked action unlocks.
+        XCTAssertTrue(app.staticTexts["auth-reason"].exists)
     }
 }
 
 final class WhyLintAccountUITests: XCTestCase {
+    @MainActor func testGuestChoicesAndProgressCarryIntoANewAccount() async throws {
+        try await checkGuestProgress(signup: true)
+    }
+
+    @MainActor func testGuestProgressCarriesIntoAnExistingAccount() async throws {
+        try await checkGuestProgress(signup: false)
+    }
+
+    @MainActor private func checkGuestProgress(signup: Bool) async throws {
+        let base = "http://127.0.0.1:3130/api/v1/learning"
+        let dailyURL = try XCTUnwrap(URL(string: base + "/daily?language=ja"))
+        let (dailyData, _) = try await URLSession.shared.data(from: dailyURL)
+        let daily = try XCTUnwrap(JSONSerialization.jsonObject(with: dailyData) as? [String: Any])
+        let question = try XCTUnwrap(daily["question"] as? [String: Any])
+        let questionID = try XCTUnwrap(question["id"] as? String)
+        var grade = URLRequest(
+            url: try XCTUnwrap(URL(string: base + "/questions/" + questionID + "/taps")))
+        grade.httpMethod = "POST"
+        grade.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        grade.httpBody = Data("{\"choice\":0}".utf8)
+        let (gradeData, _) = try await URLSession.shared.data(for: grade)
+        let graded = try XCTUnwrap(JSONSerialization.jsonObject(with: gradeData) as? [String: Any])
+        let choice = try XCTUnwrap(graded["correctOption"] as? Int)
+        let unique = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(10))
+            .lowercased()
+        let email = "ios-carry-\(unique)@example.test"
+        let username = "carry_\(unique)"
+        let password = "FixtureOnly-Password-7130"
+        if !signup {
+            var create = URLRequest(
+                url: try XCTUnwrap(URL(string: "http://127.0.0.1:3130/api/v1/auth/mobile/signup")))
+            create.httpMethod = "POST"
+            create.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            create.httpBody = try JSONEncoder().encode([
+                "email": email, "username": username, "password": password,
+            ])
+            let (_, response) = try await URLSession.shared.data(for: create)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 201)
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing", "--tab", "profile", "--theme", "dark", "--language", "ja",
+            "--reset-guest", "--screen-onboarding",
+        ]
+        app.launchEnvironment["WHYLINT_API_URL"] = "http://127.0.0.1:3130"
+        app.launch()
+        signOutIfNeeded(in: app)
+        // As a guest, pick an area and start learning.
+        let next = app.buttons["次へ"]
+        XCTAssertTrue(next.waitForExistence(timeout: 20))
+        let interest = app.buttons.matching(
+            NSPredicate(
+                format:
+                    "label CONTAINS 'フロント' OR label CONTAINS 'Frontend' OR label CONTAINS 'バック'")
+        ).firstMatch
+        XCTAssertTrue(interest.waitForExistence(timeout: 5))
+        interest.tap()
+        next.tap()
+        let start = app.buttons["学習を始める"]
+        for _ in 0..<5 {
+            if start.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        app.buttons["tab-feed"].tap()
+        let answers = app.buttons.matching(identifier: "answer-\(choice)")
+        XCTAssertTrue(answers.firstMatch.waitForExistence(timeout: 15))
+        let answer = answers.allElementsBoundByIndex.first { $0.isHittable } ?? answers.firstMatch
+        answer.tap()
+        XCTAssertTrue(app.staticTexts["正解！"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["login-topbar"].waitForExistence(timeout: 15))
+        app.buttons["login-topbar"].tap()
+        if signup {
+            app.buttons["auth-switch"].tap()
+            app.textFields["auth-email"].tap()
+            app.textFields["auth-email"].typeText(email)
+            app.textFields["auth-username"].tap()
+            app.textFields["auth-username"].typeText(username)
+        } else {
+            app.textFields["auth-identifier"].tap()
+            app.textFields["auth-identifier"].typeText(email)
+        }
+        app.secureTextFields["auth-password"].tap()
+        app.secureTextFields["auth-password"].typeText(password)
+        app.buttons["auth-submit"].tap()
+        XCTAssertTrue(app.buttons["auth-submit"].waitForNonExistence(timeout: 20))
+        app.buttons["tab-profile"].tap()
+        XCTAssertTrue(app.buttons["public-profile"].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["次へ"].exists)
+        let dailyGoal = app.staticTexts["profile-daily-goal"]
+        XCTAssertTrue(dailyGoal.waitForExistence(timeout: 10))
+        XCTAssertEqual(dailyGoal.label, "1 / 5")
+        let xp = app.staticTexts["profile-total-xp"]
+        let correct = app.staticTexts["profile-correct-answers"]
+        for _ in 0..<4 where !correct.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertEqual(xp.label, "5")
+        XCTAssertEqual(correct.label, "1 / 1")
+    }
+
     @MainActor func testSignupPreferencesSessionPersistenceAndLogout() {
         let app = XCUIApplication()
         app.launchArguments = [
             "--ui-testing", "--tab", "profile", "--theme", "dark", "--language", "ja",
+            "--reset-guest",
         ]
         app.launchEnvironment["WHYLINT_API_URL"] = "http://127.0.0.1:3130"
         app.launch()
@@ -403,7 +508,8 @@ final class WhyLintSafetyUITests: XCTestCase {
                 "difficulty": "beginner", "language": "ja",
             ])
         XCTAssertEqual(prefs, 200)
-        return Learner(email: email, username: username, token: token, id: me["id"] as? String ?? "")
+        return Learner(
+            email: email, username: username, token: token, id: me["id"] as? String ?? "")
     }
 
     @MainActor private func launchSignedIn(as learner: Learner) -> XCUIApplication {

@@ -65,7 +65,7 @@ struct QuestionCard: View {
                 store.palette.muted)
             HStack(spacing: 8) {
                 Button {
-                    if store.signedIn { sheet = .explain } else { store.showingLogin = true }
+                    if store.signedIn { sheet = .explain } else { store.promptSignIn("explain") }
                 } label: {
                     HStack {
                         Image("web-pencil").renderingMode(.template).resizable().frame(
@@ -78,7 +78,7 @@ struct QuestionCard: View {
                 ).accessibilityIdentifier("explain-open")
                 if tap != nil {
                     Button {
-                        if store.signedIn { sheet = .ask } else { store.showingLogin = true }
+                        if store.signedIn { sheet = .ask } else { store.promptSignIn("ask") }
                     } label: {
                         HStack(spacing: 5) {
                             Image("web-comment").renderingMode(.template).resizable().frame(
@@ -92,10 +92,14 @@ struct QuestionCard: View {
                     OutlineButton())
             }.font(.custom("DMSans-9ptRegular", size: 13, relativeTo: .body)).fontWeight(.semibold)
         }
-        .padding(9).background(store.palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .padding(9).background {
+            RoundedRectangle(cornerRadius: 16).fill(store.palette.surface).shadow(
+                color: store.palette.light ? Color(hex: 0x131811).opacity(0.16) : .clear,
+                radius: 12, y: 5)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 16).stroke(
-                store.palette.accent.opacity(0.9), lineWidth: 1)
+                store.palette.accent.opacity(0.9), lineWidth: store.palette.light ? 1.5 : 1)
         )
         .onAppear {
             tap = question.tap
@@ -128,6 +132,15 @@ struct QuestionCard: View {
             ).fontWeight(.bold)
                 .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
             if let code = question.code {
+                if question.format == "spot_bug", tap == nil {
+                    // The lines are the answers, so say so: nothing else on the card is tappable
+                    // before the answer.
+                    Label(
+                        store.text("バグのある行をタップ", "Tap the buggy line"), systemImage: "hand.tap"
+                    ).font(.custom("DMSans-9ptRegular", size: 14, relativeTo: .subheadline))
+                        .fontWeight(.semibold).foregroundStyle(store.palette.accent)
+                        .accessibilityIdentifier("spot-bug-hint")
+                }
                 codeView(code, fontSize: codeSize)
             }
             if question.format != "spot_bug" {
@@ -252,6 +265,11 @@ struct QuestionCard: View {
                             alignment: .leading
                         )
                         .background(markTint(mark))
+                        .overlay(alignment: .leading) {
+                            if question.format == "spot_bug", option != nil, tap == nil {
+                                Rectangle().fill(store.palette.accent.opacity(0.55)).frame(width: 3)
+                            }
+                        }
                         // The glyph keeps the result readable without color. It sits in the row's
                         // leading padding, so code does not shift when it appears.
                         .overlay(alignment: .leading) {
@@ -402,7 +420,7 @@ struct QuestionCard: View {
     }
     private func toggle(_ action: String) {
         guard store.signedIn else {
-            store.showingLogin = true
+            store.promptSignIn(action == "save" ? "save" : "like")
             return
         }
         Task {

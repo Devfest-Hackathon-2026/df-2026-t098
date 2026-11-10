@@ -68,8 +68,13 @@ internal class TokenVault(context: Context) {
                 )
                 String(cipher.doFinal(data.copyOfRange(12, data.size)), Charsets.UTF_8)
             }
-        } catch (_: Exception) {
+        } catch (_: java.security.GeneralSecurityException) {
+            // The stored token can no longer be decrypted (the key was reset or the data is
+            // damaged), so it is useless and removed.
             clear()
+            null
+        } catch (_: Exception) {
+            // A temporary storage failure must not sign the learner out; the next launch retries.
             null
         }
 
@@ -85,6 +90,7 @@ internal class TokenVault(context: Context) {
         )
     }
 
+    @Suppress("ApplySharedPref")
     fun clear() {
         preferences.edit().remove("token").commit()
     }
@@ -130,7 +136,7 @@ internal class Api(context: Context) {
                             (path == "/learning/questions" && method == "POST")
                     )
                         75_000
-                    else 15_000
+                    else if (path == "/learning/guest-answers") 30_000 else 15_000
                 connection.setRequestProperty("Accept", "application/json")
                 connection.setRequestProperty("Cache-Control", "no-store")
                 session?.let { connection.setRequestProperty("Authorization", "Bearer $it") }

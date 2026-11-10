@@ -3,10 +3,21 @@ import SwiftUI
 
 @main struct WhyLintApp: App {
     @State private var store = AppStore()
+    @State private var showSplash = !ProcessInfo.processInfo.arguments.contains("--ui-testing")
     var body: some Scene {
         WindowGroup {
-            ReadingScaleRoot().environment(store).onOpenURL {
-                _ = GIDSignIn.sharedInstance.handle($0)
+            ZStack {
+                ReadingScaleRoot().environment(store).onOpenURL {
+                    _ = GIDSignIn.sharedInstance.handle($0)
+                }
+                if showSplash {
+                    SplashView {
+                        withAnimation(.easeIn(duration: 0.26)) { showSplash = false }
+                    }
+                    .environment(store)
+                    .transition(.opacity.combined(with: .scale(scale: 1.06)))
+                    .zIndex(1)
+                }
             }
             .preferredColorScheme(
                 store.hasThemePreference ? (store.theme == "light" ? .light : .dark) : nil
@@ -17,17 +28,93 @@ import SwiftUI
     }
 }
 
+/// The "W" of the WhyLint mark, drawn from the same outline as the brand asset (20.526 × 11.638).
+nonisolated struct MarkW: Shape {
+    func path(in rect: CGRect) -> Path {
+        let k = rect.width / 20.526
+        let points: [(Double, Double)] = [
+            (2.444, 9.428), (0.5, 0.5), (2.372, 0.5), (3.452, 6.764), (4.73, 0.5), (6.782, 0.5),
+            (8.06, 6.764), (9.14, 0.5), (11.012, 0.5), (9.068, 9.428), (7.106, 9.428),
+            (5.756, 2.984), (4.406, 9.428),
+        ]
+        var path = Path()
+        for (index, point) in points.enumerated() {
+            let p = CGPoint(x: rect.minX + point.0 * k, y: rect.minY + point.1 * k)
+            if index == 0 { path.move(to: p) } else { path.addLine(to: p) }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Plays once per launch: the W settles in, the cursor underline types across and blinks once,
+/// then the screen dissolves into the app. Reduce Motion gets a short static fade instead.
+struct SplashView: View {
+    @Environment(AppStore.self) private var store
+    @Environment(\.colorScheme) private var systemScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let onFinish: () -> Void
+    @State private var wIn = false
+    @State private var barIn = false
+    @State private var cursorOn = true
+
+    private var palette: Palette {
+        Palette(light: store.hasThemePreference ? store.theme == "light" : systemScheme == .light)
+    }
+
+    var body: some View {
+        let k: CGFloat = 112 / 20.526
+        ZStack {
+            palette.canvas.ignoresSafeArea()
+            ZStack(alignment: .topLeading) {
+                MarkW().fill(palette.accent)
+                    .frame(width: 20.526 * k, height: 11.638 * k)
+                    .opacity(wIn ? 1 : 0)
+                    .scaleEffect(wIn ? 1 : 0.82, anchor: .center)
+                    .offset(y: wIn ? 0 : 10)
+                Rectangle().fill(palette.text)
+                    .frame(width: 8.352 * k, height: 1.71 * k)
+                    .scaleEffect(x: barIn ? 1 : 0.001, y: 1, anchor: .leading)
+                    .opacity(cursorOn ? 1 : 0)
+                    .offset(x: 11.674 * k, y: 9.428 * k)
+            }
+            .frame(width: 20.526 * k, height: 11.638 * k)
+        }
+        .accessibilityHidden(true)
+        .task {
+            if reduceMotion {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    wIn = true
+                    barIn = true
+                }
+                try? await Task.sleep(for: .milliseconds(450))
+                onFinish()
+                return
+            }
+            withAnimation(.spring(duration: 0.5, bounce: 0.25)) { wIn = true }
+            try? await Task.sleep(for: .milliseconds(250))
+            withAnimation(.easeOut(duration: 0.35)) { barIn = true }
+            try? await Task.sleep(for: .milliseconds(420))
+            withAnimation(.easeInOut(duration: 0.1)) { cursorOn = false }
+            try? await Task.sleep(for: .milliseconds(120))
+            withAnimation(.easeInOut(duration: 0.1)) { cursorOn = true }
+            try? await Task.sleep(for: .milliseconds(200))
+            onFinish()
+        }
+    }
+}
+
 struct Palette {
     let light: Bool
-    var canvas: Color { Color(hex: light ? 0xf3f5f0 : 0x080808) }
+    var canvas: Color { Color(hex: light ? 0xe9eee1 : 0x080808) }
     var surface: Color { Color(hex: light ? 0xffffff : 0x151515) }
-    var text: Color { Color(hex: light ? 0x20251f : 0xf5f5f2) }
-    var muted: Color { Color(hex: light ? 0x555e53 : 0xb4b4ac) }
-    var accent: Color { Color(hex: light ? 0x4b6c08 : 0xc6f24e) }
-    var border: Color { Color(hex: light ? 0xd2d9cf : 0x333333) }
-    var control: Color { Color(hex: light ? 0xf1f3ed : 0x222222) }
-    var code: Color { Color(hex: light ? 0xf1f3ed : 0x090909) }
-    var button: Color { Color(hex: light ? 0x22291f : 0xf3f3eb) }
+    var text: Color { Color(hex: light ? 0x131811 : 0xf5f5f2) }
+    var muted: Color { Color(hex: light ? 0x465142 : 0xb4b4ac) }
+    var accent: Color { Color(hex: light ? 0x3d5d00 : 0xc6f24e) }
+    var border: Color { Color(hex: light ? 0xaab6a2 : 0x333333) }
+    var control: Color { Color(hex: light ? 0xe3e9d8 : 0x222222) }
+    var code: Color { Color(hex: light ? 0xe0e7d4 : 0x090909) }
+    var button: Color { Color(hex: light ? 0x182016 : 0xf3f3eb) }
     var buttonText: Color { Color(hex: light ? 0xffffff : 0x111111) }
     var danger: Color { Color(hex: light ? 0xc2362f : 0xff6b6b) }
     var success: Color { Color(hex: light ? 0x2e7d16 : 0x8ee05a) }
@@ -41,16 +128,18 @@ extension Color {
 }
 struct PrimaryButton: ButtonStyle {
     @Environment(AppStore.self) private var store
+    @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.fontWeight(.semibold).frame(maxWidth: .infinity, minHeight: 48)
             .foregroundStyle(store.palette.buttonText).background(
                 store.palette.button, in: RoundedRectangle(cornerRadius: 10)
             )
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .opacity(configuration.isPressed ? 0.75 : enabled ? 1 : 0.4)
     }
 }
 struct OutlineButton: ButtonStyle {
     @Environment(AppStore.self) private var store
+    @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.frame(minHeight: 44).padding(.horizontal, 12)
             .foregroundStyle(store.palette.text).background(
@@ -58,6 +147,7 @@ struct OutlineButton: ButtonStyle {
                 in: RoundedRectangle(cornerRadius: 10)
             )
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(store.palette.border))
+            .opacity(enabled ? 1 : 0.4)
     }
 }
 struct Surface<Content: View>: View {
@@ -133,7 +223,9 @@ struct AppRoot: View {
             }.padding(.horizontal, 8)
         }
         .background(store.palette.canvas).foregroundStyle(store.palette.text)
-        .sheet(isPresented: $store.showingLogin) { AuthView().environment(store) }
+        .sheet(isPresented: $store.showingLogin, onDismiss: { store.loginReason = nil }) {
+            AuthView().environment(store)
+        }
         .sheet(isPresented: $store.showingOnboarding) { OnboardingView().environment(store) }
         .sheet(item: $store.selectedQuestion) { question in
             NavigationStack {
@@ -180,7 +272,7 @@ struct AppRoot: View {
                     Text("\(store.guestCorrect)/\(store.guestAnswered)")
                 }
                 .padding(8).background(store.palette.control, in: Capsule())
-                Button(store.text("ログインして記録", "Save progress")) { store.showingLogin = true }
+                Button(store.text("ログインして記録", "Save progress")) { store.promptSignIn("progress") }
                     .fontWeight(.semibold).foregroundStyle(store.palette.accent).padding(
                         .horizontal, 10
                     ).frame(minHeight: 44)
@@ -280,32 +372,35 @@ struct BrandWordmark: View {
 }
 struct AccentButton: ButtonStyle {
     @Environment(AppStore.self) private var store
+    @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.fontWeight(.semibold).frame(maxWidth: .infinity, minHeight: 48)
             .foregroundStyle(store.theme == "light" ? Color.white : Color(hex: 0x111111))
             .background(store.palette.accent, in: RoundedRectangle(cornerRadius: 8)).opacity(
-                configuration.isPressed ? 0.8 : 1)
+                configuration.isPressed ? 0.8 : enabled ? 1 : 0.4)
     }
 }
 struct CompactPrimaryButton: ButtonStyle {
     @Environment(AppStore.self) private var store
+    @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.fontWeight(.semibold).padding(.horizontal, 20).frame(minHeight: 48)
             .foregroundStyle(store.palette.buttonText).background(
                 store.palette.button, in: RoundedRectangle(cornerRadius: 10)
             )
-            .opacity(configuration.isPressed ? 0.8 : 1)
+            .opacity(configuration.isPressed ? 0.8 : enabled ? 1 : 0.4)
     }
 }
 
 struct AccentOutlineButton: ButtonStyle {
     @Environment(AppStore.self) private var store
+    @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.foregroundStyle(store.palette.accent).padding(.horizontal, 12).frame(
             minHeight: 44
         )
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(store.palette.accent))
-        .opacity(configuration.isPressed ? 0.8 : 1)
+        .opacity(configuration.isPressed ? 0.8 : enabled ? 1 : 0.4)
     }
 }
 

@@ -20,9 +20,15 @@ struct AuthView: View {
                             signup ? "アカウントを作成" : "ログイン", signup ? "Create an account" : "Sign in")
                     ).font(.custom("DMSans-9ptRegular", size: 34, relativeTo: .largeTitle)).bold()
                     Text(
-                        store.text(
-                            "ログインして、学習を続けましょう。", "Sign in and continue learning with WhyLint.")
-                    ).foregroundStyle(store.palette.muted)
+                        store.loginReasonText(store.loginReason)
+                            ?? (signup
+                                ? store.text(
+                                    "進捗やXPを保存して、学習を続けましょう。",
+                                    "Create an account to keep your progress and XP.")
+                                : store.text(
+                                    "ログインして、学習を続けましょう。",
+                                    "Sign in and continue learning with WhyLint."))
+                    ).foregroundStyle(store.palette.muted).accessibilityIdentifier("auth-reason")
                     VStack(alignment: .leading, spacing: 16) {
                         if signup {
                             field(
@@ -55,9 +61,24 @@ struct AuthView: View {
                     if let error { ErrorNotice(message: error) }
                     Button {
                         error = nil
-                        guard !password.isEmpty, !signup || password.count >= 15,
-                            password.count <= 128
-                        else {
+                        if signup, email.trimmingCharacters(in: .whitespaces).isEmpty {
+                            error = store.text("メールアドレスを入力してください。", "Enter your email address.")
+                            return
+                        }
+                        if signup, username.trimmingCharacters(in: .whitespaces).isEmpty {
+                            error = store.text("ユーザー名を入力してください。", "Enter a username.")
+                            return
+                        }
+                        if !signup, identifier.trimmingCharacters(in: .whitespaces).isEmpty {
+                            error = store.text(
+                                "メールアドレスまたはユーザー名を入力してください。", "Enter your email or username.")
+                            return
+                        }
+                        if password.isEmpty {
+                            error = store.text("パスワードを入力してください。", "Enter your password.")
+                            return
+                        }
+                        guard !signup || password.count >= 15, password.count <= 128 else {
                             error = store.text("パスワードの長さを確認してください。", "Check the password length.")
                             return
                         }
@@ -86,6 +107,7 @@ struct AuthView: View {
                     }
                     .buttonStyle(AccentButton()).disabled(pending).accessibilityIdentifier(
                         "auth-submit")
+                    if signup { ConsentNotice(signup: true) }
                     Button(
                         store.text(
                             signup ? "アカウントをお持ちですか？ログイン" : "アカウントを作成",
@@ -93,7 +115,7 @@ struct AuthView: View {
                     ) {
                         signup.toggle()
                         error = nil
-                    }.frame(minHeight: 44).accessibilityIdentifier("auth-switch")
+                    }.buttonStyle(OutlineButton()).accessibilityIdentifier("auth-switch")
                     HStack {
                         Rectangle().frame(height: 1)
                         Text(store.text("または", "or"))
@@ -116,6 +138,7 @@ struct AuthView: View {
                             Text(store.text("Googleで続ける", "Continue with Google"))
                         }.frame(maxWidth: .infinity)
                     }.buttonStyle(PrimaryButton()).disabled(pending)
+                    if !signup { ConsentNotice(signup: false) }
                     LegalLinksView()
                 }.padding(28).frame(maxWidth: 520)
             }.frame(maxWidth: .infinity).background(store.palette.canvas).foregroundStyle(
@@ -123,7 +146,7 @@ struct AuthView: View {
             )
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(store.text("学習に戻る", "Back to practice")) { dismiss() }
+                    Button(store.text("学習に戻る", "Back to learning")) { dismiss() }
                 }
             }
         }
@@ -243,6 +266,13 @@ struct OnboardingView: View {
                                 Task { await store.loadCatalog() }
                             }.buttonStyle(OutlineButton())
                         }
+                        if interests.isEmpty {
+                            Text(
+                                store.text(
+                                    "続けるには、分野を1つ以上選んでください。", "Pick at least one area to continue.")
+                            ).font(.custom("DMSans-9ptRegular", size: 13, relativeTo: .footnote))
+                                .foregroundStyle(store.palette.muted)
+                        }
                         Button(store.text("次へ", "Continue")) { step = 2 }.buttonStyle(
                             PrimaryButton()
                         ).disabled(interests.isEmpty)
@@ -284,7 +314,8 @@ struct OnboardingView: View {
                                             RoundedRectangle(cornerRadius: 8).stroke(
                                                 technologies.contains(technology)
                                                     ? store.palette.accent : store.palette.border))
-                                    }.buttonStyle(.plain)
+                                    }.buttonStyle(.plain).accessibilityAddTraits(
+                                        technologies.contains(technology) ? [.isSelected] : [])
                                 }
                             }
                         }.frame(maxHeight: 250)
@@ -355,8 +386,15 @@ struct CollectionView: View {
                 }
                 if !store.signedIn {
                     Button(store.text("ログインして復習", "Sign in to practice")) {
-                        store.showingLogin = true
+                        store.promptSignIn("practice")
                     }.buttonStyle(PrimaryButton())
+                    StepsList(items: [
+                        store.text("フィードで問題に間違える", "You miss a question in the feed."),
+                        store.text(
+                            "翌朝9時（日本時間）に、もう一度フィードに出てきます。",
+                            "It returns the next morning at 9:00 (Japan time)."),
+                        store.text("正解すると、復習は完了です。", "Get it right and it is cleared."),
+                    ])
                 } else if loading {
                     ProgressView()
                 } else if let error {
@@ -442,7 +480,7 @@ struct ProfileView: View {
                                     "ログインすると学習の進み具合を保存できます。",
                                     "Sign in to keep your progress across devices.")
                             ).foregroundStyle(store.palette.muted)
-                            Button(store.text("ログイン", "Sign in")) { store.showingLogin = true }
+                            Button(store.text("ログイン", "Sign in")) { store.promptSignIn("progress") }
                                 .buttonStyle(CompactPrimaryButton())
                         }
                     }
@@ -894,6 +932,23 @@ private struct AccountLearningView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            if store.guestImportFailed {
+                ErrorNotice(
+                    message: store.text(
+                        "ゲストの回答を保存できませんでした。この端末に残っています。",
+                        "We couldn’t save your guest answers. They’re still on this device."))
+                Button(store.text("再試行", "Try again")) {
+                    Task { await store.retryGuestAnswers() }
+                }.buttonStyle(OutlineButton())
+            }
+            if store.guestImportSkipped > 0 {
+                Text(
+                    store.text(
+                        "一部のゲスト回答は保存済みか、取り込めませんでした。",
+                        "Some guest answers were already saved or couldn’t be imported.")
+                )
+                .foregroundStyle(store.palette.muted)
+            }
             Surface {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(store.text("今日の目標", "Today’s goal")).font(
@@ -906,7 +961,7 @@ private struct AccountLearningView: View {
                     ).tint(store.palette.accent)
                     Text(
                         "\(store.progress.number("dailyCompleted")) / \(store.progress.number("dailyGoal"))"
-                    )
+                    ).accessibilityIdentifier("profile-daily-goal")
                     Text(store.text("日本時間で毎日更新されます。", "A new day starts at midnight in Japan."))
                         .foregroundStyle(store.palette.muted)
                     LazyVGrid(
@@ -914,14 +969,17 @@ private struct AccountLearningView: View {
                         alignment: .leading, spacing: 20
                     ) {
                         stat(store.text("レベル", "Level"), "\(store.progress.number("level"))")
-                        stat(store.text("累計XP", "Total XP"), "\(store.progress.number("totalXp"))")
+                        stat(
+                            store.text("累計XP", "Total XP"), "\(store.progress.number("totalXp"))",
+                            id: "profile-total-xp")
                         stat(store.text("連続日数", "Day streak"), "\(store.progress.number("streak"))")
                         stat(
                             store.text("最高コンボ", "Best combo"),
                             "×\(store.progress.number("bestCombo"))")
                         stat(
                             store.text("正解した問題", "Correct answers"),
-                            "\(store.progress.number("correctTaps")) / \(store.progress.number("answeredTaps"))"
+                            "\(store.progress.number("correctTaps")) / \(store.progress.number("answeredTaps"))",
+                            id: "profile-correct-answers"
                         )
                         stat(
                             store.text("説明で合格", "Explained"),
@@ -954,13 +1012,13 @@ private struct AccountLearningView: View {
         }
     }
 
-    private func stat(_ title: String, _ value: String) -> some View {
+    private func stat(_ title: String, _ value: String, id: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title).font(.custom("DMSans-9ptRegular", size: 12, relativeTo: .caption))
                 .foregroundStyle(store.palette.muted)
             Text(value).font(
                 .custom("DMSans-9ptRegular", size: 22, relativeTo: .title2)
-            ).bold()
+            ).bold().accessibilityIdentifier(id ?? title)
         }
     }
 }
@@ -1087,6 +1145,47 @@ struct MasteryRadar: View {
 }
 
 /// Privacy policy and terms (and optionally the support contact) when they are configured.
+/// A short numbered "how it works" for tabs a guest cannot use yet, so they are not empty.
+struct StepsList: View {
+    @Environment(AppStore.self) private var store
+    let items: [String]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                HStack(alignment: .top, spacing: 10) {
+                    Text("\(index + 1)").fontWeight(.bold).foregroundStyle(store.palette.accent)
+                        .frame(width: 20, alignment: .leading)
+                    Text(item).foregroundStyle(store.palette.muted)
+                }
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+    }
+}
+
+/// "By continuing you agree to the Terms and Privacy Policy" with working links.
+struct ConsentNotice: View {
+    @Environment(AppStore.self) private var store
+    let signup: Bool
+    var body: some View {
+        Text(message).font(.custom("DMSans-9ptRegular", size: 13, relativeTo: .footnote))
+            .foregroundStyle(store.palette.muted).tint(store.palette.text)
+            .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("auth-consent")
+    }
+    private var message: AttributedString {
+        func link(_ title: String, _ url: URL?) -> String {
+            guard let url else { return title }
+            return "[\(title)](\(url.absoluteString))"
+        }
+        let terms = link(store.text("利用規約", "Terms of Service"), SiteLinks.terms)
+        let privacy = link(store.text("プライバシーポリシー", "Privacy Policy"), SiteLinks.privacy)
+        let sentence =
+            store.language == "ja"
+            ? "\(terms)と\(privacy)に同意のうえ、\(signup ? "アカウントを作成します" : "続けます")。"
+            : "By \(signup ? "creating an account" : "continuing"), you agree to the \(terms) and \(privacy)."
+        return (try? AttributedString(markdown: sentence)) ?? AttributedString(sentence)
+    }
+}
+
 struct LegalLinksView: View {
     @Environment(AppStore.self) private var store
     var showSupport = false
